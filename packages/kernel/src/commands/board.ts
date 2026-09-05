@@ -4,6 +4,7 @@ import { DEFAULT_STACKUP } from '../model/board.js';
 import { findFootprint, BUILTIN_FOOTPRINTS } from '../library/footprints.js';
 import { registeredFootprint } from '../library/registry.js';
 import { ensureFootprintDef } from '../board/footprintResolve.js';
+import { boardBounds, footprintBody, allPads } from '../board/geometry.js';
 import type { Vec } from '../geometry.js';
 import { newId } from '../ids.js';
 import { command, type Command } from './types.js';
@@ -103,8 +104,62 @@ export function applyRoutes(traces: Omit<Trace, 'id'>[], vias: Omit<Via, 'id'>[]
   })));
 }
 
-export function setOutlineRect(w: number, h: number): Command {
-  return command('板框', (proj) => updateBoard(proj, (b) => ({ ...b, outline: [{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: h }, { x: 0, y: h }] })));
+/** 矩形板框：保持当前板框左上角不动（元件不会因此跑到板外）；可指定 origin。 */
+export function setOutlineRect(w: number, h: number, origin?: Vec): Command {
+  return command('板框尺寸', (proj) => updateBoard(proj, (b) => {
+    const o = origin ?? (b.outline.length >= 3 ? boardBounds(b) : { x: 0, y: 0 });
+    return { ...b, outline: [{ x: o.x, y: o.y }, { x: o.x + w, y: o.y }, { x: o.x + w, y: o.y + h }, { x: o.x, y: o.y + h }] };
+  }));
+}
+
+const shift = (p: Vec, dx: number, dy: number): Vec => ({ x: Math.round((p.x + dx) * 1000) / 1000, y: Math.round((p.y + dy) * 1000) / 1000 });
+
+/** 平移板框（不动元件）。 */
+export function translateOutline(dx: number, dy: number): Command {
+  return command('移动板框', (proj) => updateBoard(proj, (b) => ({ ...b, outline: b.outline.map((p) => shift(p, dx, dy)) })));
+}
+
+/** 整板平移：板框 + 元件 + 走线 + 过孔 + 铺铜 + 文字一起动。 */
+export function translateBoard(dx: number, dy: number): Command {
+  return command('移动整板', (proj) => updateBoard(proj, (b) => ({
+    ...b,
+    outline: b.outline.map((p) => shift(p, dx, dy)),
+    footprints: b.footprints.map((f) => ({ ...f, ...shift(f, dx, dy) })),
+    traces: b.traces.map((t) => ({ ...t, points: t.points.map((p) => shift(p, dx, dy)) })),
+    vias: b.vias.map((v) => ({ ...v, ...shift(v, dx, dy) })),
+    zones: b.zones.map((z) => ({ ...z, polygon: z.polygon.map((p) => shift(p, dx, dy)) })),
+    texts: b.texts.map((t) => ({ ...t, ...shift(t, dx, dy) }))
+  })));
+}
+
+/** 板上内容（元件本体与焊盘、走线、过孔、铺铜、文字）的外接框；没有内容返回 null。 */
+export function contentBounds(b: Board): { x: number; y: number; w: number; h: number } | null {
+  const xs: number[] = [], ys: number[] = [];
+  const add = (x: number, y: number) => { xs.push(x); ys.push(y); };
+  for (const f of b.footprints) { const r = footprintBody(f); add(r.x, r.y); add(r.x + r.w, r.y + r.h); }
+  for (const p of allPads(b)) { add(p.rect.x, p.rect.y); add(p.rect.x + p.rect.w, p.rect.y + p.rect.h); }
+  for (const t of b.traces) for (const p of t.points) { add(p.x - t.width / 2, p.y - t.width / 2); add(p.x + t.width / 2, p.y + t.width / 2); }
+  for (const v of b.vias) { add(v.x - v.size / 2, v.y - v.size / 2); add(v.x + v.size / 2, v.y + v.size / 2); }
+  for (const z of b.zones) for (const p of z.polygon) add(p.x, p.y);
+  for (const t of b.texts) { add(t.x - t.text.length * 0.4 * t.size, t.y - t.size); add(t.x + t.text.length * 0.4 * t.size, t.y); }
+  if (!xs.length) return null;
+  const x = Math.min(...xs), y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}
+
+/** 板框自动包住现有内容（四周留 margin，取整到 0.5mm），不移动元件。 */
+export function fitOutlineToContent(margin = 2): Command {
+  return command('板框适配内容', (proj) => updateBoard(proj, (b) => {
+    const c = contentBounds(b); if (!c) return b;
+    const r = (v: number) => Math.round(v * 2) / 2;
+    const x = r(c.x - margin), y = r(c.y - margin), w = Math.max(5, r(c.w + 2 * margin)), h = Math.max(5, r(c.h + 2 * margin));
+    return { ...b, outline: [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }] };
+  }));
+}
+
+/** 把整板（含内容）平移到板框左上角位于 (0,0)。 */
+export function normalizeBoardOrigin(): Command {
+  return command('板框归零', (proj) => { const bb = boardBounds(proj.board); return bb.x === 0 && bb.y === 0 ? proj : translateBoard(-bb.x, -bb.y).apply(proj); });
 }
 
 export function setCopperCount(count: 2 | 4): Command {

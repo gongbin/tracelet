@@ -37,7 +37,7 @@ const PCB_TOOLS: ToolDef[] = [
   { id: 'via', name: '过孔', key: '', d: I.via, desc: '放置过孔，尺寸跟随网络类。' },
   { id: 'zone', name: '铺铜', key: 'Z', d: I.zone, desc: '画一个区域并选网络（默认 GND），自动填充铜。' },
   { id: 'place', name: '放置', key: 'A', d: I.comp, desc: '在 PCB 上直接放置新元件，同时同步回原理图。' },
-  { id: 'edge', name: '板框', key: 'E', d: I.edge, desc: '拖动顶点调整板框，或点击画新的多边形板框（双击闭合）。' },
+  { id: 'edge', name: '板框', key: 'E', d: I.edge, desc: '改长宽、拖动整板（可连同元件）、板框自动包住内容；拖顶点微调，点板外画新的多边形板框（双击闭合）。' },
   { id: 'text', name: '文字', key: 'T', d: I.text, desc: '在丝印层写文字，如版本号、标识。' },
   { id: 'measure', name: '测量', key: 'M', d: I.ruler, desc: '点两点显示距离与 ΔX / ΔY。' },
   { id: 'flip', name: '翻面', key: 'F', d: I.flip, desc: '把选中元件放到板子另一面。', sep: true },

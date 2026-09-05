@@ -173,3 +173,26 @@ describe('图纸尺寸与命令', () => {
     expect(exportFabFiles(ed.project).find((f) => f.kind === 'readme')!.content).toContain('ENIG');
   });
 });
+
+describe('板框尺寸 / 移动 / 适配', () => {
+  it('setOutlineRect 保持左上角；translateBoard 连同内容；fitOutlineToContent 包住内容；归零', () => {
+    const ed = new ProjectEditor(createDemoProject());
+    const original = ed.project.board;
+    ed.dispatch(pcb.translateBoard(10, 5));
+    const b1 = ed.project.board; const u1 = b1.footprints.find((f) => f.ref === 'U1')!;
+    expect(b1.outline[0]).toEqual({ x: 10, y: 5 }); expect(u1.x).toBe(26); expect(b1.traces[0].points[0].x).toBeCloseTo(original.traces[0].points[0].x + 10, 3);
+    ed.dispatch(pcb.setOutlineRect(60, 40));
+    expect(ed.project.board.outline).toEqual([{ x: 10, y: 5 }, { x: 70, y: 5 }, { x: 70, y: 45 }, { x: 10, y: 45 }]);
+    expect(ed.project.board.footprints.find((f) => f.ref === 'U1')!.x).toBe(26);
+    ed.dispatch(pcb.translateOutline(-10, -5));
+    expect(ed.project.board.outline[0]).toEqual({ x: 0, y: 0 }); expect(ed.project.board.footprints.find((f) => f.ref === 'U1')!.x).toBe(26);
+    ed.dispatch(pcb.fitOutlineToContent(2));
+    const c = pcb.contentBounds(ed.project.board)!; const o = ed.project.board.outline;
+    expect(o[0].x).toBeLessThanOrEqual(c.x - 2 + 0.5); expect(o[2].x).toBeGreaterThanOrEqual(c.x + c.w + 2 - 0.5); expect(o[2].y).toBeGreaterThanOrEqual(c.y + c.h + 2 - 0.5);
+    expect(runDrc(ed.project.board, ruleSetOf(ed.project)).items.filter((i) => i.rule === 'outside-board')).toEqual([]);
+    ed.dispatch(pcb.normalizeBoardOrigin());
+    expect(ed.project.board.outline[0]).toEqual({ x: 0, y: 0 });
+    ed.undo(); ed.undo(); ed.undo(); ed.undo(); ed.undo();
+    expect(ed.project.board).toEqual(original);
+  });
+});

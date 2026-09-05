@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from 'react';
-import { pcb, LAYER_COLORS, copperLayers, footprintPads, footprintBody, boardBounds, netClassFor, snapTo, PCB_GRID, dist, segRectDist, segSegDist, pointSegDist, rectsOverlap, alignFootprints, autoroute, type Vec, type Rect, type CopperLayer, type Layer, type WorldPad, type AlignMode } from '@tracelet/kernel';
+import { pcb, LAYER_COLORS, copperLayers, footprintPads, footprintBody, boardBounds, netClassFor, snapTo, PCB_GRID, dist, segRectDist, segSegDist, pointSegDist, pointInPolygon, rectsOverlap, alignFootprints, autoroute, type Vec, type Rect, type CopperLayer, type Layer, type WorldPad, type AlignMode } from '@tracelet/kernel';
 import { useApp, useEditor, useProject } from '../../store/app.js';
 import { getAnalysis } from '../../store/analysis.js';
 import { useViewport, gridStep } from '../../hooks/useViewport.js';
@@ -34,6 +34,8 @@ type Drag =
   | { kind: 'tracePt'; id: string; index: number }
   | { kind: 'traceSeg'; id: string; index: number; start: Vec; orig: Vec[] }
   | { kind: 'outlinePt'; index: number }
+  | { kind: 'outlineMaybe'; raw: Vec; p: Vec; client: { x: number; y: number } }
+  | { kind: 'outlineMove'; start: Vec; orig: Vec[]; applied: Vec; withContents: boolean }
   | { kind: 'marquee'; start: Vec; add: boolean };
 
 const ALIGN: [AlignMode, string][] = [['left', '左对齐'], ['hcenter', '水平居中'], ['right', '右对齐'], ['top', '上对齐'], ['vcenter', '垂直居中'], ['bottom', '下对齐'], ['hdist', '水平等距'], ['vdist', '垂直等距']];
@@ -52,6 +54,7 @@ export function PcbCanvas() {
   const lastClick = useRef<{ t: number; x: number; y: number }>({ t: 0, x: 0, y: 0 });
   const [marquee, setMarquee] = useState<{ a: Vec; b: Vec } | null>(null);
   const [previewBad, setPreviewBad] = useState(false);
+  const [moveWithContents, setMoveWithContents] = useState(true);
   PCB_SNAP = app.pcbGrid;
 
   useEffect(() => {
@@ -147,7 +150,10 @@ export function PcbCanvas() {
     if (tool === 'edge') {
       const d = app.outlineDraft ?? [];
       if (dbl && d.length >= 3) { editor.dispatch(pcb.setOutline(d)); app.patch({ outlineDraft: null }); app.toast('板框已更新', 'success'); return; }
-      if (!dbl) app.patch({ outlineDraft: [...d, p] });
+      if (dbl) return;
+      // 在板内按下：拖动 = 移动板框（可连同内容），单击 = 开始画新板框
+      if (!d.length && board.outline.length >= 3 && pointInPolygon(raw, board.outline)) { drag.current = { kind: 'outlineMaybe', raw, p, client: { x: e.clientX, y: e.clientY } }; (e.currentTarget as Element).setPointerCapture(e.pointerId); return; }
+      app.patch({ outlineDraft: [...d, p] });
       return;
     }
     if (tool === 'measure') { const m = app.measure ?? []; app.patch({ measure: m.length >= 2 ? [p] : [...m, p] }); return; }
@@ -197,6 +203,18 @@ export function PcbCanvas() {
       editor.dispatch(pcb.setTracePoints(d.id, pts));
     }
     else if (d.kind === 'outlinePt') { const pts = [...editor.project.board.outline]; pts[d.index] = p; editor.dispatch(pcb.setOutline(pts)); }
+    else if (d.kind === 'outlineMaybe') {
+      if (Math.hypot(e.clientX - d.client.x, e.clientY - d.client.y) < 4) return;
+      editor.begin(moveWithContents ? '移动整板' : '移动板框');
+      drag.current = { kind: 'outlineMove', start: d.raw, orig: board.outline, applied: { x: 0, y: 0 }, withContents: moveWithContents };
+    }
+    else if (d.kind === 'outlineMove') {
+      const dx = sg(raw.x - d.start.x), dy = sg(raw.y - d.start.y);
+      if (dx === d.applied.x && dy === d.applied.y) return;
+      if (d.withContents) editor.dispatch(pcb.translateBoard(dx - d.applied.x, dy - d.applied.y));
+      else editor.dispatch(pcb.setOutline(d.orig.map((q) => ({ x: q.x + dx, y: q.y + dy }))));
+      d.applied = { x: dx, y: dy };
+    }
   };
 
   const onUp = (e: RPE<SVGSVGElement>) => {
@@ -212,8 +230,12 @@ export function PcbCanvas() {
       selectIn({ x: Math.min(d.start.x, end.x), y: Math.min(d.start.y, end.y), w, h }, d.add, end.x >= d.start.x);
       return;
     }
+    if (d.kind === 'outlineMaybe') { app.patch({ outlineDraft: [d.p] }); return; } // 没拖动：当作开始画新板框
+    if (d.kind === 'outlineMove') { editor.commit(); if (d.withContents) app.toast('已移动整板（板框 + 内容），可 Undo'); return; }
     editor.commit();
   };
+  /** 板框尺寸输入（保持左上角不动）。 */
+  const resizeBoard = (w: number, h: number) => { if (w >= 5 && h >= 5 && w <= 1000 && h <= 1000 && (Math.abs(w - bb.w) > 1e-6 || Math.abs(h - bb.h) > 1e-6)) editor.dispatch(pcb.setOutlineRect(w, h)); };
 
   const begin = (label: string, dr: Drag, e: RPE<SVGElement>) => {
     e.stopPropagation();
@@ -517,7 +539,17 @@ export function PcbCanvas() {
         </div>
       )}
       {tool === 'edge' && !app.routing && (
-        <div className="banner"><span className="dim">板框：</span>{app.outlineDraft?.length ? `已 ${app.outlineDraft.length} 点 · 双击闭合 · Esc 取消` : '拖动顶点调整当前板框，或点击开始画新板框（双击闭合）'}</div>
+        <div className="banner" style={{ gap: 10, flexWrap: 'wrap', width: 'max-content', maxWidth: 'calc(100% - 24px)' }} onPointerDown={(e) => e.stopPropagation()}>
+          <span className="dim">板框</span>
+          <span className="row mono" style={{ gap: 4 }}>
+            <input className="input mono" key={`w${bb.w}`} style={{ width: 64, height: 22 }} defaultValue={fmt(bb.w)} title="板宽 mm（左上角不动）" onBlur={(e) => resizeBoard(Number(e.target.value), bb.h)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />×
+            <input className="input mono" key={`h${bb.h}`} style={{ width: 64, height: 22 }} defaultValue={fmt(bb.h)} title="板高 mm（左上角不动）" onBlur={(e) => resizeBoard(bb.w, Number(e.target.value))} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} /> mm
+          </span>
+          <button className="btn sm" title="板框自动包住所有元件 / 走线（四周留 2mm）" onClick={() => { editor.dispatch(pcb.fitOutlineToContent(2)); app.toast('板框已包住全部内容（留 2mm），可 Undo', 'success'); }}>适配内容</button>
+          <button className="btn sm" title="把整板（含内容）移到原点 (0,0)" onClick={() => editor.dispatch(pcb.normalizeBoardOrigin())}>归零</button>
+          <span className={`chip${moveWithContents ? ' on' : ''}`} title="拖动板框时元件、走线、铺铜一起移动" onClick={() => setMoveWithContents(!moveWithContents)}>{moveWithContents ? '✓ 连同内容移动' : '仅移动板框'}</span>
+          <span className="dim">{app.outlineDraft?.length ? `新板框已 ${app.outlineDraft.length} 点 · 双击闭合 · Esc 取消` : '拖板内 = 移动 · 拖顶点 = 调整 · 点板外 = 画新板框'}</span>
+        </div>
       )}
       {ar.status === 'running' && (
         <div className="banner" style={{ width: 'max-content', maxWidth: 'calc(100% - 24px)', flexWrap: 'nowrap', gap: 8 }}><span className="spinner" /><span>自动布线中 · {ar.copperCount ?? board.copperCount} 层板</span><span className="mono" style={{ flex: '0 0 auto', width: '9ch', fontVariantNumeric: 'tabular-nums' }}>{ar.progress?.done ?? 0}/{ar.progress?.total ?? analysis.ratsnest.unrouted}</span><span className="dim" title={ar.progress?.net || '准备中'} style={{ flex: '0 1 auto', width: '12ch', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ar.progress?.net || '准备中'}</span>
@@ -548,7 +580,7 @@ export function PcbCanvas() {
         </div>
       )}
       <Hint space="pcb" />
-      <div className="float" style={{ right: 12, top: 12 }}><span className="dim">板</span><span>{fmt(bb.w)}×{fmt(bb.h)} mm</span></div>
+      <div className="float" style={{ right: 12, top: 12, cursor: 'pointer' }} title="点击编辑板框尺寸 / 位置" onClick={() => app.setPcbTool('edge')}><span className="dim">板</span><span>{fmt(bb.w)}×{fmt(bb.h)} mm</span><span className="dim">✎</span></div>
     </div>
   );
 }
