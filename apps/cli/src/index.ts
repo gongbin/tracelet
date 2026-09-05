@@ -108,6 +108,9 @@ imp.command('kicad <files...>').description('导入 KiCad 工程（.kicad_sch �
   console.log(`已导入 ${schs.length} 页原理图（${comps} 元件）${pcbFile ? `、PCB（${r.project.board.footprints.length} 封装 / ${r.project.board.traces.length} 走线）` : ''} → ${out}`);
 });
 
-program.command('serve').description('以 MCP server 模式启动').option('--mcp').action(() => { console.error('MCP server 在 P3 里程碑接入；内核命令已就绪，届时逐一映射为工具。'); process.exitCode = 2; });
+program.command('serve').description('以 MCP server（stdio）模式启动，供 Claude Code / Claude Desktop 调用').option('--mcp', 'MCP stdio 模式').option('-f, --file <file>', '启动时打开的项目').action(async (o) => {
+  const { serveMcp } = await import('./mcp.js');
+  await serveMcp(o.file);
+});
 
 program.parse();

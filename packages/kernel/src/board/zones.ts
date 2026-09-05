@@ -4,7 +4,7 @@ import type { RuleSet } from '../model/project.js';
 import { RULE_SETS } from '../model/project.js';
 import { pointInPolygon, type Vec } from '../geometry.js';
 import { allPads, netClassFor } from './geometry.js';
-import { circlePoly, stadiumPoly, expandedRectPoly, type MultiPolygon, type Ring } from './shapes.js';
+import { circlePoly, stadiumPoly, expandedRectPoly, rectPoly, type MultiPolygon, type Ring } from './shapes.js';
 
 type PcRing = [number, number][];
 type PcMulti = PcRing[][];
@@ -20,7 +20,7 @@ export interface ZoneFill { zone: Zone; polygons: MultiPolygon }
  */
 export function fillZone(board: Board, zone: Zone, rules: RuleSet): MultiPolygon {
   const nc = netClassFor(board, zone.net);
-  const clearance = Math.max(rules.minClearance, nc?.clearance ?? 0.2);
+  const clearance = zone.clearance && zone.clearance > 0 ? Math.max(rules.minClearance, zone.clearance) : Math.max(rules.minClearance, nc?.clearance ?? 0.2);
   const pads = allPads(board);
 
   const zonePoly: PcMulti = [[closed(toPc(zone.polygon))]];
@@ -37,7 +37,20 @@ export function fillZone(board: Board, zone: Zone, rules: RuleSet): MultiPolygon
   const obstacles: PcMulti = [];
   for (const p of pads) {
     if (!p.layers.includes(zone.layer)) continue;
-    if (p.net && p.net === zone.net) continue;
+    if (p.net && p.net === zone.net) {
+      // 热焊盘：焊盘外围留 gap 环，只保留 4 条辐条连接
+      if ((zone.thermal ?? 'relief') === 'relief') {
+        const gap = zone.thermalGap ?? 0.3, sw = zone.spokeWidth ?? 0.4;
+        const ring: PcMulti = [[closed(toPc(expandedRectPoly(p.rect, gap)))]];
+        const L = Math.max(p.rect.w, p.rect.h) / 2 + gap + 0.05;
+        const spokes: PcMulti = [
+          [closed(toPc(rectPoly({ x: p.center.x - L, y: p.center.y - sw / 2, w: 2 * L, h: sw })))],
+          [closed(toPc(rectPoly({ x: p.center.x - sw / 2, y: p.center.y - L, w: sw, h: 2 * L })))]
+        ];
+        try { const relief = pc.difference(ring, ...spokes); for (const poly of relief) obstacles.push(poly); } catch { /* 忽略退化情况 */ }
+      }
+      continue;
+    }
     obstacles.push([closed(toPc(expandedRectPoly(p.rect, clearance)))]);
   }
   for (const t of board.traces) {

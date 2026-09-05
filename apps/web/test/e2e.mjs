@@ -89,8 +89,19 @@ await page.waitForTimeout(300);
 await page.screenshot({ path: `${outDir}/08-pcb-drc.png` });
 
 await page.click('.ws-tab:has-text("3D")');
-await page.waitForTimeout(300);
+await page.waitForTimeout(1200);
 await page.screenshot({ path: `${outDir}/09-3d.png` });
+// 路由：地址栏应为 /p/<id>/3d，刷新后仍在 3D
+const url3d = new URL(page.url());
+if (!/^\/p\/[^/]+\/3d$/.test(url3d.pathname)) errors.push('3D 路由不正确: ' + url3d.pathname);
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(1200);
+if (!(await page.$('.ws-tab.on:has-text("3D")'))) errors.push('刷新后没有停留在 3D 页');
+await page.screenshot({ path: `${outDir}/09b-3d-after-reload.png` });
+// 直接访问 PCB 路由并选中铺铜看属性
+await page.goto(url3d.origin + url3d.pathname.replace(/3d$/, 'pcb'), { waitUntil: 'networkidle' });
+await page.waitForTimeout(800);
+if (!(await page.$('.ws-tab.on:has-text("PCB")'))) errors.push('直接打开 /pcb 路由失败');
 await page.click('.ws-tab:has-text("制造")');
 await page.screenshot({ path: `${outDir}/10-fab.png` });
 await page.click('button:has-text("预览 Gerber")');
@@ -118,10 +129,9 @@ await page.keyboard.press('Escape');
 // 浅色主题 + 英文
 await page.evaluate(() => { localStorage.setItem('tracelet:theme', 'light'); localStorage.setItem('tracelet:locale', 'en'); });
 await page.reload({ waitUntil: 'networkidle' });
-await page.waitForSelector('text=Projects');
-await page.screenshot({ path: `${outDir}/13a-light-en-home.png` });
-await page.click('text=ESP32 传感器板');
-await page.waitForSelector('text=Schematic');
+// 有了 URL 路由，刷新后仍在项目内（英文界面）
+await page.waitForSelector('.ws-tab:has-text("Schematic")');
+await page.click('.ws-tab:has-text("Schematic")');
 await page.waitForTimeout(400);
 await page.screenshot({ path: `${outDir}/13-light-en-schematic.png` });
 await page.click('.ws-tab:has-text("PCB")');

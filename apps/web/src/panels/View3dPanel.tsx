@@ -4,7 +4,7 @@ import { useApp } from '../store/app.js';
 export function View3dPanel() {
   const s = use3d();
   const app = useApp();
-  const toggles: [keyof typeof s, string][] = [['components', '元件 3D'], ['silk', '丝印'], ['mask', '阻焊'], ['copper', '铜层透视']];
+  const toggles: [keyof typeof s, string][] = [['components', '元件 3D'], ['silk', '丝印'], ['mask', '阻焊'], ['copper', '铜层透视'], ['autoRotate', '自动旋转']];
   return (
     <div className="panel-pad">
       <div className="kicker">显示</div>

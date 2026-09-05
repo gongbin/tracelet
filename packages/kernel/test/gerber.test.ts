@@ -96,3 +96,26 @@ describe('Gerber / Excellon', () => {
     expect(z[0]).toBe(0x50); expect(z[1]).toBe(0x4b);
   });
 });
+
+describe('热焊盘', () => {
+  it('同网络焊盘四周留缝、中心经辐条连通；实心模式下无缝', async () => {
+    const { createDemoProject, ProjectEditor, pcb, zoneFills, ruleSetOf, footprintPads, pointInPolygon, computeRatsnest } = await import('../src/index.js');
+    const ed = new ProjectEditor(createDemoProject());
+    // 顶层 GND 铺铜覆盖 U1.8（GND）
+    ed.dispatch(pcb.addZone({ layer: 'F.Cu', net: 'GND', polygon: [{ x: 20, y: 14 }, { x: 34, y: 14 }, { x: 34, y: 24 }, { x: 20, y: 24 }] }));
+    const rules = ruleSetOf(ed.project);
+    const u1 = ed.project.board.footprints.find((f) => f.ref === 'U1')!;
+    const pad8 = footprintPads(u1, ed.project.board).find((p) => p.number === '8')!;
+    const zone = ed.project.board.zones.find((z) => z.layer === 'F.Cu')!;
+    const inFill = () => { const f = zoneFills(ed.project.board, rules).find((x) => x.zone.id === zone.id)!; return (p: { x: number; y: number }) => f.polygons.some((poly) => pointInPolygon(p, poly[0]) && !poly.slice(1).some((h) => pointInPolygon(p, h))); };
+    let test = inFill();
+    const diag = { x: pad8.rect.x + pad8.rect.w + 0.15, y: pad8.rect.y + pad8.rect.h + 0.15 };
+    expect(test(pad8.center)).toBe(true);        // 辐条经过中心
+    expect(test(diag)).toBe(false);              // 对角处是间隙
+    expect(test({ x: pad8.center.x + pad8.rect.w / 2 + 0.15, y: pad8.center.y })).toBe(true); // 水平辐条
+    void computeRatsnest;
+    ed.dispatch(pcb.setZoneProps(zone.id, { thermal: 'solid' }));
+    test = inFill();
+    expect(test(diag)).toBe(true);
+  });
+});

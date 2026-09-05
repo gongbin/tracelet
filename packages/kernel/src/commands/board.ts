@@ -40,8 +40,12 @@ export function deleteVias(ids: string[]): Command {
   return command('删除过孔', (proj) => updateBoard(proj, (b) => ({ ...b, vias: b.vias.filter((v) => !set.has(v.id)) })));
 }
 
-export function addZone(z: Omit<Zone, 'id'>): Command {
-  return command('铺铜', (proj) => updateBoard(proj, (b) => ({ ...b, zones: [...b.zones, { id: newId('z'), ...z }] })));
+export function addZone(z: Omit<Zone, 'id' | 'thermal' | 'thermalGap' | 'spokeWidth' | 'clearance'> & Partial<Pick<Zone, 'thermal' | 'thermalGap' | 'spokeWidth' | 'clearance'>>): Command {
+  return command('铺铜', (proj) => updateBoard(proj, (b) => ({ ...b, zones: [...b.zones, { thermal: 'relief', thermalGap: 0.3, spokeWidth: 0.4, clearance: 0, ...z, id: newId('z') }] })));
+}
+
+export function setZoneProps(id: string, props: Partial<Pick<Zone, 'net' | 'layer' | 'thermal' | 'thermalGap' | 'spokeWidth' | 'clearance'>>): Command {
+  return command('修改铺铜', (proj) => updateBoard(proj, (b) => ({ ...b, zones: b.zones.map((z) => (z.id === id ? { ...z, ...props } : z)) })));
 }
 
 export function deleteZones(ids: string[]): Command {

@@ -83,7 +83,18 @@ export function PropertiesPanel() {
     if (zone) return (
       <div className="panel-pad">
         <div className="row"><span style={{ fontWeight: 500 }}>铺铜</span><span className="ml-auto muted" style={{ cursor: 'pointer' }} onClick={() => { editor.dispatch(pcb.deleteZones([zone.id])); app.patch({ pcbSelection: [] }); }}>删除</span></div>
-        <div className="kv"><span className="k">网络</span><span className="field mono">{zone.net || '—'}</span><span className="k">层</span><span className="field mono">{zone.layer}</span><span className="k">顶点</span><span className="field mono">{zone.polygon.length}</span></div>
+        <div className="kv">
+          <span className="k">网络</span><select className="input mono" value={zone.net} onChange={(e) => editor.dispatch(pcb.setZoneProps(zone.id, { net: e.target.value }))}><option value="">（无）</option>{a.netlist.nets.map((n) => <option key={n.name} value={n.name}>{n.name}</option>)}</select>
+          <span className="k">层</span><select className="input mono" value={zone.layer} onChange={(e) => editor.dispatch(pcb.setZoneProps(zone.id, { layer: e.target.value as typeof zone.layer }))}>{copperLayers(project.board.copperCount).map((l) => <option key={l} value={l}>{l}</option>)}</select>
+          <span className="k">焊盘连接</span><div className="seg sm"><span className={`seg-opt${(zone.thermal ?? 'relief') === 'relief' ? ' on' : ''}`} onClick={() => editor.dispatch(pcb.setZoneProps(zone.id, { thermal: 'relief' }))}>热焊盘</span><span className={`seg-opt${zone.thermal === 'solid' ? ' on' : ''}`} onClick={() => editor.dispatch(pcb.setZoneProps(zone.id, { thermal: 'solid' }))}>实心</span></div>
+          {(zone.thermal ?? 'relief') === 'relief' && <>
+            <span className="k">热焊盘间隙</span><ValueInput value={String(zone.thermalGap ?? 0.3)} onCommit={(v) => { const n = Number(v); if (n > 0) editor.dispatch(pcb.setZoneProps(zone.id, { thermalGap: n })); }} />
+            <span className="k">辐条宽度</span><ValueInput value={String(zone.spokeWidth ?? 0.4)} onCommit={(v) => { const n = Number(v); if (n > 0) editor.dispatch(pcb.setZoneProps(zone.id, { spokeWidth: n })); }} />
+          </>}
+          <span className="k">间距 (mm)</span><ValueInput value={zone.clearance ? String(zone.clearance) : ''} onCommit={(v) => editor.dispatch(pcb.setZoneProps(zone.id, { clearance: Number(v) || 0 }))} />
+          <span className="k">顶点</span><span className="field mono">{zone.polygon.length}</span>
+        </div>
+        <div className="dim xs">间距留空 = 使用网络类 / 板厂规则；热焊盘让焊盘更容易焊接，大电流路径可改实心。</div>
       </div>
     );
     const bb = project.board;

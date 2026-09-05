@@ -81,7 +81,13 @@ export const ZoneSchema = z.object({
   id: z.string(),
   layer: CopperLayerSchema,
   net: z.string().default(''),
-  polygon: z.array(VecSchema).min(3)
+  polygon: z.array(VecSchema).min(3),
+  /** 同网络焊盘连接方式：热焊盘（辐条）或实心 */
+  thermal: z.enum(['relief', 'solid']).default('relief'),
+  thermalGap: z.number().default(0.3),
+  spokeWidth: z.number().default(0.4),
+  /** 与异网络铜的间距（0 = 用规则集 / 网络类） */
+  clearance: z.number().default(0)
 });
 export type Zone = z.infer<typeof ZoneSchema>;
 
