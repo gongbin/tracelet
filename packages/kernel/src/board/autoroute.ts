@@ -581,6 +581,8 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     return simplify(out);
   };
   /** 推挤：候选路径 cand 与其他新走线差一点点间距时，把对方线段垂直外移，校验通过则同时提交双方。 */
+  const shoveStats: Record<string, number> = {};
+  const shoveFail = (why: string) => { shoveStats[why] = (shoveStats[why] ?? 0) + 1; return false; };
   const tryShove = (nr: NetRoutes, cand: Route): boolean => {
     const myW = (t: TraceOut) => t.width / 2;
     interface Conf { x: NetRoutes; r: Route; ti: number; si: number; shift: Vec }
@@ -594,22 +596,28 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
           let worst = 0, away: Vec | null = null;
           for (const tr of cand.traces) { if (tr.layer !== ft.layer) continue; for (let k = 1; k < tr.points.length; k++) { const a = tr.points[k - 1], b = tr.points[k]; const need = myW(tr) + ft.width / 2 + gapBetween(nr.net, x.net); const d0 = segSegDist(a, b, c, d); if (d0 < need - 1e-6 && need - d0 > worst) { worst = need - d0; const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; const fm = { x: (c.x + d.x) / 2, y: (c.y + d.y) / 2 }; const len = Math.hypot(d.x - c.x, d.y - c.y) || 1; let n = { x: -(d.y - c.y) / len, y: (d.x - c.x) / len }; if (n.x * (fm.x - mid.x) + n.y * (fm.y - mid.y) < 0) n = { x: -n.x, y: -n.y }; away = n; } } }
           for (const v of cand.vias) { const need = v.size / 2 + ft.width / 2 + gapBetween(nr.net, x.net); const d0 = pointSegDist(v, c, d); if (d0 < need - 1e-6 && need - d0 > worst) { worst = need - d0; const fm = { x: (c.x + d.x) / 2, y: (c.y + d.y) / 2 }; const len = Math.hypot(d.x - c.x, d.y - c.y) || 1; let n = { x: -(d.y - c.y) / len, y: (d.x - c.x) / len }; if (n.x * (fm.x - v.x) + n.y * (fm.y - v.y) < 0) n = { x: -n.x, y: -n.y }; away = n; } }
-          if (worst > 0 && away) { if (worst > 0.35 || si === 1 || si === ft.points.length - 1) return false; confs.push({ x, r, ti, si, shift: { x: away.x * (worst + 0.03), y: away.y * (worst + 0.03) } }); }
+          if (worst > 0 && away) { if (worst > 0.6) return shoveFail('deficit>0.6'); confs.push({ x, r, ti, si, shift: { x: away.x * (worst + 0.03), y: away.y * (worst + 0.03) } }); }
         }
         // 对方过孔挡路：不推
-        for (const v of r.vias) for (const tr of cand.traces) for (let k = 1; k < tr.points.length; k++) if (pointSegDist(v, tr.points[k - 1], tr.points[k]) < myW(tr) + v.size / 2 + gapBetween(nr.net, x.net) - 1e-6) return false;
-        for (const v of r.vias) for (const w of cand.vias) if (Math.hypot(v.x - w.x, v.y - w.y) < (v.size + w.size) / 2 + gapBetween(nr.net, x.net) - 1e-6) return false;
+        for (const v of r.vias) for (const tr of cand.traces) for (let k = 1; k < tr.points.length; k++) if (pointSegDist(v, tr.points[k - 1], tr.points[k]) < myW(tr) + v.size / 2 + gapBetween(nr.net, x.net) - 1e-6) return shoveFail('their-via');
+        for (const v of r.vias) for (const w of cand.vias) if (Math.hypot(v.x - w.x, v.y - w.y) < (v.size + w.size) / 2 + gapBetween(nr.net, x.net) - 1e-6) return shoveFail('via-via');
       }
     }
-    if (!confs.length || confs.length > 6) return false;
+    if (!confs.length) return shoveFail('no-conf'); if (confs.length > 6) return shoveFail('too-many');
     // 应用平移（同一条线上多段各自平移），角度归一
     const touched = new Map<Route, Map<number, TraceOut>>();
     const originals = new Map<Route, TraceOut[]>();
     for (const cf of confs) {
       if (!originals.has(cf.r)) originals.set(cf.r, cf.r.traces);
       const cur = touched.get(cf.r)?.get(cf.ti) ?? { ...cf.r.traces[cf.ti], points: cf.r.traces[cf.ti].points.map((p) => ({ ...p })) };
-      cur.points[cf.si - 1] = { x: cur.points[cf.si - 1].x + cf.shift.x, y: cur.points[cf.si - 1].y + cf.shift.y };
-      cur.points[cf.si] = { x: cur.points[cf.si].x + cf.shift.x, y: cur.points[cf.si].y + cf.shift.y };
+      if (touched.get(cf.r)?.has(cf.ti)) { if (!(cf.si < cur.points.length)) continue; }
+      const n = cur.points.length;
+      const mv = (p: Vec) => ({ x: p.x + cf.shift.x, y: p.y + cf.shift.y });
+      // 端点段（接焊盘 / 过孔）：端点不动，插入一个折点后再平移；中间段：两端一起平移
+      if (cf.si === 1 && cf.si === n - 1) cur.points = [cur.points[0], mv(cur.points[0]), mv(cur.points[1]), cur.points[1]];
+      else if (cf.si === 1) cur.points = [cur.points[0], mv(cur.points[0]), mv(cur.points[1]), ...cur.points.slice(2)];
+      else if (cf.si === n - 1) cur.points = [...cur.points.slice(0, n - 2), mv(cur.points[n - 2]), mv(cur.points[n - 1]), cur.points[n - 1]];
+      else { cur.points[cf.si - 1] = mv(cur.points[cf.si - 1]); cur.points[cf.si] = mv(cur.points[cf.si]); }
       if (!touched.has(cf.r)) touched.set(cf.r, new Map()); touched.get(cf.r)!.set(cf.ti, cur);
     }
     const affected = new Set<NetRoutes>();
@@ -623,7 +631,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       for (const [r, m] of touched) if (x.routes.includes(r)) for (const ti of m.keys()) { const tr = r.traces[ti]; for (let i = 1; i < tr.points.length && ok; i++) { if (!safeX(tr.points[i - 1], tr.points[i], tr.width / 2, [tr.layer], [], [], true)) ok = false; for (const mt of cand.traces) if (mt.layer === tr.layer) for (let k = 1; k < mt.points.length; k++) if (segSegDist(tr.points[i - 1], tr.points[i], mt.points[k - 1], mt.points[k]) < tr.width / 2 + mt.width / 2 + gapBetween(x.net, nr.net) - 1e-6) ok = false; for (const v of cand.vias) if (pointSegDist(v, tr.points[i - 1], tr.points[i]) < tr.width / 2 + v.size / 2 + gapBetween(x.net, nr.net) - 1e-6) ok = false; } }
     }
     if (ok) { const safeMe = makeSafe(nr.net, clearanceOf(nr.net)); ok = cand.traces.every((tr) => tr.points.slice(1).every((b, i) => safeMe(tr.points[i], b, tr.width / 2, [tr.layer], [], [], true))) && cand.vias.every((v) => safeMe(v, v, v.size / 2, layers, [], [], true)); }
-    if (!ok) { for (const [r, orig] of originals) r.traces = orig; for (const x of affected) markNet(x); return false; }
+    if (!ok) { for (const [r, orig] of originals) r.traces = orig; for (const x of affected) markNet(x); return shoveFail('invalid-after'); }
     unmarkNet(nr); nr.routes.push(cand); nr.failures.delete(cand.key); markNet(nr); routedLines++;
     return true;
   };
@@ -671,7 +679,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     if (!probe.route) continue; // 静态障碍就把它堵死了，拆别人也没用
     const blockers = (probe.crossed ?? []).map((n) => nets.get(n)).filter((x): x is NetRoutes => !!x && x !== nr);
     if (!blockers.length) { unmarkNet(nr); routeGroup([nr], 'strict', 0); continue; }
-    // 先试推挤：把挡路走线的线段垂直平移一点点（≤0.35mm），比拆线重布温和；成功就直接采用探测路径
+    // 先试推挤：把挡路走线的线段垂直平移一点点（≤0.6mm），比拆线重布温和；成功就直接采用探测路径
     if (tryShove(nr, probe.route)) { rounds++; opts.debug?.({ shove: line.net, t: Date.now() - t0, blockers: blockers.map((b) => b.net) }); continue; }
     if (blockers.length > 8) continue;
     rounds++;
@@ -760,6 +768,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   }
   result.routed = Math.max(0, result.total - remaining.length);
   result.rounds = rounds;
+  opts.debug?.({ shoveStats });
   result.ms = Date.now() - t0;
   if (opts.allowComponentMoves && result.routed < result.total) {
     const moves = suggestRoutingMoves(board, rules, result.failed.map((f) => f.net));
