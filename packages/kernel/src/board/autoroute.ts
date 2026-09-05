@@ -410,34 +410,46 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     const path: { x: number; y: number; l: number }[] = [];
     for (let i = found; i >= 0; i = came[i]) path.push({ l: Math.floor(i / N), y: Math.floor((i % N) / W), x: (i % N) % W });
     path.reverse();
+    const crossedSet = new Set<string>();
     if (mode === 'soft') {
-      const crossed = new Set<string>();
       for (let k = 0; k < path.length; k++) {
         const p = path[k]; const i = idx(p.x, p.y, p.l);
-        if (!dynFree(p.x, p.y, p.l) && dynNet[i]) crossed.add(nameOfNid.get(dynNet[i]) ?? '');
-        if (k > 0 && path[k - 1].l !== p.l) { const wp = toWorld(p.x, p.y); for (const layer of layers) { const o = dyn.conflictNet(wp, viaSize / 2, layer, net, clearance); if (o) crossed.add(o); } }
+        if (!dynFree(p.x, p.y, p.l) && dynNet[i]) crossedSet.add(nameOfNid.get(dynNet[i]) ?? '');
+        if (k > 0 && path[k - 1].l !== p.l) { const wp = toWorld(p.x, p.y); for (const layer of layers) { const o = dyn.conflictNet(wp, viaSize / 2, layer, net, clearance); if (o) crossedSet.add(o); } }
       }
-      crossed.delete('');
-      return { route: { key: keyOf(line), traces: [], vias: [] }, crossed: [...crossed] };
+      crossedSet.delete('');
     }
     const sourcePoint = startPoints.get(idx(path[0].x, path[0].y, path[0].l)) ?? line.a;
     const targetPoint = goalPoints.get(found) ?? line.b;
     const traces: TraceOut[] = [], vias: ViaOut[] = [];
-    let seg: Vec[] = [];
-    let curL = path[0].l;
-    const flush = () => { if (seg.length >= 2) traces.push({ layer: layers[curL], net, width, points: simplify(seg) }); seg = []; };
-    for (let k = 0; k < path.length; k++) {
-      const p = path[k];
-      if (p.l !== curL) {
-        const at = k === 1 && seg.length === 1 ? { ...sourcePoint } : k === path.length - 1 && p.x === t.x && p.y === t.y ? { ...targetPoint } : toWorld(p.x, p.y);
-        flush();
-        vias.push({ x: at.x, y: at.y, size: viaSize, drill: viaDrill, net });
-        curL = p.l; seg = [at];
-        continue;
+    const buildGeometry = (viaInPadEnd: boolean, viaInPadStart: boolean): { traces: TraceOut[]; vias: ViaOut[] } => {
+      const tr: TraceOut[] = [], vs: ViaOut[] = [];
+      let sg: Vec[] = []; let cl = path[0].l;
+      const fl = () => { if (sg.length >= 2) tr.push({ layer: layers[cl], net, width, points: simplify(sg) }); sg = []; };
+      const inPad = (p: { x: number; y: number }, pd?: WorldPad) => { if (!pd) return false; const w = toWorld(p.x, p.y); return w.x >= pd.rect.x - 1e-6 && w.x <= pd.rect.x + pd.rect.w + 1e-6 && w.y >= pd.rect.y - 1e-6 && w.y <= pd.rect.y + pd.rect.h + 1e-6; };
+      let kStart = 0, kEnd = path.length;
+      if (viaInPadStart) { for (let k = 1; k < path.length && inPad(path[k], pa); k++) if (path[k].l !== path[k - 1].l) kStart = k; }
+      if (viaInPadEnd) { for (let k = path.length - 2; k >= kStart && inPad(path[k], pb); k--) if (path[k + 1].l !== path[k].l) kEnd = k + 1; }
+      if (kStart > 0) { vs.push({ x: sourcePoint.x, y: sourcePoint.y, size: viaSize, drill: viaDrill, net }); cl = path[kStart].l; sg = [{ ...sourcePoint }]; }
+      for (let k = kStart; k < kEnd; k++) {
+        const p = path[k];
+        if (k === kStart && kStart > 0) continue;
+        if (p.l !== cl) {
+          const at = k === 1 && sg.length === 1 ? { ...sourcePoint } : k === path.length - 1 && p.x === t.x && p.y === t.y ? { ...targetPoint } : toWorld(p.x, p.y);
+          fl(); vs.push({ x: at.x, y: at.y, size: viaSize, drill: viaDrill, net }); cl = p.l; sg = [at]; continue;
+        }
+        sg.push(toWorld(p.x, p.y));
       }
-      seg.push(toWorld(p.x, p.y));
-    }
-    flush();
+      if (kEnd < path.length) { sg.push({ ...targetPoint }); fl(); vs.push({ x: targetPoint.x, y: targetPoint.y, size: viaSize, drill: viaDrill, net }); } else fl();
+      return { traces: tr, vias: vs };
+    };
+    // 候选几何：默认按路径换层；校验不过时再试“焊盘内换层 → 盘中孔”的变体（见下方 finish）
+    const geomVariants = [buildGeometry(false, false), buildGeometry(true, false), buildGeometry(false, true), buildGeometry(true, true)].filter((gv, i, arr) => arr.findIndex((o) => JSON.stringify(o) === JSON.stringify(gv)) === i);
+    ({ traces: traces.length = 0, vias: vias.length = 0 } as unknown);
+    traces.push(...geomVariants[0].traces); vias.push(...geomVariants[0].vias);
+
+    const finish = (gv: { traces: TraceOut[]; vias: ViaOut[] }): { route?: Route; reason?: string; badCells?: number[] } => {
+    const traces = gv.traces.map((t) => ({ ...t, points: [...t.points] })), vias = gv.vias.map((v) => ({ ...v }));
     const first = traces[0], last = traces[traces.length - 1];
     if (!first) { const m = bend(sourcePoint, targetPoint); traces.push({ layer: layers[path[0].l], net, width, points: m ? [{ ...sourcePoint }, m, { ...targetPoint }] : [{ ...sourcePoint }, { ...targetPoint }] }); }
     else {
@@ -493,6 +505,11 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     }
     void nr;
     return { route: { key: keyOf(line), traces: candidate, vias } };
+    };
+    let out: { route?: Route; reason?: string; badCells?: number[] } = { reason: '' };
+    for (const gv of geomVariants) { out = finish(gv); if (out.route) break; }
+    if (out.route) return { ...out, crossed: mode === 'soft' ? [...crossedSet] : undefined };
+    return out;
   };
 
   /** 把一个网络的全部飞线布完（网络内逐条，每条后重算连通性）。返回是否有失败。 */
@@ -557,6 +574,59 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       opts.onProgress?.(Math.min(done, result.total), result.total, net);
     }
   };
+  /** 折线角度归一到 0/45/90°：非 45° 倍数的段用"斜线 + 直线"折弯替代。 */
+  const normalize45 = (pts: Vec[]): Vec[] => {
+    const out: Vec[] = [pts[0]];
+    for (let i = 1; i < pts.length; i++) { const a = out[out.length - 1], b = pts[i]; const ang = Math.abs(Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI) % 45; if (Math.min(ang, 45 - ang) > 0.5) { const m = bend(a, b); if (m) out.push(m); } out.push(b); }
+    return simplify(out);
+  };
+  /** 推挤：候选路径 cand 与其他新走线差一点点间距时，把对方线段垂直外移，校验通过则同时提交双方。 */
+  const tryShove = (nr: NetRoutes, cand: Route): boolean => {
+    const myW = (t: TraceOut) => t.width / 2;
+    interface Conf { x: NetRoutes; r: Route; ti: number; si: number; shift: Vec }
+    const confs: Conf[] = [];
+    for (const x of nets.values()) {
+      if (x === nr) continue;
+      for (const r of x.routes) for (let ti = 0; ti < r.traces.length; ti++) {
+        const ft = r.traces[ti];
+        for (let si = 1; si < ft.points.length; si++) {
+          const c = ft.points[si - 1], d = ft.points[si];
+          let worst = 0, away: Vec | null = null;
+          for (const tr of cand.traces) { if (tr.layer !== ft.layer) continue; for (let k = 1; k < tr.points.length; k++) { const a = tr.points[k - 1], b = tr.points[k]; const need = myW(tr) + ft.width / 2 + gapBetween(nr.net, x.net); const d0 = segSegDist(a, b, c, d); if (d0 < need - 1e-6 && need - d0 > worst) { worst = need - d0; const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; const fm = { x: (c.x + d.x) / 2, y: (c.y + d.y) / 2 }; const len = Math.hypot(d.x - c.x, d.y - c.y) || 1; let n = { x: -(d.y - c.y) / len, y: (d.x - c.x) / len }; if (n.x * (fm.x - mid.x) + n.y * (fm.y - mid.y) < 0) n = { x: -n.x, y: -n.y }; away = n; } } }
+          for (const v of cand.vias) { const need = v.size / 2 + ft.width / 2 + gapBetween(nr.net, x.net); const d0 = pointSegDist(v, c, d); if (d0 < need - 1e-6 && need - d0 > worst) { worst = need - d0; const fm = { x: (c.x + d.x) / 2, y: (c.y + d.y) / 2 }; const len = Math.hypot(d.x - c.x, d.y - c.y) || 1; let n = { x: -(d.y - c.y) / len, y: (d.x - c.x) / len }; if (n.x * (fm.x - v.x) + n.y * (fm.y - v.y) < 0) n = { x: -n.x, y: -n.y }; away = n; } }
+          if (worst > 0 && away) { if (worst > 0.35 || si === 1 || si === ft.points.length - 1) return false; confs.push({ x, r, ti, si, shift: { x: away.x * (worst + 0.03), y: away.y * (worst + 0.03) } }); }
+        }
+        // 对方过孔挡路：不推
+        for (const v of r.vias) for (const tr of cand.traces) for (let k = 1; k < tr.points.length; k++) if (pointSegDist(v, tr.points[k - 1], tr.points[k]) < myW(tr) + v.size / 2 + gapBetween(nr.net, x.net) - 1e-6) return false;
+        for (const v of r.vias) for (const w of cand.vias) if (Math.hypot(v.x - w.x, v.y - w.y) < (v.size + w.size) / 2 + gapBetween(nr.net, x.net) - 1e-6) return false;
+      }
+    }
+    if (!confs.length || confs.length > 6) return false;
+    // 应用平移（同一条线上多段各自平移），角度归一
+    const touched = new Map<Route, Map<number, TraceOut>>();
+    const originals = new Map<Route, TraceOut[]>();
+    for (const cf of confs) {
+      if (!originals.has(cf.r)) originals.set(cf.r, cf.r.traces);
+      const cur = touched.get(cf.r)?.get(cf.ti) ?? { ...cf.r.traces[cf.ti], points: cf.r.traces[cf.ti].points.map((p) => ({ ...p })) };
+      cur.points[cf.si - 1] = { x: cur.points[cf.si - 1].x + cf.shift.x, y: cur.points[cf.si - 1].y + cf.shift.y };
+      cur.points[cf.si] = { x: cur.points[cf.si].x + cf.shift.x, y: cur.points[cf.si].y + cf.shift.y };
+      if (!touched.has(cf.r)) touched.set(cf.r, new Map()); touched.get(cf.r)!.set(cf.ti, cur);
+    }
+    const affected = new Set<NetRoutes>();
+    for (const cf of confs) affected.add(cf.x);
+    for (const [r, m] of touched) { r.traces = r.traces.map((t, i) => (m.has(i) ? { ...m.get(i)!, points: normalize45(m.get(i)!.points) } : t)); }
+    for (const x of affected) markNet(x);
+    // 校验：被推的线对静态 + 其他网络 + 我们的候选；我们的候选对全部
+    let ok = true;
+    for (const x of affected) {
+      const safeX = makeSafe(x.net, clearanceOf(x.net));
+      for (const [r, m] of touched) if (x.routes.includes(r)) for (const ti of m.keys()) { const tr = r.traces[ti]; for (let i = 1; i < tr.points.length && ok; i++) { if (!safeX(tr.points[i - 1], tr.points[i], tr.width / 2, [tr.layer], [], [], true)) ok = false; for (const mt of cand.traces) if (mt.layer === tr.layer) for (let k = 1; k < mt.points.length; k++) if (segSegDist(tr.points[i - 1], tr.points[i], mt.points[k - 1], mt.points[k]) < tr.width / 2 + mt.width / 2 + gapBetween(x.net, nr.net) - 1e-6) ok = false; for (const v of cand.vias) if (pointSegDist(v, tr.points[i - 1], tr.points[i]) < tr.width / 2 + v.size / 2 + gapBetween(x.net, nr.net) - 1e-6) ok = false; } }
+    }
+    if (ok) { const safeMe = makeSafe(nr.net, clearanceOf(nr.net)); ok = cand.traces.every((tr) => tr.points.slice(1).every((b, i) => safeMe(tr.points[i], b, tr.width / 2, [tr.layer], [], [], true))) && cand.vias.every((v) => safeMe(v, v, v.size / 2, layers, [], [], true)); }
+    if (!ok) { for (const [r, orig] of originals) r.traces = orig; for (const x of affected) markNet(x); return false; }
+    unmarkNet(nr); nr.routes.push(cand); nr.failures.delete(cand.key); markNet(nr); routedLines++;
+    return true;
+  };
   // 第 0 阶段：全局路由——粗网格协商拥塞，得到每个网络的走廊（含层分配）；细节布线先在走廊内搜索
   let corridors: Map<string, Uint8Array> | undefined;
   // 目前实测（door 板）走廊约束不优于直接细节布线，默认关闭；保留为实验开关，供后续换成按轨道数计容量 + 走廊内协商细节布线
@@ -601,6 +671,8 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     if (!probe.route) continue; // 静态障碍就把它堵死了，拆别人也没用
     const blockers = (probe.crossed ?? []).map((n) => nets.get(n)).filter((x): x is NetRoutes => !!x && x !== nr);
     if (!blockers.length) { unmarkNet(nr); routeGroup([nr], 'strict', 0); continue; }
+    // 先试推挤：把挡路走线的线段垂直平移一点点（≤0.35mm），比拆线重布温和；成功就直接采用探测路径
+    if (tryShove(nr, probe.route)) { rounds++; opts.debug?.({ shove: line.net, t: Date.now() - t0, blockers: blockers.map((b) => b.net) }); continue; }
     if (blockers.length > 8) continue;
     rounds++;
     opts.debug?.({ pass: iter, t: Date.now() - t0, line: `${line.net} ${Math.hypot(line.a.x - line.b.x, line.a.y - line.b.y).toFixed(1)}mm`, blockers: blockers.map((b) => b.net) });
