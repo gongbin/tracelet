@@ -18,6 +18,8 @@ import { computeRatsnest, type RatsnestLine } from './ratsnest.js';
 import { suggestRoutingMoves, type RoutingMove } from './routingPlacement.js';
 import { RoutingSpace } from './routingSpace.js';
 import { zoneFills, traceTouchesPolygon } from './zones.js';
+import { globalRoute } from './globalRoute.js';
+import { netRules } from './routingModel.js';
 
 export interface AutorouteOptions {
   grid?: number;
@@ -39,6 +41,12 @@ export interface AutorouteOptions {
   timeBudgetMs?: number;
   /** 诊断回调 */
   debug?: (info: Record<string, unknown>) => void;
+  /** 实验：先做粗网格全局路由（协商拥塞）得到走廊与层分配，再细节布线（默认关闭） */
+  globalRoute?: boolean;
+  /** 走廊外每格附加代价（调参用） */
+  corridorPenalty?: number;
+  /** 走廊膨胀格数（调参用） */
+  corridorDilate?: number;
 }
 
 export interface AutorouteResult {
@@ -161,8 +169,8 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   }
 
   // ---------- 网络与动态拥塞图 ----------
-  const widthOf = (net: string) => Math.max(rules.minTraceWidth, netClassFor(board, net)?.traceWidth ?? 0.25);
-  const clearanceOf = (net: string) => Math.max(rules.minClearance, netClassFor(board, net)?.clearance ?? 0);
+  const widthOf = (net: string) => netRules(board, rules, net).width;
+  const clearanceOf = (net: string) => netRules(board, rules, net).clearance;
   const netNames = [...new Set(initialLines.map((l) => l.net))];
   const wMax = Math.max(...netNames.map(widthOf)), clMax = Math.max(...netNames.map(clearanceOf));
   // 每格记录最多两个"邻近新走线"网络及其铜边到格心的距离，冲突按真实间距判定（自身半宽 + 间距）
@@ -281,7 +289,8 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   let routedLines = 0;
 
   /** 布一条飞线。mode=negotiate：与其他新走线冲突只加代价；strict：视为硬障碍。 */
-  const routeLine = (line: RatsnestLine, mode: 'negotiate' | 'strict', pf: number, connectivity: ReturnType<typeof computeRatsnest>): { route?: Route; reason?: string } => {
+  let corridorInfo: { CW: number; CH: number; f: number } | null = null;
+  const routeLine = (line: RatsnestLine, mode: 'negotiate' | 'strict', pf: number, connectivity: ReturnType<typeof computeRatsnest>, corridor?: Uint8Array): { route?: Route; reason?: string } => {
     generation++;
     const net = line.net, nid = netId(net), nr = netOf(net);
     const preferredWidth = widthOf(net), clearance = clearanceOf(net);
@@ -328,13 +337,14 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       dynV[i] = ok ? 1 : -1;
       return ok;
     };
+    const inCorridor = (x: number, y: number, l: number) => { if (!corridor || !corridorInfo) return true; const { CW, CH, f } = corridorInfo; return corridor[(l * CH + Math.floor(y / f)) * CW + Math.floor(x / f)] === 1; };
+    const OUTSIDE = opts.corridorPenalty ?? 1.5; // 走廊外每步附加代价（软约束：允许局部偏离，但整体沿全局规划）
     const free = (x: number, y: number, l: number) => {
       if (!staticFree(x, y, l)) return false;
       if (mode === 'strict') return dynFree(x, y, l);
       const c = conflictAt(idx(x, y, l), nid, hw, net); return c === 0 || c === 1;
     };
-    const viaDrill = Math.max(rules.minDrill, netClassFor(board, net)?.viaDrill ?? 0.3);
-    const viaSize = Math.max(netClassFor(board, net)?.viaSize ?? 0.6, viaDrill + 2 * rules.minAnnularRing);
+    const { viaDrill, viaSize } = netRules(board, rules, net);
     const viaFree = (x: number, y: number): boolean => {
       const i = y * W + x;
       if (viaStamp[i] === generation) return viaVal[i] === 1;
@@ -375,14 +385,14 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
         const turn = prev >= 0 && (x - px !== dx || y - py !== dy) ? 0.8 : 0;
         const own = (occ[ni] === nid || ownOnlyAt(ni, nid)) && !goal.has(ni) ? 0.6 : 0;
         const congestion = mode === 'negotiate' && conflictAt(ni, nid, hw, net) === 1 ? pf * (1 + hist[ni]) : 0;
-        const ng = gi + c + turn + own + dirPen(l, dx, dy) + congestion;
+        const ng = gi + c + turn + own + dirPen(l, dx, dy) + congestion + (corridor && !inCorridor(nx, ny, l) ? OUTSIDE : 0);
         if (ng < gScore[ni]) { gScore[ni] = ng; came[ni] = i; heap.push(ng + h(nx, ny), ni); }
       }
       if (L > 1 && viaFree(x, y)) {
         const vc = mode === 'strict' ? (layers.every((layer) => dyn.free(toWorld(x, y), viaSize / 2, layer, net, clearance)) ? 0 : -1) : viaConflict(x, y);
         if (vc >= 0 && !(mode === 'strict' && vc)) for (let nl = 0; nl < L; nl++) {
           if (nl === l) continue;
-          const ni = idx(x, y, nl); const ng = gi + viaCost + (vc ? pf * vc * (1 + hist[ni]) : 0);
+          const ni = idx(x, y, nl); const ng = gi + viaCost + (vc ? pf * vc * (1 + hist[ni]) : 0) + (corridor && !inCorridor(x, y, nl) ? viaCost : 0);
           if (ng < gScore[ni]) { gScore[ni] = ng; came[ni] = i; heap.push(ng + h(x, y), ni); }
         }
       }
@@ -498,7 +508,8 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       if (!best) break;
       const net = best.net, nr = netOf(net), key = keyOf(best); tried.add(key);
       unmarkNet(nr);
-      const r = routeLine(best, mode, pf, conn.get(net)!);
+      const cor = corridors?.get(net);
+      const r = routeLine(best, mode, pf, conn.get(net)!, cor);
       if (r.route) { nr.routes.push(r.route); nr.failures.delete(key); routedLines++; } else nr.failures.set(key, r.reason!);
       markNet(nr);
       refresh(net);
@@ -506,8 +517,22 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       opts.onProgress?.(Math.min(done, result.total), result.total, net);
     }
   };
+  // 第 0 阶段：全局路由——粗网格协商拥塞，得到每个网络的走廊（含层分配）；细节布线先在走廊内搜索
+  let corridors: Map<string, Uint8Array> | undefined;
+  // 目前实测（door 板）走廊约束不优于直接细节布线，默认关闭；保留为实验开关，供后续换成按轨道数计容量 + 走廊内协商细节布线
+  if (opts.globalRoute === true && initialLines.length >= 8) {
+    const f = Math.max(4, Math.round(1.5 / g));
+    const widthDefault = netRules(board, rules, '').width, clDefault = netRules(board, rules, '').clearance, viaDefault = netRules(board, rules, '').viaSize;
+    generation++;
+    const cellFree = (x: number, y: number, l: number) => x >= 0 && y >= 0 && x < W && y < H && edgeDistance[y * W + x] >= edge + widthDefault / 2 && space.free(toWorld(x, y), widthDefault / 2, layers[l], '', clDefault);
+    const viaFreeG = (x: number, y: number) => edgeDistance[y * W + x] >= edge + viaDefault / 2 && layers.every((layer) => space.free(toWorld(x, y), viaDefault / 2, layer, '', clDefault));
+    const gr = globalRoute({ W, H, L, f, lines: initialLines, toCell, cellFree, viaFree: viaFreeG, layersAt: (p) => { const pd = padAt(p); return pd ? pd.layers.map(layerIdx).filter((i) => i >= 0) : undefined; }, pitch: widthDefault + clDefault, coarseMm: f * g, maxIters: 20, dilate: opts.corridorDilate ?? 1, deadline: t0 + Math.min(15000, (opts.timeBudgetMs ?? 90000) / 4) });
+    corridors = gr.corridors; corridorInfo = { CW: gr.CW, CH: gr.CH, f };
+    opts.debug?.({ global: true, t: Date.now() - t0, iterations: gr.iterations, overused: gr.overused, coarse: `${gr.CW}x${gr.CH}` });
+  }
   // 第 1 阶段：全部网络严格布线（全局最短飞线优先）
   routeGroup([...nets.values()], 'strict', 0);
+  opts.debug?.({ phase1: true, t: Date.now() - t0 });
   /** 挡在失败飞线附近的网络（端点 2.5mm 内或直连线走廊 1mm 内有其新走线）。 */
   const blockersOf = (failedNets: NetRoutes[], radius = 2.5): NetRoutes[] => {
     const lines = remainingLines().filter((l) => failedNets.some((n) => n.net === l.net));
