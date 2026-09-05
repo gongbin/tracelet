@@ -51,6 +51,11 @@ export interface AutorouteOptions {
   shove?: 0 | 1 | 3;
   /** 布通后的过孔 / 长度优化（默认开） */
   optimize?: boolean;
+  /** 只在这个矩形（mm）内建栅格（局部细网格重试用；矩形外视为不可走） */
+  window?: { x: number; y: number; w: number; h: number };
+  /** 主流程仍失败的飞线，在其周围窗口内用更细网格（默认 0.05mm）再试（默认开） */
+  fineRetry?: boolean;
+  fineGrid?: number;
 }
 
 export interface AutorouteResult {
@@ -112,7 +117,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   const g = opts.grid ?? pickGrid(pads);
   const layers = copperLayers(board.copperCount);
   const L = layers.length;
-  const bb = boardBounds(board);
+  const bb = opts.window ?? boardBounds(board);
   const W = Math.ceil(bb.w / g) + 1, H = Math.ceil(bb.h / g) + 1;
   const N = W * H;
   const viaCostBase = opts.viaCost ?? Math.round(3 / g);
@@ -308,6 +313,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     const startLayers = pa ? pa.layers.map(layerIdx).filter((i) => i >= 0) : layers.map((_, i) => i);
     const goalLayers = new Set(pb ? pb.layers.map(layerIdx).filter((i) => i >= 0) : layers.map((_, i) => i));
     const s = toCell(line.a), t = toCell(line.b);
+    if (opts.window && [s, t].some((c) => c.x < 0 || c.y < 0 || c.x >= W || c.y >= H)) return { reason: '端点在局部窗口外' };
     const componentAt = (p: Vec) => connectivity.components?.find((c) => c.net === net && c.pads.some((q) => Math.hypot(q.x - p.x, q.y - p.y) < 1e-6));
     const startAnchors = componentAt(line.a)?.anchors ?? [{ point: line.a, layers: startLayers.map((l) => layers[l]) }];
     const goalAnchors = componentAt(line.b)?.anchors ?? [{ point: line.b, layers: [...goalLayers].map((l) => layers[l]) }];
@@ -446,7 +452,9 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
         }
         sg.push(toWorld(p.x, p.y));
       }
-      if (kEnd < path.length) { sg.push({ ...targetPoint }); fl(); vs.push({ x: targetPoint.x, y: targetPoint.y, size: viaSize, drill: viaDrill, net }); } else fl();
+      if (kEnd < path.length) { sg.push({ ...targetPoint }); fl(); vs.push({ x: targetPoint.x, y: targetPoint.y, size: viaSize, drill: viaDrill, net }); }
+      else if (sg.length === 1 && !near(sg[0], targetPoint)) { const m = bend(sg[0], targetPoint); sg.push(...(m ? [m, { ...targetPoint }] : [{ ...targetPoint }])); fl(); } // 路径最后一格就是换层点：过孔后还要在目标层接到焊盘中心，否则缝合段会落在错误的层上
+      else fl();
       return { traces: tr, vias: vs };
     };
     // 候选几何：默认按路径换层；校验不过时再试“焊盘内换层 → 盘中孔”的变体（见下方 finish）
@@ -505,7 +513,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
         const why: string[] = [];
         for (const tr of candidate) for (let i = 1; i < tr.points.length; i++) if (!safe(tr.points[i - 1], tr.points[i], tr.width / 2, [tr.layer], extraT, extraV, useDyn)) { const a = tr.points[i - 1], b = tr.points[i]; const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; const nd = dyn.nearest(a, b, tr.layer, net); why.push(`nearestDyn=${nd ? `${nd.net} d=${nd.d.toFixed(3)} ${nd.geom}` : '-'} padA=${pa ? `${pa.rect.x.toFixed(2)},${pa.rect.y.toFixed(2)} ${pa.rect.w}x${pa.rect.h} ${pa.layers}` : '-'} padB=${pb ? `${pb.rect.x.toFixed(2)},${pb.rect.y.toFixed(2)} ${pb.rect.w}x${pb.rect.h} ${pb.layers}` : '-'} vias=${vias.map((v) => `${v.x.toFixed(2)},${v.y.toFixed(2)}`).join(';')}`); why.push(`seg ${a.x.toFixed(2)},${a.y.toFixed(2)}→${b.x.toFixed(2)},${b.y.toFixed(2)} w${tr.width} ${tr.layer} static=${space.conflictNet(mid, tr.width / 2, tr.layer, net, clearance) ?? space.conflictNet(a, tr.width / 2, tr.layer, net, clearance) ?? space.conflictNet(b, tr.width / 2, tr.layer, net, clearance)} dyn=${dyn.conflictNet(mid, tr.width / 2, tr.layer, net, clearance) ?? dyn.conflictNet(a, tr.width / 2, tr.layer, net, clearance) ?? dyn.conflictNet(b, tr.width / 2, tr.layer, net, clearance)} edge=${board.outline.length ? Math.min(...board.outline.map((q, k) => segSegDist(a, b, q, board.outline[(k + 1) % board.outline.length]))).toFixed(2) : '-'}`); }
         for (const v of vias) if (!safe(v, v, v.size / 2, layers, extraT, extraV, useDyn)) why.push(`via ${v.x.toFixed(2)},${v.y.toFixed(2)} static=${layers.map((l) => space.conflictNet(v, v.size / 2, l, net, clearance)).join('/')} dyn=${layers.map((l) => dyn.conflictNet(v, v.size / 2, l, net, clearance)).join('/')}`);
-        opts.debug({ invalid: net, from: `${pa?.ref}.${pa?.number}`, to: `${pb?.ref}.${pb?.number}`, why: why.slice(0, 3) });
+        opts.debug({ invalid: net, from: `${pa?.ref}.${pa?.number}`, to: `${pb?.ref}.${pb?.number}`, why: why.slice(0, 3), cand: candidate.map((tr) => `${tr.layer} w${tr.width} ${tr.points.map((q) => `${q.x.toFixed(2)},${q.y.toFixed(2)}`).join(' ')}`), viasAt: vias.map((v) => `${v.x.toFixed(2)},${v.y.toFixed(2)}`) });
       }
       return { reason: '焊盘出线或过孔不满足实际铜间距，已跳过', badCells: [...new Set(badCells)].filter((c) => !goal.has(c) && !startPoints.has(c)) };
     }
@@ -706,7 +714,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   // 只拆这些网络，先布失败线再补回它们；没有变好就回滚。比按距离猜挡路者精准得多。
   const attempted = new Set<string>();
   let sweep = 0;
-  for (let iter = 0; iter < 90 && Date.now() < deadline; iter++) {
+  const ripUpSweep = () => { for (let iter = 0; iter < 90 && Date.now() < deadline; iter++) {
     let remaining = remainingLines().filter((l) => !attempted.has(keyOf(l)) && !/板框外/.test(netOf(l.net).failures.get(keyOf(l)) ?? ''));
     // 一轮扫完还有剩余：板子已经变了，再扫一轮（最多 3 轮）
     if (!remaining.length && sweep < 2 && remainingLines().some((l) => !/板框外/.test(netOf(l.net).failures.get(keyOf(l)) ?? ''))) { sweep++; attempted.clear(); remaining = remainingLines().filter((l) => !/板框外/.test(netOf(l.net).failures.get(keyOf(l)) ?? '')); }
@@ -733,7 +741,8 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     opts.debug?.({ result: line.net, before, after, stillFailing: subset.filter(retryable).map((x) => `${x.net}:${[...x.failures.values()][0]?.slice(0, 12)}`) });
     if (after >= before) for (const [x, snap] of snapshot) { ripNet(x); x.routes = snap.routes; x.failures = snap.failures; markNet(x); }
     auditAll(`pass${iter} ${line.net}`);
-  }
+  } };
+  ripUpSweep();
   void blockersOf;
   // 收尾：剩余飞线在最终布局上再各试一次（前面失败时的局面可能已经变了）
   for (const nr of [...nets.values()].filter(retryable)) { if (Date.now() > deadline) break; unmarkNet(nr); routeGroup([nr], 'strict', 0); }
@@ -752,6 +761,46 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     if (after >= before) { for (const [nr, snap] of snapshot) { ripNet(nr); nr.routes = snap.routes; nr.failures = snap.failures; markNet(nr); } break; }
   }
   let stuck: NetRoutes[] = [];
+  // 第 4 阶段：局部细网格重试——剩余失败线大多是焊盘旁过孔位被邻网合法占住、粗网格落不到缝隙里；
+  // 在飞线周围的小窗口里用 0.05mm 网格单独再布（现有一切新走线作为静态障碍），窗口小所以代价可控
+  const fineG = opts.fineGrid ?? 0.05;
+  if (opts.fineRetry !== false && !opts.window && fineG < g - 1e-9) {
+    const bbAll = boardBounds(board);
+    let fineTried = 0, fineWon = 0;
+    for (let iter = 0; iter < 40 && Date.now() < deadline; iter++) {
+      const remaining = remainingLines().filter((l) => !/板框外|窗口外/.test(netOf(l.net).failures.get(keyOf(l)) ?? ''));
+      const line = remaining.filter((l) => !attempted.has(`fine:${keyOf(l)}`)).sort((x, y) => Math.hypot(x.a.x - x.b.x, x.a.y - x.b.y) - Math.hypot(y.a.x - y.b.x, y.a.y - y.b.y))[0];
+      if (!line) break;
+      attempted.add(`fine:${keyOf(line)}`); fineTried++;
+      const len = Math.hypot(line.a.x - line.b.x, line.a.y - line.b.y);
+      const margin = Math.min(12, Math.max(4, len * 0.6));
+      const x1 = Math.max(bbAll.x, Math.min(line.a.x, line.b.x) - margin), y1 = Math.max(bbAll.y, Math.min(line.a.y, line.b.y) - margin);
+      const x2 = Math.min(bbAll.x + bbAll.w, Math.max(line.a.x, line.b.x) + margin), y2 = Math.min(bbAll.y + bbAll.h, Math.max(line.a.y, line.b.y) + margin);
+      const window = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+      const nr = netOf(line.net);
+      // 先用中等网格（快），不行再上细网格；窗口过大时只用中等网格
+      let sub: AutorouteResult | null = null;
+      for (const gg of [...new Set([Math.max(fineG, Math.min(0.1, g / 1.25)), fineG])]) {
+        if ((window.w / gg + 1) * (window.h / gg + 1) * L > 2.5e6 || Date.now() > deadline) continue;
+        sub = autoroute(currentBoard(), rules, { nets: [line.net], grid: gg, window, timeBudgetMs: Math.max(1000, Math.min(6000, deadline - Date.now())), optimize: false, shove: 0, fineRetry: false, allowComponentMoves: false, noRetry: true, globalRoute: false, maxNodes: 1.5e6, debug: opts.debug ? (info) => opts.debug!({ fine: line.net, ...info }) : undefined });
+        if (sub.traces.length || sub.vias.length) break;
+      }
+      // 只接收真正把这条飞线连上的结果：合并后按本网络连通性确认
+      if (!sub || (!sub.traces.length && !sub.vias.length)) continue;
+      const before = remainingLines().length;
+      const route: Route = { key: keyOf(line), traces: sub.traces.map((t) => ({ layer: t.layer, net: t.net, width: t.width, points: t.points })), vias: sub.vias.map((v) => ({ x: v.x, y: v.y, size: v.size, drill: v.drill, net: v.net })) };
+      const safe = makeSafe(nr.net, clearanceOf(nr.net));
+      const valid = route.traces.every((tr) => tr.points.slice(1).every((b, i) => safe(tr.points[i], b, tr.width / 2, [tr.layer], [], [], true))) && route.vias.every((v) => safe(v, v, v.size / 2, layers, [], [], true));
+      if (!valid) { opts.debug?.({ fineInvalid: line.net }); continue; }
+      unmarkNet(nr); nr.routes.push(route); markNet(nr);
+      const after = remainingLines().length;
+      if (after >= before) { unmarkNet(nr); nr.routes = nr.routes.filter((r) => r !== route); markNet(nr); continue; }
+      nr.failures.delete(keyOf(line)); routedLines++; fineWon++;
+      opts.debug?.({ fineRouted: line.net, t: Date.now() - t0, window: `${window.w.toFixed(1)}x${window.h.toFixed(1)}`, vias: route.vias.length, ms: sub.ms });
+      auditAll(`fine ${line.net}`);
+    }
+    opts.debug?.({ finePhase: true, tried: fineTried, won: fineWon, t: Date.now() - t0 });
+  }
   // 优化阶段：逐条重布已布通的连接（其他一切为障碍），过孔代价 ×3 —— 过孔更少或明显更短才替换
   const routeLen = (r: Route) => r.traces.reduce((n, t) => { for (let i = 1; i < t.points.length; i++) n += Math.hypot(t.points[i].x - t.points[i - 1].x, t.points[i].y - t.points[i - 1].y); return n; }, 0);
   if (opts.optimize !== false) {
