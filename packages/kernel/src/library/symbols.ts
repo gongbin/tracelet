@@ -28,12 +28,12 @@ export const BUILTIN_SYMBOLS: SymbolDef[] = [
     ]
   },
   {
-    id: 'sym:GND', name: 'GND', kind: '地', prefix: '#GND', width: 300, height: 200, graphic: 'gnd', showPinNames: false, power: true, color: '#1F5F2B',
+    id: 'sym:GND', name: 'GND', kind: '地', prefix: '#GND', width: 300, height: 200, graphic: 'gnd', showPinNames: false, power: true, color: '#800000',
     defaultValue: 'GND', defaultFootprint: '', description: '地符号',
     pins: [{ number: '1', name: 'GND', side: 'T', offset: 150, length: 200, type: 'power_out' }]
   },
   {
-    id: 'sym:PWR', name: '电源', kind: '电源', prefix: '#PWR', width: 400, height: 200, graphic: 'power', showPinNames: false, power: true, color: '#C0392B',
+    id: 'sym:PWR', name: '电源', kind: '电源', prefix: '#PWR', width: 400, height: 200, graphic: 'power', showPinNames: false, power: true, color: '#800000',
     defaultValue: '+3V3', defaultFootprint: '', description: '电源符号，值即网络名',
     pins: [{ number: '1', name: '+', side: 'B', offset: 200, length: 200, type: 'power_out' }]
   },

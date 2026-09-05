@@ -4,6 +4,7 @@ import { useApp, useEditor, useProject, useSheet } from '../../store/app.js';
 import { getAnalysis } from '../../store/analysis.js';
 import { useViewport, gridStep } from '../../hooks/useViewport.js';
 import { SymbolGlyph } from './SymbolGlyph.js';
+import { SCH_COLORS, crossSheetLabelNames, netLabelLayout } from '@tracelet/kernel';
 import { Hint } from '../../components/Hint.js';
 
 let SCH_SNAP = SCH_GRID;
@@ -87,6 +88,8 @@ export function SchematicCanvas() {
   const analysis = getAnalysis(project);
   const drag = useRef<Drag | null>(null);
   const [labelText, setLabelText] = useState('');
+  const [labelPort, setLabelPort] = useState(false);
+  const crossSheet = useMemo(() => crossSheetLabelNames(project.schematic), [project.schematic]);
   const [textPrompt, setTextPrompt] = useState<{ at: Vec; value: string } | null>(null);
   const [marquee, setMarquee] = useState<{ a: Vec; b: Vec } | null>(null);
   const fitted = useRef<string | null>(null);
@@ -408,7 +411,7 @@ export function SchematicCanvas() {
   const cursor = app.placing || app.pasting ? 'copy' : wireMode || tool === 'label' || tool === 'bus' || tool === 'junction' || tool === 'draw' || tool === 'measure' ? 'crosshair' : view.panning ? 'grabbing' : view.spaceDown ? 'grab' : 'default';
   const labelScreen = app.labelPrompt ? view.toScreen(app.labelPrompt) : null;
   const textScreen = textPrompt ? view.toScreen(textPrompt.at) : null;
-  const submitLabel = () => { if (app.labelPrompt && labelText.trim()) editor.dispatch(sch.addLabel(sheet.id, labelText.trim(), app.labelPrompt)); app.patch({ labelPrompt: null }); };
+  const submitLabel = () => { if (app.labelPrompt && labelText.trim()) editor.dispatch(sch.addLabel(sheet.id, labelText.trim(), app.labelPrompt, labelPort ? 'port' : undefined)); app.patch({ labelPrompt: null }); };
   const submitText = () => { if (textPrompt && textPrompt.value.trim()) editor.dispatch(sch.addGraphic(sheet.id, { kind: 'text', x: textPrompt.at.x, y: textPrompt.at.y, text: textPrompt.value.trim(), size: 120 })); setTextPrompt(null); };
   const selWire = app.selection.length === 1 ? sheet.wires.find((w) => w.id === app.selection[0]) : undefined;
   const hs = 8 / vp.k;
@@ -437,17 +440,16 @@ export function SchematicCanvas() {
           {(sheet.buses ?? []).map((b) => <path key={b.id} d={pathD(b.points)} stroke={app.selection.includes(b.id) ? '#E5B800' : '#2C5AA0'} strokeWidth={44} fill="none" strokeLinejoin="round" strokeLinecap="round" onPointerDown={onMovableDown(b.id)} style={{ cursor: editable ? 'move' : 'pointer' }} />)}
           {/* 导线 */}
           {sheet.wires.map((w) => {
-            const isPwr = w.auto && w.auto.some((k) => { const c = sheet.components.find((x) => x.id === k.split(':')[0]); return c && c.symbolId === 'sym:PWR'; });
-            const inHl = app.highlightNet && highlightPins.some((p) => w.points.some((pt) => pt.x === p.pos.x && pt.y === p.pos.y));
+                        const inHl = app.highlightNet && highlightPins.some((p) => w.points.some((pt) => pt.x === p.pos.x && pt.y === p.pos.y));
             const sel = app.selection.includes(w.id);
             return <g key={w.id} onPointerDown={onWireDown(w)} style={{ cursor: editable ? 'pointer' : undefined }}>
               {sel && <path d={pathD(w.points)} stroke="rgba(255,216,77,.55)" strokeWidth={70} fill="none" strokeLinejoin="round" strokeLinecap="round" />}
-              <path d={pathD(w.points)} stroke={inHl ? '#E5B800' : isPwr ? '#C0392B' : '#1F5F2B'} strokeWidth={inHl ? 30 : 16} fill="none" strokeLinejoin="round" strokeLinecap="round" />
+              <path d={pathD(w.points)} stroke={inHl ? '#E5B800' : SCH_COLORS.wire} strokeWidth={inHl ? 30 : 16} fill="none" strokeLinejoin="round" strokeLinecap="round" />
               <path d={pathD(w.points)} stroke="transparent" strokeWidth={90} fill="none" />
             </g>;
           })}
-          {autoJunctions.map((p, i) => <circle key={'aj' + i} cx={p.x} cy={p.y} r={35} fill="#1F5F2B" pointerEvents="none" />)}
-          {sheet.junctions.map((j) => <circle key={j.id} cx={j.x} cy={j.y} r={app.selection.includes(j.id) ? 48 : 40} fill={app.selection.includes(j.id) ? '#E5B800' : '#1F5F2B'} onPointerDown={onMovableDown(j.id)} style={{ cursor: editable ? 'move' : 'pointer' }} />)}
+          {autoJunctions.map((p, i) => <circle key={'aj' + i} cx={p.x} cy={p.y} r={35} fill={SCH_COLORS.junction} pointerEvents="none" />)}
+          {sheet.junctions.map((j) => <circle key={j.id} cx={j.x} cy={j.y} r={app.selection.includes(j.id) ? 48 : 40} fill={app.selection.includes(j.id) ? '#E5B800' : SCH_COLORS.junction} onPointerDown={onMovableDown(j.id)} style={{ cursor: editable ? 'move' : 'pointer' }} />)}
           {/* 预览：引脚连线 / 自由画线 / 总线 / 图形 */}
           {pending && <path d={pathD(pending)} stroke="#3D8BFF" strokeWidth={16} strokeDasharray="50 40" fill="none" pointerEvents="none" />}
           {app.wireDraft && <path d={pathD([...app.wireDraft, ...ortho(app.wireDraft[app.wireDraft.length - 1], cursorSnap).slice(1)])} stroke="#3D8BFF" strokeWidth={16} strokeDasharray="50 40" fill="none" pointerEvents="none" />}
@@ -458,8 +460,14 @@ export function SchematicCanvas() {
           {/* 标签 */}
           {sheet.labels.map((l) => (
             <g key={l.id} onPointerDown={onLabelDown(l.id)} style={{ cursor: editable ? 'move' : 'pointer' }}>
-              <path d={`M${l.x} ${l.y}L${l.x + 60} ${l.y - 60}H${l.x + 120 + l.text.length * 70}V${l.y - 180}H${l.x + 60}Z`} fill={app.selection.includes(l.id) ? 'rgba(255,216,77,.3)' : '#FFFFFF'} stroke="#2C5AA0" strokeWidth={12} />
-              <text x={l.x + 90} y={l.y - 95} fontSize={100} fontFamily="'JetBrains Mono',monospace" fill="#2C5AA0">{l.text}</text>
+              {/* 标准网络标签：纯文字贴在导线上方，无边框；跨页端口：锚点空心圆 + 文字在导线另一侧 */}
+              {(() => { const lay = netLabelLayout(sheet, l, crossSheet); const sel = app.selection.includes(l.id); const tw = l.text.length * 62;
+                const hx = lay.text.anchor === 'middle' ? lay.text.x - tw / 2 - 20 : lay.text.anchor === 'end' ? lay.text.x - tw - 20 : lay.text.x - 20;
+                return <>
+                  <rect x={Math.min(hx, l.x - 60)} y={Math.min(lay.text.y - 110, l.y - 60)} width={Math.max(hx + tw + 40, l.x + 60) - Math.min(hx, l.x - 60)} height={Math.max(lay.text.y + 40, l.y + 60) - Math.min(lay.text.y - 110, l.y - 60)} rx={20} fill={sel ? 'rgba(255,216,77,.35)' : 'transparent'} stroke={sel ? '#E5B800' : 'none'} strokeWidth={12} />
+                  {lay.port && <circle cx={l.x} cy={l.y} r={lay.r} fill={SCH_COLORS.fill} stroke={SCH_COLORS.wire} strokeWidth={14} />}
+                  <text x={lay.text.x} y={lay.text.y} fontSize={100} fontFamily="'JetBrains Mono',monospace" fill={lay.port ? SCH_COLORS.text : SCH_COLORS.netLabel} textAnchor={lay.text.anchor}>{l.text}</text>
+                </>; })()}
             </g>
           ))}
           {sheet.components.map((c) => (
@@ -490,7 +498,7 @@ export function SchematicCanvas() {
             <g transform={`translate(${pasteOffset.x} ${pasteOffset.y})`} pointerEvents="none">
               {app.pasting.clip.wires.map((w, i) => <path key={i} d={pathD(w.points)} stroke="#3D8BFF" strokeWidth={16} strokeDasharray="50 40" fill="none" />)}
               {app.pasting.clip.components.map((c) => <SymbolGlyph key={c.id} comp={c} sym={getSymbol(c.symbolId)} ghost />)}
-              {app.pasting.clip.labels.map((l) => <text key={l.id} x={l.x + 90} y={l.y - 95} fontSize={100} fill="#3D8BFF" fontFamily="'JetBrains Mono',monospace">{l.text}</text>)}
+              {app.pasting.clip.labels.map((l) => <text key={l.id} x={l.x + 30} y={l.y - 40} fontSize={100} fill="#3D8BFF" fontFamily="'JetBrains Mono',monospace">{l.text}</text>)}
             </g>
           )}
         </g>
@@ -499,6 +507,7 @@ export function SchematicCanvas() {
       {labelScreen && app.labelPrompt && (
         <div className="label-prompt" style={{ left: labelScreen.x + 8, top: labelScreen.y - 40 }} onPointerDown={(e) => e.stopPropagation()}>
           <input autoFocus value={labelText} placeholder="网络名，如 SDA" onChange={(e) => setLabelText(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') submitLabel(); if (e.key === 'Escape') app.patch({ labelPrompt: null }); }} />
+          <label className="row xs" style={{ gap: 4, whiteSpace: 'nowrap', cursor: 'pointer' }} title="跨页端口：导线末端空心圆 + 文字，用于连接其他图纸；同名标签出现在多张图纸时会自动按端口显示"><input type="checkbox" checked={labelPort} onChange={(e) => setLabelPort(e.target.checked)} />跨页端口</label>
           <button className="btn sm primary" onClick={submitLabel}>放置</button>
         </div>
       )}

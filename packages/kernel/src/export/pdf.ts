@@ -7,7 +7,7 @@ import type { Project } from '../model/project.js';
 import type { Sheet } from '../model/schematic.js';
 import { paperSize, titleBlockSize } from '../model/schematic.js';
 import { getSymbol } from '../library/symbols.js';
-import { componentStrokes } from '../schematic/render.js';
+import { SCH_COLORS, componentStrokes, crossSheetLabelNames, netLabelLayout } from '../schematic/render.js';
 import { allPads, footprintBody, boardBounds } from '../board/geometry.js';
 import type { Vec } from '../geometry.js';
 
@@ -123,15 +123,15 @@ export function paintSheet(project: Project, sheet: Sheet, index: number): { w: 
     P.text(X(2680), Y(540), fr.comment, 100);
   }
   // 导线 / 总线 / 结点
-  P.color('#1F5F2B'); for (const w of sheet.wires) P.polyline(w.points, 16);
+  P.color(SCH_COLORS.wire); for (const w of sheet.wires) P.polyline(w.points, 16);
   P.color('#2C5AA0'); for (const b of sheet.buses ?? []) P.polyline(b.points, 44);
-  P.color('#1F5F2B', false); for (const j of sheet.junctions) P.circle({ x: j.x, y: j.y }, 40, 4, true);
+  P.color(SCH_COLORS.junction, false); for (const j of sheet.junctions) P.circle({ x: j.x, y: j.y }, 40, 4, true);
   // 图形
   P.color('#5B6472'); P.color('#5B6472', false);
   for (const g of sheet.graphics ?? []) { if (g.kind === 'line') P.polyline(g.points, 14); else if (g.kind === 'rect') P.rect(Math.min(g.a.x, g.b.x), Math.min(g.a.y, g.b.y), Math.abs(g.b.x - g.a.x), Math.abs(g.b.y - g.a.y), 14); else P.text(g.x, g.y, g.text, g.size); }
   // 元件
   for (const c of sheet.components) {
-    const sym = getSymbol(c.symbolId); const ink = sym.color ?? '#7A1F1F';
+    const sym = getSymbol(c.symbolId); const ink = sym.color ?? SCH_COLORS.symbol;
     const s = componentStrokes(c, sym);
     P.color(ink); P.color('#FFFFFF', false);
     for (const l of s.lines) P.polyline(l.points, l.width, { fill: l.fill });
@@ -139,8 +139,12 @@ export function paintSheet(project: Project, sheet: Sheet, index: number): { w: 
     for (const t of s.texts) { P.color(t.color ?? ink, false); P.text(t.x, t.y, t.text, t.size, t.anchor, { bold: t.bold }); }
   }
   // 标签
-  P.color('#2C5AA0', false); P.color('#2C5AA0');
-  for (const l of sheet.labels) { P.polyline([{ x: l.x, y: l.y }, { x: l.x + 60, y: l.y - 60 }, { x: l.x + 120 + l.text.length * 70, y: l.y - 60 }, { x: l.x + 120 + l.text.length * 70, y: l.y - 180 }, { x: l.x + 60, y: l.y - 180 }, { x: l.x, y: l.y - 120 }], 10); P.text(l.x + 90, l.y - 95, l.text, 100); }
+  const cross = crossSheetLabelNames(project.schematic);
+  for (const l of sheet.labels) {
+    const lay = netLabelLayout(sheet, l, cross);
+    if (lay.port) { P.color(SCH_COLORS.wire); P.color(SCH_COLORS.fill, false); P.circle({ x: l.x, y: l.y }, lay.r, 12, true); P.color(SCH_COLORS.text, false); P.text(lay.text.x, lay.text.y, l.text, 100, lay.text.anchor); }
+    else { P.color(SCH_COLORS.netLabel, false); P.text(lay.text.x, lay.text.y, l.text, 100); }
+  }
   return { w: pw, h: ph, content: P.content() };
 }
 

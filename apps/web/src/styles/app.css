@@ -149,6 +149,15 @@ a:hover { color: var(--accent-hover); }
 .ws-tab .badge { position: absolute; top: 5px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .search-box { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px; flex: 0 1 240px; min-width: 110px; border-radius: var(--radius); background: var(--bg-panel); border: 1px solid var(--border); color: var(--text-3); font-size: 12px; white-space: nowrap; overflow: hidden; cursor: pointer; }
 .search-box:hover { border-color: var(--text-3); }
+/* 顶栏向导按钮：呼吸光环提示，弹层挂在顶栏下方 */
+.guide-btn { position: relative; width: 30px; height: 28px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-panel); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex: none; margin-right: 6px; }
+.guide-btn:hover, .guide-btn.on { background: var(--bg-raised); border-color: var(--accent); }
+.guide-btn .guide-ring { position: absolute; inset: -1px; border-radius: inherit; border: 1.5px solid var(--accent); opacity: 0; animation: guidering 2.6s ease-out infinite; pointer-events: none; }
+.guide-btn.on .guide-ring { animation: none; }
+@keyframes guidering { 0% { transform: scale(1); opacity: .7; } 70% { transform: scale(1.45); opacity: 0; } 100% { opacity: 0; } }
+.guide-backdrop { position: fixed; inset: 0; z-index: 39; }
+.guide-pop { position: fixed; top: 44px; right: 270px; width: 380px; max-width: calc(100vw - 24px); height: min(72vh, 640px); background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: 0 16px 40px rgba(0, 0, 0, .45); z-index: 40; display: flex; flex-direction: column; overflow: hidden; animation: slidein .16s ease-out; }
+@media (max-width: 900px) { .guide-pop { right: 12px; } }
 .avatar { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--bg-topbar); display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; }
 
 .editor-body { flex: 1; display: flex; min-height: 0; }

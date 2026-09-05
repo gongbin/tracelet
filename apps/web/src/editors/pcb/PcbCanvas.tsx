@@ -415,7 +415,7 @@ export function PcbCanvas() {
     editor.dispatch(pcb.applyRoutes(r.traces, r.vias, r.moves));
     app.patch({ autoroute: { status: 'idle', result: null } });
     app.toast(`已接受自动布线：${r.traces.length} 段走线 · ${r.vias.length} 个过孔${r.moves?.length ? ` · 微调 ${r.moves.length} 个器件` : ''}（可 Undo）`, 'success');
-    app.set('rightTab', 'guide');
+    app.set('guideOpen', true);
   };
   useEffect(() => { if (tool === 'autoroute' && app.autoroute.status === 'idle') { runAutoroute(); app.set('pcbTool', 'select'); } // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool]);

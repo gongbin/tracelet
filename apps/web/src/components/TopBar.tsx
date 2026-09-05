@@ -7,6 +7,7 @@ import { I } from '../icons.js';
 import { useT } from '../i18n/index.js';
 import { PrefsMenu } from './PrefsMenu.js';
 import { useBridge } from '../store/bridge.js';
+import { GuidePanel } from '../panels/GuidePanel.js';
 
 const TABS: { id: Screen; key: 'ws.sch' | 'ws.pcb' | 'ws.3d' | 'ws.lib' | 'ws.bom' | 'ws.fab' }[] = [
   { id: 'sch', key: 'ws.sch' }, { id: 'pcb', key: 'ws.pcb' }, { id: '3d', key: 'ws.3d' }, { id: 'lib', key: 'ws.lib' }, { id: 'bom', key: 'ws.bom' }, { id: 'fab', key: 'ws.fab' }
@@ -26,7 +27,7 @@ export function TopBar() {
   const editor = useEditor();
   const t = useT();
   const fileRef = useRef<HTMLInputElement>(null);
-  const { screen, go, projMenuOpen, set, projects, openProject, closeProject, lastSavedAt, saving, toast } = useApp();
+  const { screen, go, projMenuOpen, set, projects, openProject, closeProject, lastSavedAt, saving, toast, guideOpen } = useApp();
   const bridgeStatus = useBridge((b) => b.status);
   const pendingSync = screen === 'pcb' && (() => { const d = diffBoardFromSchematic(project); return d.added.length + d.removed.length > 0; })();
 
@@ -80,7 +81,15 @@ export function TopBar() {
       {screen === 'sch' && (
         <button className="btn quiet" style={{ marginLeft: 6 }} onClick={sync}><Icon d={I.arrow} size={13} stroke={2} />{t('ws.sync')}</button>
       )}
-      <div className="search-box ml-auto" onClick={() => set('paletteOpen', true)}>
+      <button className={`guide-btn ml-auto${guideOpen ? ' on' : ''}`} title={`${t('tab.guide')} · 分步完成一块板`} onClick={() => set('guideOpen', !guideOpen)}><Icon d={I.guide} size={15} stroke={1.8} /><span className="guide-ring" /></button>
+      {guideOpen && <>
+        <div className="guide-backdrop" onPointerDown={() => set('guideOpen', false)} />
+        <div className="guide-pop">
+          <div className="row" style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', gap: 8 }}><Icon d={I.guide} size={14} stroke={1.8} /><span style={{ fontWeight: 500 }}>{t('tab.guide')}</span><button className="btn sm quiet ml-auto" onClick={() => set('guideOpen', false)}>✕</button></div>
+          <div style={{ flex: 1, minHeight: 0 }}><GuidePanel /></div>
+        </div>
+      </>}
+      <div className="search-box" onClick={() => set('paletteOpen', true)}>
         <Icon d={I.search} size={13} stroke={2} /><span>{t('ws.search')}</span><span className="ml-auto mono xs">⌘K</span>
       </div>
       <span className="row xs muted" style={{ gap: 5, whiteSpace: 'nowrap', flex: 'none' }}>

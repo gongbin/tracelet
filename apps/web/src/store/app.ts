@@ -6,8 +6,8 @@ import { createProjectStore, type ProjectMeta, type ProjectStore } from './proje
 export type Screen = 'home' | 'sch' | 'pcb' | '3d' | 'lib' | 'bom' | 'fab';
 export type SchTool = 'select' | 'wire' | 'place' | 'pwr' | 'label' | 'bus' | 'junction' | 'draw' | 'measure';
 export type DrawMode = 'line' | 'rect' | 'text';
-export type PcbTool = 'select' | 'route' | 'via' | 'zone' | 'place' | 'hole' | 'edge' | 'text' | 'measure' | 'flip' | 'align' | 'autoroute' | 'refill';
-export type RightTab = 'props' | 'layers' | 'lib' | 'check' | 'ai' | '3d' | 'guide';
+export type PcbTool = 'select' | 'route' | 'via' | 'zone' | 'place' | 'hole' | 'edge' | 'text' | 'measure' | 'flip' | 'align' | 'placement' | 'autoroute' | 'refill';
+export type RightTab = 'props' | 'layers' | 'lib' | 'check' | 'ai' | '3d';
 
 export interface Placing { symbolId: string; value: string; footprint: string; props?: Record<string, string>; rotation: number; partLabel?: string }
 export interface PcbPlacing { footprintId: string; label: string; rotation: number }
@@ -22,6 +22,8 @@ export interface AppState {
   wizardOpen: boolean;
   projMenuOpen: boolean;
   paletteOpen: boolean;
+  /** 顶栏向导弹层 */
+  guideOpen: boolean;
   focusMode: boolean;
   bottomExpanded: boolean;
   bottomTab: 'problems' | 'nets' | 'console' | 'history';
@@ -110,6 +112,7 @@ export const useApp = create<AppState>((set, get) => ({
   wizardOpen: false,
   projMenuOpen: false,
   paletteOpen: false,
+  guideOpen: false,
   focusMode: false,
   bottomExpanded: false,
   bottomTab: 'problems',
@@ -176,7 +179,7 @@ export const useApp = create<AppState>((set, get) => ({
         try { await get().store.save(editor.project); set({ lastSavedAt: Date.now(), saving: false }); } catch (e) { set({ saving: false }); get().toast(`保存失败：${(e as Error).message}`, 'error'); }
       }, 600);
     });
-    set({ editor, autoroute: { status: 'idle', result: null }, placement: { status: 'idle', result: null }, screen: 'sch', rightTab: null, selection: [], pcbSelection: [], placing: null, pendingPin: null, routing: null, schTool: 'select', pcbTool: 'select', lastSavedAt: Date.now(), projMenuOpen: false, wizardOpen: false, highlightNet: null, checkHighlight: null, sheetId: p.schematic.sheets[0].id, wireDraft: null, busDraft: null, drawDraft: null, pasting: null });
+    set({ editor, autoroute: { status: 'idle', result: null }, placement: { status: 'idle', result: null }, guideOpen: false, screen: 'sch', rightTab: null, selection: [], pcbSelection: [], placing: null, pendingPin: null, routing: null, schTool: 'select', pcbTool: 'select', lastSavedAt: Date.now(), projMenuOpen: false, wizardOpen: false, highlightNet: null, checkHighlight: null, sheetId: p.schematic.sheets[0].id, wireDraft: null, busDraft: null, drawDraft: null, pasting: null });
     void get().store.save(p).then(() => get().refreshProjects());
   },
   closeProject() {

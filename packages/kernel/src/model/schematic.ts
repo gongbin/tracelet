@@ -91,7 +91,9 @@ export const NetLabelSchema = z.object({
   id: z.string(),
   text: z.string(),
   x: z.number(),
-  y: z.number()
+  y: z.number(),
+  /** net：普通网络标签（纯文字）；port：跨页端口（导线末端空心圆 + 文字）。省略时按"同名标签是否出现在其他图纸"自动判断 */
+  kind: z.enum(['net', 'port']).optional()
 });
 export type NetLabel = z.infer<typeof NetLabelSchema>;
 

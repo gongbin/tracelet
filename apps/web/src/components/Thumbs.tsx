@@ -1,4 +1,4 @@
-import { symbolLocalStrokes, pinLocal, type SymbolDef, type FootprintDef } from '@tracelet/kernel';
+import { symbolLocalStrokes, pinLocal, SCH_COLORS, type SymbolDef, type FootprintDef } from '@tracelet/kernel';
 
 /** 符号缩略图：用内核的矢量几何绘制（内置图形与导入的 shapes 通用）。 */
 export function SymbolThumb({ sym, size = 30 }: { sym: SymbolDef; size?: number }) {
@@ -11,9 +11,9 @@ export function SymbolThumb({ sym, size = 30 }: { sym: SymbolDef; size?: number 
   const sw = ext / 60;
   return (
     <svg width={size} height={size} viewBox={`${ox} ${oy} ${ext} ${ext}`}>
-      <g stroke={sym.color ?? '#7A1F1F'} strokeWidth={sw} fill="none" strokeLinecap="round" strokeLinejoin="round">
-        {strokes.lines.map((l, i) => <path key={i} d={l.points.map((p, j) => `${j ? 'L' : 'M'}${p.x} ${p.y}`).join('')} fill={l.fill ? '#FFFBE8' : 'none'} />)}
-        {strokes.circles.map((c, i) => <circle key={'c' + i} cx={c.c.x} cy={c.c.y} r={c.r} fill={c.fill ? '#FFFBE8' : 'none'} />)}
+      <g stroke={sym.color ?? SCH_COLORS.symbol} strokeWidth={sw} fill="none" strokeLinecap="round" strokeLinejoin="round">
+        {strokes.lines.map((l, i) => <path key={i} d={l.points.map((p, j) => `${j ? 'L' : 'M'}${p.x} ${p.y}`).join('')} fill={l.fill ? SCH_COLORS.fill : 'none'} />)}
+        {strokes.circles.map((c, i) => <circle key={'c' + i} cx={c.c.x} cy={c.c.y} r={c.r} fill={c.fill ? SCH_COLORS.fill : 'none'} />)}
         {pins.map((p, i) => <path key={'p' + i} d={`M${p.base.x} ${p.base.y}L${p.end.x} ${p.end.y}`} />)}
       </g>
     </svg>

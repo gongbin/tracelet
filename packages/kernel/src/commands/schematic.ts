@@ -168,8 +168,13 @@ export function deleteWires(sheetId: string, ids: string[]): Command {
   return command('删除导线', (proj) => updateSheet(proj, sheetId, (s) => ({ ...s, wires: s.wires.filter((w) => !set.has(w.id)) })));
 }
 
-export function addLabel(sheetId: string, text: string, at: Vec): Command {
-  return command(`标签 ${text}`, (proj) => updateSheet(proj, sheetId, (s) => ({ ...s, labels: [...s.labels, { id: newId('l'), text, x: at.x, y: at.y }] })));
+export function addLabel(sheetId: string, text: string, at: Vec, kind?: 'net' | 'port'): Command {
+  return command(`标签 ${text}`, (proj) => updateSheet(proj, sheetId, (s) => ({ ...s, labels: [...s.labels, { id: newId('l'), text, x: at.x, y: at.y, ...(kind ? { kind } : {}) }] })));
+}
+
+/** 切换标签样式：普通网络标签 / 跨页端口（空心圆）。 */
+export function setLabelKind(sheetId: string, id: string, kind: 'net' | 'port' | undefined): Command {
+  return command(kind === 'port' ? '改为跨页端口' : '改为网络标签', (proj) => updateSheet(proj, sheetId, (s) => ({ ...s, labels: s.labels.map((l) => (l.id === id ? { ...l, kind } : l)) })));
 }
 
 export function deleteLabels(sheetId: string, ids: string[]): Command {

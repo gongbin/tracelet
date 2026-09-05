@@ -43,12 +43,13 @@ const PCB_TOOLS: ToolDef[] = [
   { id: 'measure', name: '测量', key: 'M', d: I.ruler, desc: '点两点显示距离与 ΔX / ΔY。' },
   { id: 'flip', name: '翻面', key: 'F', d: I.flip, desc: '把选中元件放到板子另一面。', sep: true },
   { id: 'align', name: '对齐 / 分布', key: 'L', d: I.align, desc: '框选 2 个以上元件后：左/右/上/下对齐、居中、等距分布。' },
+  { id: 'placement', name: '布局优化', key: '', d: I.layout, desc: '布线前检查并整理元件布局：去耦电容靠近芯片、最小间距、对齐、飞线更短；用试布线验证不变差。结果先预览，接受后才生效，可 Undo。' },
   { id: 'autoroute', name: '自动布线', key: '', d: I.auto, desc: '内置网格 A* 布线器布完剩余飞线（支持过孔换层），结果先以"建议"预览，接受后才生效，可 Undo。' },
   { id: 'refill', name: '重填铺铜', key: 'B', d: I.refill, desc: '移动元件后重新计算铺铜区域。' }
 ];
 let clipboard: Clipboard | null = null;
 const DRAW_MODES: ['line' | 'rect' | 'text', string, string][] = [['line', '线条', '点击加点 · 双击结束'], ['rect', '矩形', '点两个对角'], ['text', '文字', '点击放置注释']];
-const PWR_OPTIONS = [['+3V3', '#C0392B', '常用 · 3.3V 逻辑'], ['+5V', '#C0392B', 'USB 供电'], ['VCC', '#C0392B', '通用电源'], ['GND', '#1F5F2B', '地']];
+const PWR_OPTIONS = [['+3V3', '#800000', '常用 · 3.3V 逻辑'], ['+5V', '#800000', 'USB 供电'], ['VCC', '#800000', '通用电源'], ['GND', '#800000', '地']];
 
 export function Workspace() {
   const project = useProject();
@@ -67,6 +68,7 @@ export function Workspace() {
       const t = e.target as HTMLElement;
       if (t && (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable)) return;
       const S = useApp.getState();
+      if (e.key === 'Escape' && S.guideOpen) { S.set('guideOpen', false); return; }
       const mod = e.metaKey || e.ctrlKey;
       const k = e.key.toLowerCase();
       if (mod && k === 'z') { e.preventDefault(); if (e.shiftKey) editor.redo(); else editor.undo(); return; }
@@ -120,7 +122,7 @@ export function Workspace() {
         else return;
         e.preventDefault();
       } else if (S.screen === 'pcb') {
-        if (e.key === 'Escape') { if (S.autoroute.status !== 'idle') S.patch({ autoroute: { status: 'idle', result: null } }); else if (S.placement.status !== 'idle') S.patch({ placement: { status: 'idle', result: null } }); else if (S.pcbPlacing) S.patch({ pcbPlacing: null }); else if (S.routing || S.zoneDraft || S.outlineDraft || S.measure) S.patch({ routing: null, zoneDraft: null, outlineDraft: null, measure: null }); else if (S.pcbTool !== 'select') S.setPcbTool('select'); else S.patch({ pcbSelection: [], highlightNet: null, checkHighlight: null }); }
+        if (e.key === 'Escape') { if (S.guideOpen) S.set('guideOpen', false); else if (S.autoroute.status !== 'idle') S.patch({ autoroute: { status: 'idle', result: null } }); else if (S.placement.status !== 'idle') S.patch({ placement: { status: 'idle', result: null } }); else if (S.pcbPlacing) S.patch({ pcbPlacing: null }); else if (S.routing || S.zoneDraft || S.outlineDraft || S.measure) S.patch({ routing: null, zoneDraft: null, outlineDraft: null, measure: null }); else if (S.pcbTool !== 'select') S.setPcbTool('select'); else S.patch({ pcbSelection: [], highlightNet: null, checkHighlight: null }); }
         else if (k === 'v') {
           if (S.routing) {
             const r = S.routing; const last = r.points[r.points.length - 1];
@@ -171,6 +173,7 @@ export function Workspace() {
   const removeSheet = (id: string) => { if (sheets.length <= 1) return; const sh = sheets.find((x) => x.id === id)!; if (sh.components.length && !confirm(`删除图纸「${sh.name}」及其中 ${sh.components.length} 个元件？`)) return; editor.dispatch(sch.deleteSheet(id)); app.patch({ sheetId: sheets.find((x) => x.id !== id)!.id, selection: [] }); };
   const onPcbTool = (id: string) => {
     if (id === 'refill') { app.toast('铺铜实时计算，无需重填'); return; }
+    if (id === 'placement') { if (!project.board.footprints.length) { app.toast('板上还没有元件，先在原理图里「同步到 PCB」'); return; } app.patch({ placementSeq: app.placementSeq + 1, routing: null, zoneDraft: null, outlineDraft: null, measure: null }); return; }
     if (id === 'autoroute') { if (a.ratsnest.unrouted === 0) { app.toast('没有未布线的连接'); return; } app.patch({ pcbTool: 'autoroute', routing: null, zoneDraft: null, outlineDraft: null, measure: null }); return; }
     app.setPcbTool(id as typeof app.pcbTool);
   };

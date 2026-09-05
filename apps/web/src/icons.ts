@@ -17,6 +17,8 @@ export const I = {
   flip: 'M12 3v18M8 7L4 12l4 5M16 7l4 5-4 5',
   align: 'M4 4v16M9 8h11M9 14h7',
   auto: 'M4 18h4l4-8 4 8h4M12 4v2M6 8l1.5 1.5M18 8l-1.5 1.5',
+  layout: 'M4 4h7v5H4zM13 4h7v9h-7zM4 11h7v9H4zM13 15h7v5h-7z',
+  guide: 'M12 3a9 9 0 100 18 9 9 0 000-18zM15.5 8.5l-2 5-5 2 2-5 5-2z',
   refill: 'M4 4h16v16H4zM8 12a4 4 0 108 0M12 8v4',
   search: 'M11 4a7 7 0 100 14 7 7 0 000-14zM20 20l-3.5-3.5',
   cloud: 'M17.5 19a4.5 4.5 0 100-9 6 6 0 00-11.6 1.5A4 4 0 006 19z',
