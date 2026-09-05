@@ -56,7 +56,7 @@ export function syncBoardDetailed(project: Project): SyncOutcome {
   for (const c of comps) {
     const res = resolveFootprint(c);
     const fpId = res.id;
-    if (res.created) createdFootprints.push(res.created);
+    if (res.created && !createdFootprints.some((d) => d.id === res.created!.id)) createdFootprints.push(res.created);
     if (res.placeholder) placeholders.push(c.ref);
     if (res.mapped) mapped.push(c.ref);
     const def = findFootprint(fpId);

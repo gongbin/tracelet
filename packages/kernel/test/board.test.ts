@@ -88,3 +88,30 @@ describe('封装解析', () => {
     expect(ed.project.board.footprints.length).toBe(2);
   });
 });
+
+describe('封装缺失的健壮性', () => {
+  it('同步前预算一次（如顶栏提示）再执行命令，占位封装仍会写入项目库；序列化后重新加载能渲染焊盘', async () => {
+    const { createProject, ProjectEditor, sch, pcb, syncBoardDetailed, parseProject, serializeProject, footprintPads, allPads, autoroute, ruleSetOf, registeredFootprints } = await import('../src/index.js');
+    const ed = new ProjectEditor(createProject({ name: 't' }));
+    const sheet = ed.project.schematic.sheets[0].id;
+    const u = sch.placeComponent(ed.project, { sheetId: sheet, symbolId: 'sym:ESP32-C3-MINI-1', center: { x: 4000, y: 2000 }, footprint: 'fp:kicad:Weird_Module', props: { kicadFootprint: 'Lib:Weird_Module' } });
+    ed.dispatch(u.command);
+    // 强制走占位：把符号默认封装也去掉
+    ed.dispatch(sch.setComponentFootprint(sheet, u.id, 'fp:kicad:Nope'));
+    const j = sch.placeComponent(ed.project, { sheetId: sheet, symbolId: 'sym:R', center: { x: 1000, y: 1000 }, footprint: 'fp:kicad:PinHeader_1x02_P2.54mm_Vertical', props: { kicadFootprint: 'Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical' } });
+    ed.dispatch(j.command);
+    syncBoardDetailed(ed.project); // 预算（注册了占位）
+    ed.dispatch(pcb.syncFromSchematic()); // 真正同步
+    const lib = ed.project.library.footprints.map((f) => f.id);
+    expect(lib.some((id) => id.startsWith('fp:gen:PinHeader_1x02'))).toBe(true);
+    const again = parseProject(serializeProject(ed.project));
+    for (const fp of again.board.footprints) expect(footprintPads(fp, again.board).length).toBeGreaterThan(0);
+    const header = again.board.footprints.find((f) => f.ref === 'R1')!;
+    expect(footprintPads(header, again.board)[0].def.drill).toBe(1.0);
+    // 即使定义彻底丢失也不崩
+    const broken = { ...again, board: { ...again.board, footprints: again.board.footprints.map((f) => ({ ...f, footprintId: 'fp:placeholder:lost' })) } };
+    expect(() => allPads(broken.board)).not.toThrow();
+    expect(() => autoroute(broken.board, ruleSetOf(broken))).not.toThrow();
+    void registeredFootprints;
+  });
+});

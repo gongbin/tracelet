@@ -1,7 +1,7 @@
 import type { Board } from '../model/board.js';
 import type { RuleSet } from '../model/project.js';
 import type { CheckItem, CheckReport } from '../schematic/erc.js';
-import { segRectDist, segSegDist, rectsOverlap, pointInPolygon, expandRect, type Vec } from '../geometry.js';
+import { segRectDist, segSegDist, rectsOverlap, pointInPolygon, expandRect, pointSegDist, type Vec } from '../geometry.js';
 import { allPads, footprintBody, netClassFor } from './geometry.js';
 import { computeRatsnest } from './ratsnest.js';
 
@@ -50,6 +50,18 @@ export function runDrc(board: Board, rules: RuleSet): CheckReport {
     }
   }
 
+  // 过孔 vs 异网络焊盘 / 走线
+  for (const v of board.vias) {
+    for (const p of pads) {
+      if (p.net && v.net && p.net === v.net) continue;
+      const d = segRectDist(v, v, p.rect) - v.size / 2;
+      if (d < clearance - 1e-6) push({ rule: 'clearance', severity: 'error', message: `过孔与焊盘间距不足 ${f(Math.max(d, 0))} < ${f(clearance)}mm`, why: '过孔环与相邻焊盘太近会短路。', refs: [`过孔 ${v.net || '?'} ↔ ${p.ref}.${p.number}`], location: v, objectIds: [v.id, p.footprintId] });
+    }
+    for (const t of board.traces) {
+      if (t.net && v.net && t.net === v.net) continue;
+      for (let i = 0; i < t.points.length - 1; i++) { const d = pointSegDist(v, t.points[i], t.points[i + 1]) - v.size / 2 - t.width / 2; if (d < clearance - 1e-6) { push({ rule: 'clearance', severity: 'error', message: `过孔与走线间距不足 ${f(Math.max(d, 0))} < ${f(clearance)}mm`, why: '过孔环与异网络走线太近会短路。', refs: [`过孔 ${v.net || '?'} ↔ 走线 ${t.net || '?'}`, t.layer], location: v, objectIds: [v.id, t.id] }); break; } }
+    }
+  }
   // 过孔
   for (const v of board.vias) {
     if (v.drill < rules.minDrill - 1e-6) push({ rule: 'min-drill', severity: 'error', message: `过孔孔径 ${f(v.drill)} 低于最小 ${f(rules.minDrill)}mm`, why: '钻头规格有限，太小的孔无法加工。', refs: [v.net || '?'], location: v, objectIds: [v.id] });

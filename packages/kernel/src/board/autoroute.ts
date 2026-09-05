@@ -81,14 +81,24 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   for (const t of board.traces) for (let i = 0; i < t.points.length - 1; i++) markSeg(t.points[i], t.points[i + 1], t.width / 2 + clearance, [t.layer], netId(t.net) || -1);
   for (const v of board.vias) markSeg(v, v, v.size / 2 + clearance, layers, netId(v.net) || -1);
 
-  const rats = computeRatsnest(board, rules);
-  let lines: RatsnestLine[] = rats.lines;
-  if (opts.nets?.length) lines = lines.filter((l) => opts.nets!.includes(l.net));
-  const result: AutorouteResult = { traces: [], vias: [], routed: 0, failed: [], total: lines.length };
-
+  const initial = computeRatsnest(board, rules);
+  const netFilter = (l: RatsnestLine) => !opts.nets?.length || opts.nets.includes(l.net);
+  const result: AutorouteResult = { traces: [], vias: [], routed: 0, failed: [], total: initial.lines.filter(netFilter).length };
+  const skipped = new Set<string>();
+  // 每布通一条就重新计算飞线：新走线并入连通组，后续目标自动变成"最近的已连通铜"
+  const nextLine = (): RatsnestLine | null => {
+    const cur: Board = { ...board, traces: [...board.traces, ...result.traces.map((t, i) => ({ id: `ar${i}`, ...t }))], vias: [...board.vias, ...result.vias.map((v, i) => ({ id: `av${i}`, ...v }))] };
+    const ls = computeRatsnest(cur, rules).lines.filter(netFilter).filter((l) => !skipped.has(`${l.net}|${l.a.x},${l.a.y}|${l.b.x},${l.b.y}`));
+    if (!ls.length) return null;
+    ls.sort((x, y) => Math.hypot(x.a.x - x.b.x, x.a.y - x.b.y) - Math.hypot(y.a.x - y.b.x, y.a.y - y.b.y));
+    return ls[0];
+  };
   const padAt = (p: Vec): WorldPad | undefined => pads.find((pd) => Math.abs(pd.center.x - p.x) < 1e-6 && Math.abs(pd.center.y - p.y) < 1e-6);
 
-  for (const line of lines) {
+  for (let guard = 0; guard < result.total * 3 + 10; guard++) {
+    const line = nextLine();
+    if (!line) break;
+
     const net = line.net, nid = netId(net);
     const width = padWidthOf(net);
     const halfW = width / 2 + clearance;
@@ -137,15 +147,18 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       const gi = gScore[i];
       for (const [dx, dy, c] of DIRS) {
         const nx = x + dx, ny = y + dy;
-        if (!free(nx, ny, l) && !goal.has(idx(nx, ny, l))) continue;
+        const isCenterGoal = nx === t.x && ny === t.y && goalLayers.has(l);
+        if (!free(nx, ny, l) && !isCenterGoal) continue;
         // 对角线不能穿过两个相邻占用格
         if (dx && dy && !free(x + dx, y, l) && !free(x, y + dy, l)) continue;
         const ni = idx(nx, ny, l);
         // 转向惩罚（让走线更直）
         const prev = came[i];
         let turn = 0;
-        if (prev >= 0) { const px = prev % W, py = Math.floor((prev % (W * H)) / W); if (px - x !== -dx || py - y !== -dy) turn = 0.3; }
-        const ng = gi + c + turn;
+        if (prev >= 0) { const px = prev % W, py = Math.floor((prev % (W * H)) / W); if (x - px !== dx || y - py !== dy) turn = 0.8; }
+        // 已有同网络铜上再走线（重叠）加代价，鼓励走空地
+        const own = occ[idx(nx, ny, l)] === nid && !goal.has(idx(nx, ny, l)) ? 0.6 : 0;
+        const ng = gi + c + turn + own;
         if (ng < gScore[ni]) { gScore[ni] = ng; came[ni] = i; heap.push(ng + h(nx, ny), ni); }
       }
       if (L > 1 && viaFree(x, y)) for (let nl = 0; nl < L; nl++) {
@@ -154,7 +167,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
         if (ng < gScore[ni]) { gScore[ni] = ng; came[ni] = i; heap.push(ng + h(x, y), ni); }
       }
     }
-    if (found < 0) { result.failed.push({ net, reason: expanded > maxNodes ? '搜索空间过大' : '没有可用路径' }); continue; }
+    if (found < 0) { skipped.add(`${net}|${line.a.x},${line.a.y}|${line.b.x},${line.b.y}`); result.failed.push({ net, reason: expanded > maxNodes ? '搜索空间过大' : '没有可用路径' }); continue; }
 
     // 回溯路径
     const path: { x: number; y: number; l: number }[] = [];
@@ -179,11 +192,14 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       seg.push(toWorld(p.x, p.y));
     }
     flush();
-    // 首末点精确落到焊盘中心，保证连通性判定
+    // 首末点精确落到焊盘中心（连通性判定），用 45° 折线衔接，避免非 45° 短线
     const near = (a: Vec, b: Vec) => Math.hypot(a.x - b.x, a.y - b.y) < 1e-6;
+    const bend = (a: Vec, b: Vec): Vec | null => { const dx = b.x - a.x, dy = b.y - a.y, ax = Math.abs(dx), ay = Math.abs(dy); if (ax < 1e-9 || ay < 1e-9 || Math.abs(ax - ay) < 1e-9) return null; const d = Math.min(ax, ay); return { x: a.x + Math.sign(dx) * d, y: a.y + Math.sign(dy) * d }; };
     const first = result.traces[firstIdx], last = result.traces[result.traces.length - 1];
-    if (first && !near(first.points[0], line.a)) first.points.unshift({ ...line.a });
-    if (last && last !== undefined && !near(last.points[last.points.length - 1], line.b)) last.points.push({ ...line.b });
+    if (first && !near(first.points[0], line.a)) { const m = bend(line.a, first.points[0]); first.points.unshift(...(m ? [{ ...line.a }, m] : [{ ...line.a }])); }
+    if (last && !near(last.points[last.points.length - 1], line.b)) { const m = bend(last.points[last.points.length - 1], line.b); last.points.push(...(m ? [m, { ...line.b }] : [{ ...line.b }])); }
+    if (first) first.points = simplify(first.points);
+    if (last && last !== first) last.points = simplify(last.points);
     if (!first) { // 仅过孔无走线的极端情况：直接连一段
       result.traces.push({ layer: layers[curL], net, width, points: [{ ...line.a }, { ...line.b }] });
     }

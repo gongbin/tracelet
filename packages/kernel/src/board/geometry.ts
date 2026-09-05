@@ -1,7 +1,8 @@
 import type { Board, BoardFootprint, CopperLayer, FootprintDef, PadDef } from '../model/board.js';
 import { copperLayers } from '../model/board.js';
 import { type Rect, type Vec, rotate, polygonBounds } from '../geometry.js';
-import { getFootprint } from '../library/footprints.js';
+import { findFootprint } from '../library/footprints.js';
+import { ensureFootprintDef } from './footprintResolve.js';
 
 export interface WorldPad {
   footprintId: string;
@@ -18,7 +19,7 @@ export interface WorldPad {
 }
 
 export function footprintDef(fp: BoardFootprint): FootprintDef {
-  return getFootprint(fp.footprintId);
+  return findFootprint(fp.footprintId) ?? ensureFootprintDef(fp);
 }
 
 function padWorld(fp: BoardFootprint, pad: PadDef): { center: Vec; rect: Rect } {

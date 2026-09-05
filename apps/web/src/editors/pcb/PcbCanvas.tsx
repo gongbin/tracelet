@@ -14,6 +14,13 @@ function snap45(a: Vec, p: Vec): Vec {
   const len = Math.cos(ang - q) * Math.hypot(dx, dy);
   return { x: a.x + Math.cos(q) * len, y: a.y + Math.sin(q) * len };
 }
+/** 从 a 到 b 的 45° 折线：先走对角线再走直线（KiCad 风格），返回中间点或 null。 */
+function bend45(a: Vec, b: Vec): Vec | null {
+  const dx = b.x - a.x, dy = b.y - a.y, ax = Math.abs(dx), ay = Math.abs(dy);
+  if (ax < 1e-6 || ay < 1e-6 || Math.abs(ax - ay) < 1e-6) return null;
+  const d = Math.min(ax, ay);
+  return { x: a.x + Math.sign(dx) * d, y: a.y + Math.sign(dy) * d };
+}
 const sg = (v: number) => snapTo(v, PCB_GRID);
 const fmt = (v: number) => v.toFixed(2);
 const ptsBox = (pts: Vec[], m = 0): Rect => { const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y); const x = Math.min(...xs) - m, y = Math.min(...ys) - m; return { x, y, w: Math.max(...xs) + m - x, h: Math.max(...ys) + m - y }; };
@@ -83,7 +90,8 @@ export function PcbCanvas() {
 
   const finishRoute = (extra?: Vec) => {
     const r = app.routing; if (!r) return;
-    const pts = extra ? [...r.points, extra] : r.points;
+    let pts = r.points;
+    if (extra) { const last = pts[pts.length - 1]; const mid = bend45(last, extra); pts = mid ? [...pts, mid, extra] : [...pts, extra]; }
     if (pts.length >= 2) editor.dispatch(pcb.addTrace({ layer: r.layer, net: r.net, width: r.width, points: pts }).command);
     app.patch({ routing: null });
   };
@@ -157,9 +165,10 @@ export function PcbCanvas() {
     const d = drag.current;
     if (!d) {
       if (app.routing) {
-        const last = app.routing.points[app.routing.points.length - 1];
-        const pv = previewTarget(raw);
-        setPreviewBad(violates(last, pv, app.routing.layer, app.routing.width, app.routing.net));
+        const pv = previewPath(raw);
+        let prev = app.routing.points[app.routing.points.length - 1], bad = false;
+        for (const q of pv) { if (violates(prev, q, app.routing.layer, app.routing.width, app.routing.net)) bad = true; prev = q; }
+        setPreviewBad(bad);
       }
       return;
     }
@@ -240,12 +249,12 @@ export function PcbCanvas() {
   const onOutlinePtDown = (index: number) => (e: RPE<SVGElement>) => { if (e.button !== 0) return; begin('编辑板框', { kind: 'outlinePt', index }, e); };
   const onZoneDown = (id: string) => (e: RPE<SVGElement>) => { if (e.button !== 0 || !isSelectLike) return; e.stopPropagation(); select(id, e); };
 
-  const previewTarget = (raw: Vec): Vec => {
+  const previewPath = (raw: Vec): Vec[] => {
     const r = app.routing!;
     const last = r.points[r.points.length - 1];
     const pad = padAt(raw);
-    if (pad && pad.net === r.net) return pad.center;
-    return snap45(last, { x: sg(raw.x), y: sg(raw.y) });
+    if (pad && pad.net === r.net) { const mid = bend45(last, pad.center); return mid ? [mid, pad.center] : [pad.center]; }
+    return [snap45(last, { x: sg(raw.x), y: sg(raw.y) })];
   };
 
   /** 右键 / 双指轻触：结束当前走线 / 草稿 / 工具。 */
@@ -284,7 +293,7 @@ export function PcbCanvas() {
   const gs = step * vp.k;
   const bb = boardBounds(board);
   const cursorSnap = { x: sg(app.cursorWorld.x), y: sg(app.cursorWorld.y) };
-  const routePreview = app.routing ? previewTarget(app.cursorWorld) : null;
+  const routePreview = app.routing ? previewPath(app.cursorWorld) : null;
   const drcMarks = analysis.drc.items.filter((i) => i.location && i.rule !== 'outside-board');
   const cursor = tool === 'route' || tool === 'zone' || tool === 'measure' || tool === 'via' || tool === 'edge' ? 'crosshair' : view.panning ? 'grabbing' : view.spaceDown ? 'grab' : 'default';
   const hlItem = app.checkHighlight ? analysis.drc.items.find((i) => i.id === app.checkHighlight) : null;
@@ -368,8 +377,8 @@ export function PcbCanvas() {
           {app.routing && routePreview && (
             <g pointerEvents="none">
               <path d={app.routing.points.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${p.y}`).join('')} stroke={LAYER_COLORS[app.routing.layer]} strokeWidth={app.routing.width} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
-              <line x1={app.routing.points[app.routing.points.length - 1].x} y1={app.routing.points[app.routing.points.length - 1].y} x2={routePreview.x} y2={routePreview.y} stroke={previewBad ? '#FF3B30' : LAYER_COLORS[app.routing.layer]} strokeWidth={app.routing.width} strokeLinecap="round" opacity={0.9} />
-              <circle cx={routePreview.x} cy={routePreview.y} r={app.routing.width} fill="none" stroke={previewBad ? '#FF3B30' : '#fff'} strokeWidth={0.06} />
+              <path d={`M${app.routing.points[app.routing.points.length - 1].x} ${app.routing.points[app.routing.points.length - 1].y}` + routePreview.map((q) => `L${q.x} ${q.y}`).join('')} stroke={previewBad ? '#FF3B30' : LAYER_COLORS[app.routing.layer]} strokeWidth={app.routing.width} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
+              <circle cx={routePreview[routePreview.length - 1].x} cy={routePreview[routePreview.length - 1].y} r={app.routing.width} fill="none" stroke={previewBad ? '#FF3B30' : '#fff'} strokeWidth={0.06} />
             </g>
           )}
           {/* 铺铜 / 板框草稿 */}

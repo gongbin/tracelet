@@ -5,6 +5,7 @@ import { Wizard } from './screens/Wizard.js';
 import { Workspace } from './screens/Workspace.js';
 import { CommandPalette } from './components/CommandPalette.js';
 import { Toasts } from './components/Toasts.js';
+import { ErrorBoundary } from './components/ErrorBoundary.js';
 
 export function App() {
   const editor = useApp((s) => s.editor);
@@ -26,7 +27,7 @@ export function App() {
 
   return (
     <div className="app" onClick={() => { const s = useApp.getState(); if (s.projMenuOpen || s.pwrMenuOpen) s.patch({ projMenuOpen: false, pwrMenuOpen: false }); }}>
-      {editor ? <Workspace /> : <Home />}
+      {editor ? <ErrorBoundary key={editor.project.id}><Workspace /></ErrorBoundary> : <Home />}
       {wizardOpen && <Wizard />}
       <CommandPalette />
       <Toasts />

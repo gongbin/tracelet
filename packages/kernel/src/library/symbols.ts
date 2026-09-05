@@ -1,5 +1,5 @@
 import type { SymbolDef } from '../model/schematic.js';
-import { registeredSymbol } from './registry.js';
+import { registeredSymbol, registerSymbols } from './registry.js';
 
 /** 内置符号库（单位 mil，栅格 100）。后续通过 KiCad 库导入扩充。 */
 export const BUILTIN_SYMBOLS: SymbolDef[] = [
@@ -93,7 +93,11 @@ export const BUILTIN_SYMBOLS: SymbolDef[] = [
 const byId = new Map(BUILTIN_SYMBOLS.map((s) => [s.id, s]));
 export function getSymbol(id: string): SymbolDef {
   const s = byId.get(id) ?? registeredSymbol(id);
-  if (!s) throw new Error(`未知符号: ${id}`);
-  return s;
+  if (s) return s;
+  // 定义缺失（旧文件 / 未随项目保存）：生成一个无引脚的占位盒，避免界面崩溃
+  const fallback: SymbolDef = { id, name: `缺失符号 ${id.replace(/^sym:(kicad:|gen:)?/, '')}`, kind: '缺失', prefix: 'U', width: 1000, height: 600, graphic: 'box', pins: [], showPinNames: false, power: false, defaultValue: '', defaultFootprint: '', description: '符号定义缺失，请重新导入或替换', source: 'missing' };
+  registerSymbols([fallback]);
+  console.warn(`[tracelet] 未知符号 ${id}，已用占位符号代替`);
+  return fallback;
 }
 export function findSymbol(id: string): SymbolDef | undefined { return byId.get(id) ?? registeredSymbol(id); }
