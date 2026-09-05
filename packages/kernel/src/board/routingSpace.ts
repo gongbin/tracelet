@@ -65,6 +65,16 @@ export class RoutingSpace {
     }
     return true;
   }
+  /** 与点 p（半径 radius）在 layer 上冲突的第一个异网络名；无冲突返回 null。 */
+  conflictNet(p: Vec, radius: number, layer: CopperLayer, net: string, clearance: number): string | null {
+    const list = this.buckets.get(`${Math.floor(p.x / this.bucketSize)},${Math.floor(p.y / this.bucketSize)}`) ?? [];
+    for (const o of list) {
+      if ((o.net && o.net === net) || !o.layers.includes(layer)) continue;
+      const d = 'rect' in o ? pointRectDist(p, o.rect) : pointSegDist(p, o.a, o.b) - o.radius;
+      if (d < radius + Math.max(clearance, o.clearance) - 1e-7) return o.net || '';
+    }
+    return null;
+  }
   free(p: Vec, radius: number, layer: CopperLayer, net: string, clearance: number): boolean {
     const list = this.buckets.get(`${Math.floor(p.x / this.bucketSize)},${Math.floor(p.y / this.bucketSize)}`) ?? [];
     for (const o of list) {

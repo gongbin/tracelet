@@ -283,14 +283,14 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   const came = new Int32Array(N * L);
   const heap = new MinHeap();
   const freeStamp = new Int32Array(N * L), freeVal = new Int8Array(N * L);
-  const dynS = new Int32Array(N * L), dynV = new Int8Array(N * L);
+  const dynS = new Int32Array(N * L), dynV = new Int8Array(N * L), dynNet = new Int32Array(N * L);
   const viaStamp = new Int32Array(N), viaVal = new Int8Array(N);
   let generation = 0;
   let routedLines = 0;
 
   /** 布一条飞线。mode=negotiate：与其他新走线冲突只加代价；strict：视为硬障碍。 */
   let corridorInfo: { CW: number; CH: number; f: number } | null = null;
-  const routeLine = (line: RatsnestLine, mode: 'negotiate' | 'strict', pf: number, connectivity: ReturnType<typeof computeRatsnest>, corridor?: Uint8Array): { route?: Route; reason?: string } => {
+  const routeLine = (line: RatsnestLine, mode: 'negotiate' | 'strict' | 'soft', pf: number, connectivity: ReturnType<typeof computeRatsnest>, corridor?: Uint8Array): { route?: Route; reason?: string; crossed?: string[] } => {
     generation++;
     const net = line.net, nid = netId(net), nr = netOf(net);
     const preferredWidth = widthOf(net), clearance = clearanceOf(net);
@@ -333,15 +333,18 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       dynS[i] = generation;
       const p = toWorld(x, y);
       const nearPad = [pa, pb].some((pd) => pd && segRectDist(p, p, pd.rect) < 1.25);
-      const ok = dyn.free(p, (nearPad ? width : preferredWidth) / 2, layers[l], net, clearance);
-      dynV[i] = ok ? 1 : -1;
-      return ok;
+      const other = dyn.conflictNet(p, (nearPad ? width : preferredWidth) / 2, layers[l], net, clearance);
+      dynV[i] = other === null ? 1 : -1;
+      dynNet[i] = other === null ? 0 : netId(other);
+      return other === null;
     };
     const inCorridor = (x: number, y: number, l: number) => { if (!corridor || !corridorInfo) return true; const { CW, CH, f } = corridorInfo; return corridor[(l * CH + Math.floor(y / f)) * CW + Math.floor(x / f)] === 1; };
     const OUTSIDE = opts.corridorPenalty ?? 1.5; // 走廊外每步附加代价（软约束：允许局部偏离，但整体沿全局规划）
+    const softCost = (x: number, y: number, l: number) => (mode === 'soft' && !dynFree(x, y, l) ? pf : 0);
     const free = (x: number, y: number, l: number) => {
       if (!staticFree(x, y, l)) return false;
       if (mode === 'strict') return dynFree(x, y, l);
+      if (mode === 'soft') return true; // 与其他新走线的冲突只加代价（探测挡路网络）
       const c = conflictAt(idx(x, y, l), nid, hw, net); return c === 0 || c === 1;
     };
     const { viaDrill, viaSize } = netRules(board, rules, net);
@@ -385,14 +388,14 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
         const turn = prev >= 0 && (x - px !== dx || y - py !== dy) ? 0.8 : 0;
         const own = (occ[ni] === nid || ownOnlyAt(ni, nid)) && !goal.has(ni) ? 0.6 : 0;
         const congestion = mode === 'negotiate' && conflictAt(ni, nid, hw, net) === 1 ? pf * (1 + hist[ni]) : 0;
-        const ng = gi + c + turn + own + dirPen(l, dx, dy) + congestion + (corridor && !inCorridor(nx, ny, l) ? OUTSIDE : 0);
+        const ng = gi + c + turn + own + dirPen(l, dx, dy) + congestion + softCost(nx, ny, l) + (corridor && !inCorridor(nx, ny, l) ? OUTSIDE : 0);
         if (ng < gScore[ni]) { gScore[ni] = ng; came[ni] = i; heap.push(ng + h(nx, ny), ni); }
       }
       if (L > 1 && viaFree(x, y)) {
-        const vc = mode === 'strict' ? (layers.every((layer) => dyn.free(toWorld(x, y), viaSize / 2, layer, net, clearance)) ? 0 : -1) : viaConflict(x, y);
+        const vc = mode === 'strict' ? (layers.every((layer) => dyn.free(toWorld(x, y), viaSize / 2, layer, net, clearance)) ? 0 : -1) : mode === 'soft' ? layers.filter((layer) => !dyn.free(toWorld(x, y), viaSize / 2, layer, net, clearance)).length : viaConflict(x, y);
         if (vc >= 0 && !(mode === 'strict' && vc)) for (let nl = 0; nl < L; nl++) {
           if (nl === l) continue;
-          const ni = idx(x, y, nl); const ng = gi + viaCost + (vc ? pf * vc * (1 + hist[ni]) : 0) + (corridor && !inCorridor(x, y, nl) ? viaCost : 0);
+          const ni = idx(x, y, nl); const ng = gi + viaCost + (vc ? (mode === 'soft' ? pf * vc * 3 : pf * vc * (1 + hist[ni])) : 0) + (corridor && !inCorridor(x, y, nl) ? viaCost : 0);
           if (ng < gScore[ni]) { gScore[ni] = ng; came[ni] = i; heap.push(ng + h(x, y), ni); }
         }
       }
@@ -406,6 +409,16 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     const path: { x: number; y: number; l: number }[] = [];
     for (let i = found; i >= 0; i = came[i]) path.push({ l: Math.floor(i / N), y: Math.floor((i % N) / W), x: (i % N) % W });
     path.reverse();
+    if (mode === 'soft') {
+      const crossed = new Set<string>();
+      for (let k = 0; k < path.length; k++) {
+        const p = path[k]; const i = idx(p.x, p.y, p.l);
+        if (!dynFree(p.x, p.y, p.l) && dynNet[i]) crossed.add(nameOfNid.get(dynNet[i]) ?? '');
+        if (k > 0 && path[k - 1].l !== p.l) { const wp = toWorld(p.x, p.y); for (const layer of layers) { const o = dyn.conflictNet(wp, viaSize / 2, layer, net, clearance); if (o) crossed.add(o); } }
+      }
+      crossed.delete('');
+      return { route: { key: keyOf(line), traces: [], vias: [] }, crossed: [...crossed] };
+    }
     const sourcePoint = startPoints.get(idx(path[0].x, path[0].y, path[0].l)) ?? line.a;
     const targetPoint = goalPoints.get(found) ?? line.b;
     const traces: TraceOut[] = [], vias: ViaOut[] = [];
@@ -532,7 +545,8 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   }
   // 第 1 阶段：全部网络严格布线（全局最短飞线优先）
   routeGroup([...nets.values()], 'strict', 0);
-  opts.debug?.({ phase1: true, t: Date.now() - t0 });
+  const phase1Ms = Date.now() - t0;
+  opts.debug?.({ phase1: true, t: phase1Ms });
   /** 挡在失败飞线附近的网络（端点 2.5mm 内或直连线走廊 1mm 内有其新走线）。 */
   const blockersOf = (failedNets: NetRoutes[], radius = 2.5): NetRoutes[] => {
     const lines = remainingLines().filter((l) => failedNets.some((n) => n.net === l.net));
@@ -544,27 +558,41 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     }
     return [...out];
   };
-  // 第 2 阶段：拆线重布——失败网络 + 挡路网络一起拆掉，失败网络优先重布，挡路网络随后按最短优先补回；变差则回滚
-  let rollbacks = 0;
-  for (let pass = 0; pass < 4 && rollbacks < 1; pass++) {
-    const failedNets = [...nets.values()].filter(retryable);
-    if (!failedNets.length || Date.now() > deadline) break;
-    const blockers = blockersOf(failedNets, 2.5 + pass * 1.5);
-    if (!blockers.length) break;
+  // 第 2 阶段：定向拆线重布——对每条未布通的飞线，用"软冲突"探测搜索找出真正挡路的网络（路径穿过谁），
+  // 只拆这些网络，先布失败线再补回它们；没有变好就回滚。比按距离猜挡路者精准得多。
+  const attempted = new Set<string>();
+  let sweep = 0;
+  for (let iter = 0; iter < 90 && Date.now() < deadline; iter++) {
+    let remaining = remainingLines().filter((l) => !attempted.has(keyOf(l)) && !/板框外/.test(netOf(l.net).failures.get(keyOf(l)) ?? ''));
+    // 一轮扫完还有剩余：板子已经变了，再扫一轮（最多 3 轮）
+    if (!remaining.length && sweep < 2 && remainingLines().some((l) => !/板框外/.test(netOf(l.net).failures.get(keyOf(l)) ?? ''))) { sweep++; attempted.clear(); remaining = remainingLines().filter((l) => !/板框外/.test(netOf(l.net).failures.get(keyOf(l)) ?? '')); }
+    if (!remaining.length) break;
+    remaining.sort((x, y) => Math.hypot(x.a.x - x.b.x, x.a.y - x.b.y) - Math.hypot(y.a.x - y.b.x, y.a.y - y.b.y));
+    const line = remaining[0]; attempted.add(keyOf(line));
+    const nr = netOf(line.net);
+    const probe = routeLine(line, 'soft', 12, computeRatsnest(netBoard(line.net), rules, fillsOf(line.net)));
+    if (!probe.route) continue; // 静态障碍就把它堵死了，拆别人也没用
+    const blockers = (probe.crossed ?? []).map((n) => nets.get(n)).filter((x): x is NetRoutes => !!x && x !== nr);
+    if (!blockers.length) { unmarkNet(nr); routeGroup([nr], 'strict', 0); continue; }
+    if (blockers.length > 8) continue;
     rounds++;
-    opts.debug?.({ pass, t: Date.now() - t0, failed: failedNets.map((n) => n.net), blockers: blockers.length });
+    opts.debug?.({ pass: iter, t: Date.now() - t0, line: `${line.net} ${Math.hypot(line.a.x - line.b.x, line.a.y - line.b.y).toFixed(1)}mm`, blockers: blockers.map((b) => b.net) });
     const before = remainingLines().length;
-    const subset = [...failedNets, ...blockers];
-    const snapshot = new Map(subset.map((nr) => [nr, { routes: nr.routes, failures: new Map(nr.failures) }]));
-    for (const nr of subset) ripNet(nr);
-    routeGroup(subset, 'strict', 0, new Set(failedNets.map((n) => n.net)));
+    const subset = [nr, ...blockers];
+    const snapshot = new Map(subset.map((x) => [x, { routes: x.routes, failures: new Map(x.failures) }]));
+    for (const x of blockers) ripNet(x);
+    unmarkNet(nr);
+    routeGroup(subset, 'strict', 0, new Set([nr.net]));
     const after = remainingLines().length;
-    if (after >= before) { rollbacks++; for (const [nr, snap] of snapshot) { ripNet(nr); nr.routes = snap.routes; nr.failures = snap.failures; markNet(nr); } } // 没有变好：回滚，下一轮扩大拆线范围；连续两次无效即停
+    if (after >= before) for (const [x, snap] of snapshot) { ripNet(x); x.routes = snap.routes; x.failures = snap.failures; markNet(x); }
   }
+  void blockersOf;
+  // 收尾：剩余飞线在最终布局上再各试一次（前面失败时的局面可能已经变了）
+  for (const nr of [...nets.values()].filter(retryable)) { if (Date.now() > deadline) break; unmarkNet(nr); routeGroup([nr], 'strict', 0); }
   // 第 3 阶段：还有失败就整板重布一到两次，失败网络优先（相当于换一种布线顺序）；没有变好则回滚
   for (let attempt = 0; attempt < 1; attempt++) {
     const failedNets = [...nets.values()].filter(retryable);
-    if (!failedNets.length || Date.now() > deadline || Date.now() - t0 > 20000) break; // 大板不再整板重布，时间花在刀刃上
+    if (!failedNets.length || Date.now() > deadline || phase1Ms > 4000) break; // 大板不再整板重布，时间花在刀刃上
     rounds++;
     opts.debug?.({ full: attempt, t: Date.now() - t0, failed: failedNets.map((n) => n.net) });
     const before = remainingLines().length;
