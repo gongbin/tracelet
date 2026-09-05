@@ -1,9 +1,10 @@
-import type { Sheet, SchComponent, PinType } from '../model/schematic.js';
+import type { Sheet, SchComponent, PinType, Schematic } from '../model/schematic.js';
 import { UnionFind, key, pointOnSeg, type Vec } from '../geometry.js';
 import { getSymbol } from '../library/symbols.js';
 import { pinGeoms } from './geometry.js';
 
 export interface NetPin {
+  sheetId?: string;
   componentId: string;
   ref: string;
   pinNumber: string;
@@ -44,12 +45,12 @@ export function buildNetlist(sheet: Sheet): Netlist {
       segs.push({ a, b });
     }
   }
-  for (const j of sheet.junctions) uf.find(PT(j));
-
   const attach = (p: Vec, node: string) => {
     uf.union(node, PT(p));
     for (const s of segs) if (pointOnSeg(p, s.a, s.b, 0.5)) uf.union(node, PT(s.a));
   };
+  // 结点：让经过该点的所有导线段相连
+  for (const j of sheet.junctions) attach(j, `junction:${j.id}`);
 
   const pinInfo = new Map<string, NetPin>();
   const powerOf = new Map<string, string>();
@@ -59,12 +60,13 @@ export function buildNetlist(sheet: Sheet): Netlist {
     const sym = getSymbol(c.symbolId);
     for (const g of pinGeoms(c, sym)) {
       const node = PIN(c.id, g.def.number);
-      pinInfo.set(node, { componentId: c.id, ref: c.ref, pinNumber: g.def.number, pinName: g.def.name, type: g.def.type, pos: g.end });
+      pinInfo.set(node, { sheetId: sheet.id, componentId: c.id, ref: c.ref, pinNumber: g.def.number, pinName: g.def.name, type: g.def.type, pos: g.end });
       attach(g.end, node);
       if (sym.power) { uf.union(node, `power:${c.value}`); powerOf.set(node, c.value); }
     }
   }
-  for (const l of sheet.labels) attach({ x: l.x, y: l.y }, `label:${l.id}`);
+  const onBus = (p: Vec) => (sheet.buses ?? []).some((b) => b.points.some((_, i) => i < b.points.length - 1 && pointOnSeg(p, b.points[i], b.points[i + 1], 0.5)));
+  for (const l of sheet.labels) { if (onBus({ x: l.x, y: l.y })) continue; attach({ x: l.x, y: l.y }, `label:${l.id}`); }
 
   const labelText = new Map(sheet.labels.map((l) => [`label:${l.id}`, l.text]));
   const powerComponents = new Set(sheet.components.filter((c) => getSymbol(c.symbolId).power).map((c) => c.id));
@@ -112,4 +114,27 @@ export function buildNetlist(sheet: Sheet): Netlist {
   }
   const out = [...merged.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   return { nets: out, pinNet, unconnectedPins };
+}
+
+/** 多页网表：各页独立计算后，按标签名 / 电源名跨页合并；自动命名的本地网络保留在各自页内。 */
+export function buildSchematicNetlist(schematic: Schematic): Netlist {
+  if (schematic.sheets.length === 1) return buildNetlist(schematic.sheets[0]);
+  const merged = new Map<string, Net>();
+  const pinNet = new Map<string, string>();
+  const unconnectedPins: NetPin[] = [];
+  for (const sheet of schematic.sheets) {
+    const nl = buildNetlist(sheet);
+    unconnectedPins.push(...nl.unconnectedPins);
+    for (const n of nl.nets) {
+      const global = n.labels.length > 0 || n.powerNames.length > 0;
+      const key = global ? n.name : `${sheet.id}::${n.name}`;
+      const m = merged.get(key);
+      if (!m) merged.set(key, { ...n, pins: [...n.pins], labels: [...n.labels], powerNames: [...n.powerNames] });
+      else { m.pins.push(...n.pins); m.driven = m.driven || n.driven; m.labels = [...new Set([...m.labels, ...n.labels])]; m.powerNames = [...new Set([...m.powerNames, ...n.powerNames])]; }
+      for (const p of n.pins) pinNet.set(`${p.componentId}:${p.pinNumber}`, n.name);
+    }
+    for (const [k, v] of nl.pinNet) if (!pinNet.has(k)) pinNet.set(k, v);
+  }
+  const nets = [...merged.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  return { nets, pinNet, unconnectedPins };
 }

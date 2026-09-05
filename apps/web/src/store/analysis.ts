@@ -1,4 +1,4 @@
-import { type Project, buildNetlist, runErc, runDrc, computeRatsnest, reviewSchematic, ruleSetOf, zoneFills, type Netlist, type CheckReport, type RatsnestResult, type ReviewSuggestion, type RuleSet, type ZoneFill } from '@tracelet/kernel';
+import { type Project, buildSchematicNetlist, runSchematicErc, runDrc, computeRatsnest, reviewSchematic, ruleSetOf, zoneFills, type Netlist, type CheckReport, type RatsnestResult, type ReviewSuggestion, type RuleSet, type ZoneFill } from '@tracelet/kernel';
 
 export interface Analysis {
   netlist: Netlist;
@@ -18,12 +18,12 @@ const boardCache = new WeakMap<object, { drc: CheckReport; ratsnest: RatsnestRes
 export function getAnalysis(project: Project): Analysis {
   const hit = cache.get(project);
   if (hit) return hit;
-  const sheet = project.schematic.sheets[0];
-  let s = schCache.get(sheet);
+  const schematic = project.schematic;
+  let s = schCache.get(schematic);
   if (!s) {
-    const netlist = buildNetlist(sheet);
-    s = { netlist, erc: runErc(sheet, netlist), review: reviewSchematic(sheet, netlist) };
-    schCache.set(sheet, s);
+    const netlist = buildSchematicNetlist(schematic);
+    s = { netlist, erc: runSchematicErc(schematic, netlist), review: reviewSchematic(schematic, netlist) };
+    schCache.set(schematic, s);
   }
   const rules = ruleSetOf(project);
   let b = boardCache.get(project.board);

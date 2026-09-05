@@ -79,13 +79,41 @@ export type NetLabel = z.infer<typeof NetLabelSchema>;
 export const JunctionSchema = z.object({ id: z.string(), x: z.number(), y: z.number() });
 export type Junction = z.infer<typeof JunctionSchema>;
 
+/** 总线：粗线折线，本身不导电；连到总线的导线由各自标签命名。 */
+export const BusSchema = z.object({ id: z.string(), points: z.array(VecSchema).min(2) });
+export type Bus = z.infer<typeof BusSchema>;
+
+/** 非电气图形：线 / 矩形 / 文字。 */
+export const GraphicSchema = z.discriminatedUnion('kind', [
+  z.object({ id: z.string(), kind: z.literal('line'), points: z.array(VecSchema).min(2) }),
+  z.object({ id: z.string(), kind: z.literal('rect'), a: VecSchema, b: VecSchema }),
+  z.object({ id: z.string(), kind: z.literal('text'), x: z.number(), y: z.number(), text: z.string(), size: z.number().default(120) })
+]);
+export type Graphic = z.infer<typeof GraphicSchema>;
+
+/** 图纸边框 / 标题栏模板。 */
+export const SheetFrameSchema = z.object({
+  size: z.enum(['none', 'A4', 'A3', 'A2']).default('A4'),
+  landscape: z.boolean().default(true),
+  title: z.string().default(''),
+  revision: z.string().default('1.0'),
+  company: z.string().default('')
+});
+export type SheetFrame = z.infer<typeof SheetFrameSchema>;
+export const DEFAULT_FRAME: SheetFrame = { size: 'A4', landscape: true, title: '', revision: '1.0', company: '' };
+/** 纸张尺寸（mil，横向）。 */
+export const PAPER_SIZES: Record<'A4' | 'A3' | 'A2', { w: number; h: number }> = { A4: { w: 11693, h: 8268 }, A3: { w: 16535, h: 11693 }, A2: { w: 23386, h: 16535 } };
+
 export const SheetSchema = z.object({
   id: z.string(),
   name: z.string(),
+  frame: SheetFrameSchema.default(DEFAULT_FRAME),
   components: z.array(SchComponentSchema),
   wires: z.array(WireSchema),
   labels: z.array(NetLabelSchema),
-  junctions: z.array(JunctionSchema)
+  junctions: z.array(JunctionSchema),
+  buses: z.array(BusSchema).default([]),
+  graphics: z.array(GraphicSchema).default([])
 });
 export type Sheet = z.infer<typeof SheetSchema>;
 
@@ -97,5 +125,5 @@ export const SchematicSchema = z.object({
 export type Schematic = z.infer<typeof SchematicSchema>;
 
 export function emptySchematic(): Schematic {
-  return { sheets: [{ id: 'sheet_main', name: '主图', components: [], wires: [], labels: [], junctions: [] }], counters: {} };
+  return { sheets: [{ id: 'sheet_main', name: '主图', frame: { ...DEFAULT_FRAME }, components: [], wires: [], labels: [], junctions: [], buses: [], graphics: [] }], counters: {} };
 }

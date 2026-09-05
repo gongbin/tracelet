@@ -27,6 +27,22 @@ await page.mouse.move(700, 600); await page.mouse.click(700, 600);
 await page.keyboard.press('Escape');
 await page.screenshot({ path: `${outDir}/03-schematic-placed.png` });
 
+// 总线 + 新图纸 + 全选（导线可选中）
+await page.keyboard.press('b');
+const sst = await page.$('.canvas-wrap.sch svg.stage'); const sb = await sst.boundingBox();
+await page.mouse.click(sb.x + 150, sb.y + 120); await page.waitForTimeout(400); await page.mouse.click(sb.x + 150, sb.y + 320); await page.waitForTimeout(400); await page.mouse.dblclick(sb.x + 400, sb.y + 320);
+await page.keyboard.press('Escape');
+await page.keyboard.press('Meta+a');
+await page.waitForTimeout(200);
+await page.screenshot({ path: `${outDir}/03b-schematic-bus-selectall.png` });
+await page.keyboard.press('Escape');
+page.once('dialog', (d) => d.accept('电源'));
+await page.click('text=+ 新页');
+await page.waitForSelector('text=页 2/2');
+await page.waitForTimeout(300);
+await page.screenshot({ path: `${outDir}/03c-schematic-new-sheet.png` });
+await page.click('.subbar .pill:has-text("主图")');
+await page.waitForTimeout(200);
 await page.click('button:has-text("元件库")');
 await page.waitForTimeout(200);
 await page.screenshot({ path: `${outDir}/04-library.png` });

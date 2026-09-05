@@ -1,5 +1,5 @@
-import type { Sheet } from '../model/schematic.js';
-import { buildNetlist, type Netlist } from './connectivity.js';
+import type { Sheet, Schematic } from '../model/schematic.js';
+import { buildNetlist, buildSchematicNetlist, type Netlist } from './connectivity.js';
 import { getSymbol } from '../library/symbols.js';
 
 export interface ReviewSuggestion {
@@ -16,7 +16,10 @@ export interface ReviewSuggestion {
  * 确定性设计审查：不依赖 LLM 的经验规则。
  * LLM 助手把这些结果作为"事实"再做解释与排序。
  */
-export function reviewSchematic(sheet: Sheet, netlist: Netlist = buildNetlist(sheet)): ReviewSuggestion[] {
+export function reviewSchematic(sheetOrSchematic: Sheet | Schematic, netlist?: Netlist): ReviewSuggestion[] {
+  const isSch = 'sheets' in sheetOrSchematic;
+  const sheet = (isSch ? { components: (sheetOrSchematic as Schematic).sheets.flatMap((s) => s.components) } : sheetOrSchematic) as Sheet;
+  netlist = netlist ?? (isSch ? buildSchematicNetlist(sheetOrSchematic as Schematic) : buildNetlist(sheetOrSchematic as Sheet));
   const out: ReviewSuggestion[] = [];
   let n = 0;
   const comps = new Map(sheet.components.map((c) => [c.id, c]));

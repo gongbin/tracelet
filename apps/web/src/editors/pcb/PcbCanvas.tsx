@@ -41,7 +41,7 @@ export function PcbCanvas() {
   const analysis = getAnalysis(project);
   const drag = useRef<Drag | null>(null);
   const fitted = useRef<string | null>(null);
-  const lastClick = useRef(0);
+  const lastClick = useRef<{ t: number; x: number; y: number }>({ t: 0, x: 0, y: 0 });
   const [marquee, setMarquee] = useState<{ a: Vec; b: Vec } | null>(null);
   const [previewBad, setPreviewBad] = useState(false);
 
@@ -104,7 +104,7 @@ export function PcbCanvas() {
     if (e.button !== 0) return;
     const raw = view.toWorld(e.clientX, e.clientY);
     const p = { x: sg(raw.x), y: sg(raw.y) };
-    const now = Date.now(); const dbl = now - lastClick.current < 350; lastClick.current = now;
+    const now = Date.now(); const dbl = now - lastClick.current.t < 350 && Math.abs(e.clientX - lastClick.current.x) < 4 && Math.abs(e.clientY - lastClick.current.y) < 4; lastClick.current = { t: now, x: e.clientX, y: e.clientY };
     if (app.autoroute.status === 'done') return;
     if (tool === 'route') {
       const pad = padAt(raw);

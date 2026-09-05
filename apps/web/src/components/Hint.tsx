@@ -4,12 +4,19 @@ export function Hint({ space }: { space: 'sch' | 'pcb' }) {
   const app = useApp();
   let title = '', body = '';
   if (space === 'sch') {
-    if (app.placing) { title = `放置 ${app.placing.partLabel ?? ''}`.trim(); body = '点击画布放置 · R 旋转 · 连续放置 · Esc 结束'; }
+    if (app.pasting) { title = '粘贴'; body = '点击放置 · Esc 取消'; }
+    else if (app.placing) { title = `放置 ${app.placing.partLabel ?? ''}`.trim(); body = '点击画布放置 · R 旋转 · 连续放置 · Esc 结束'; }
+    else if (app.wireDraft) { title = '画线中'; body = '点击加点 · 点引脚/导线或双击结束 · Esc 取消'; }
+    else if (app.busDraft) { title = '总线'; body = '点击加点 · 双击结束'; }
+    else if (app.schTool === 'bus') { title = '总线'; body = '点击开始画总线'; }
+    else if (app.schTool === 'junction') { title = '结点'; body = '点击导线交叉处放置'; }
+    else if (app.schTool === 'draw') { title = '图形'; body = app.drawMode === 'text' ? '点击放置文字' : app.drawMode === 'rect' ? '点两个对角画矩形' : '点击加点 · 双击结束'; }
+    else if (app.schTool === 'measure') { title = '测量'; body = '点两点 · 再点重新开始 · Esc 结束'; }
     else if (app.pendingPin) { title = '连线中'; body = '点击目标引脚结束 · Esc 取消'; }
-    else if (app.schTool === 'wire') { title = '连线'; body = '点击一个引脚开始'; }
+    else if (app.schTool === 'wire') { title = '连线'; body = '点引脚或空白处开始'; }
     else if (app.schTool === 'pwr') { title = '电源 / 地'; body = '选一个符号，再点画布'; }
     else if (app.schTool === 'label') { title = '网络标签'; body = '点击导线端点或引脚放标签 · Esc 退出'; }
-    else { title = '选择'; body = '拖空白框选 · 点引脚开始连线 · A 放元件 · R 旋转 · Del 删除 · 双指平移'; }
+    else { title = '选择'; body = '拖空白框选 · 点导线选中/再拖调整 · ⌘C/⌘V 复制粘贴 · R 旋转 · Del 删除'; }
   } else {
     const m: Record<string, [string, string]> = {
       select: ['选择', '拖空白框选 · 点焊盘高亮网络 · R 旋转 · F 翻面 · Del 删除 · 双指平移'],

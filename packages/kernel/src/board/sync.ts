@@ -1,6 +1,6 @@
 import type { Project } from '../model/project.js';
 import type { Board, BoardFootprint } from '../model/board.js';
-import { buildNetlist } from '../schematic/connectivity.js';
+import { buildSchematicNetlist } from '../schematic/connectivity.js';
 import { getSymbol } from '../library/symbols.js';
 import { findFootprint } from '../library/footprints.js';
 import { newId } from '../ids.js';
@@ -14,8 +14,7 @@ export interface SyncDiff {
 
 /** 计算同步差异（不修改）。 */
 export function diffBoardFromSchematic(project: Project): SyncDiff {
-  const sheet = project.schematic.sheets[0];
-  const comps = sheet.components.filter((c) => !getSymbol(c.symbolId).power);
+  const comps = project.schematic.sheets.flatMap((s) => s.components).filter((c) => !getSymbol(c.symbolId).power);
   const existing = new Map(project.board.footprints.filter((f) => f.componentId).map((f) => [f.componentId!, f]));
   const compIds = new Set(comps.map((c) => c.id));
   return {
@@ -26,10 +25,9 @@ export function diffBoardFromSchematic(project: Project): SyncDiff {
 }
 
 export function syncBoardFromSchematic(project: Project): Board {
-  const sheet = project.schematic.sheets[0];
   const board = project.board;
-  const netlist = buildNetlist(sheet);
-  const comps = sheet.components.filter((c) => !getSymbol(c.symbolId).power);
+  const netlist = buildSchematicNetlist(project.schematic);
+  const comps = project.schematic.sheets.flatMap((s) => s.components).filter((c) => !getSymbol(c.symbolId).power);
   const compIds = new Set(comps.map((c) => c.id));
 
   const kept = board.footprints.filter((f) => !f.componentId || compIds.has(f.componentId));

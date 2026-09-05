@@ -8,6 +8,7 @@ export function locateItem(item: CheckItem, space: 'sch' | 'pcb') {
   const patch: Parameters<typeof app.patch>[0] = { checkHighlight: item.id, rightTab: 'check' };
   if (item.location) patch.flyTo = { x: item.location.x, y: item.location.y, space, seq: Date.now() };
   if (space === 'sch' && item.objectIds.length) patch.selection = item.objectIds;
+  if (space === 'sch' && item.sheetId) patch.sheetId = item.sheetId;
   if (space === 'pcb' && item.objectIds.length) patch.pcbSelection = item.objectIds.slice(0, 1);
   if (app.screen !== space) app.go(space);
   app.patch(patch);

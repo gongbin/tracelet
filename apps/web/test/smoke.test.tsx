@@ -26,7 +26,7 @@ describe('应用冒烟测试', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBeNull();
     act(() => usePrefs.getState().setTheme('dark'));
   });
-  beforeEach(() => { cleanup(); localStorage.clear(); usePrefs.getState().setLocale('zh-CN'); });
+  beforeEach(() => { cleanup(); localStorage.clear(); usePrefs.getState().setLocale('zh-CN'); act(() => { if (useApp.getState().editor) useApp.getState().closeProject(); }); });
 
   it('首页渲染并显示示例项目', async () => {
     render(<App />);
@@ -42,7 +42,7 @@ describe('应用冒烟测试', () => {
     for (const s of ['pcb', '3d', 'fab', 'lib', 'bom', 'sch'] as const) {
       act(() => useApp.getState().go(s));
     }
-    expect(screen.getByText(/Sheet: 主图/)).toBeTruthy();
+    expect(screen.getAllByText(/主图/).length).toBeGreaterThan(0);
   });
 
   it('右侧五个面板都能渲染，且 PCB 检查面板显示未布线错误', async () => {
@@ -92,6 +92,30 @@ describe('应用冒烟测试', () => {
     expect(computeRatsnest(ed.project.board, ruleSetOf(ed.project)).unrouted).toBe(0);
     act(() => { fireEvent.keyDown(window, { key: 'z', metaKey: true }); });
     expect(computeRatsnest(ed.project.board, ruleSetOf(ed.project)).unrouted).toBeGreaterThan(0);
+  });
+
+  it('多页：新建图纸后切换，页码显示 2/2；复制粘贴进入粘贴态，⌘D 复制到位', async () => {
+    render(<App />);
+    await screen.findByText('ESP32 传感器板');
+    act(() => useApp.getState().openProjectObject(createDemoProject()));
+    await screen.findByText('同步到 PCB');
+    const ed = useApp.getState().editor!;
+    const { sch } = await import('@tracelet/kernel');
+    const r = sch.addSheet('电源');
+    act(() => { ed.dispatch(r.command); useApp.getState().patch({ sheetId: r.id }); });
+    expect(await screen.findByText(/页 2\/2/)).toBeTruthy();
+    act(() => useApp.getState().patch({ sheetId: ed.project.schematic.sheets[0].id }));
+    const before = ed.project.schematic.sheets[0].components.length;
+    const r1 = ed.project.schematic.sheets[0].components.find((c) => c.ref === 'R1')!;
+    act(() => useApp.getState().patch({ selection: [r1.id] }));
+    act(() => { fireEvent.keyDown(window, { key: 'c', metaKey: true }); });
+    act(() => { fireEvent.keyDown(window, { key: 'v', metaKey: true }); });
+    expect(useApp.getState().pasting?.clip.components.length).toBe(1);
+    act(() => { fireEvent.keyDown(window, { key: 'Escape' }); });
+    expect(useApp.getState().pasting).toBeNull();
+    act(() => { fireEvent.keyDown(window, { key: 'd', metaKey: true }); });
+    expect(ed.project.schematic.sheets[0].components.length).toBe(before + 1);
+    expect(ed.project.schematic.sheets[0].components.some((c) => c.ref === 'R2')).toBe(true);
   });
 
   it('命令面板打开并列出命令与元件', async () => {

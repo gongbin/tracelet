@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { sch, pcb, getSymbol, BUILTIN_FOOTPRINTS, BUILTIN_PARTS, findFootprint, footprintPads, milToMm, formatLength, copperLayers } from '@tracelet/kernel';
-import { useApp, useEditor, useProject } from '../store/app.js';
+import { useApp, useEditor, useProject, useSheet } from '../store/app.js';
 import { getAnalysis } from '../store/analysis.js';
 
 function ValueInput({ value, onCommit, mono = true }: { value: string; onCommit: (v: string) => void; mono?: boolean }) {
@@ -15,7 +15,7 @@ export function PropertiesPanel() {
   const editor = useEditor();
   const app = useApp();
   const a = getAnalysis(project);
-  const sheet = project.schematic.sheets[0];
+  const sheet = useSheet();
   const unit = project.settings.unit;
 
   if (app.screen === 'pcb') {

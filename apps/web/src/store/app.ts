@@ -1,9 +1,11 @@
 import { create } from 'zustand';
-import { ProjectEditor, pcb, type Project, type CopperLayer, type Layer, type Vec, type AutorouteResult } from '@tracelet/kernel';
+import { ProjectEditor, pcb, type sch, type Project, type CopperLayer, type Layer, type Vec, type AutorouteResult, type Sheet } from '@tracelet/kernel';
+type Clipboard = sch.Clipboard;
 import { createProjectStore, type ProjectMeta, type ProjectStore } from './projectStore.js';
 
 export type Screen = 'home' | 'sch' | 'pcb' | '3d' | 'lib' | 'bom' | 'fab';
 export type SchTool = 'select' | 'wire' | 'place' | 'pwr' | 'label' | 'bus' | 'junction' | 'draw' | 'measure';
+export type DrawMode = 'line' | 'rect' | 'text';
 export type PcbTool = 'select' | 'route' | 'via' | 'zone' | 'place' | 'edge' | 'text' | 'measure' | 'flip' | 'align' | 'autoroute' | 'refill';
 export type RightTab = 'props' | 'layers' | 'lib' | 'check' | 'ai' | '3d';
 
@@ -34,6 +36,13 @@ export interface AppState {
   pwrMenuOpen: boolean;
   selection: string[];
   labelPrompt: Vec | null;
+  sheetId: string | null;
+  wireDraft: Vec[] | null;
+  busDraft: Vec[] | null;
+  drawMode: DrawMode;
+  drawDraft: Vec[] | null;
+  drawMenuOpen: boolean;
+  pasting: { clip: Clipboard } | null;
   cursorWorld: Vec;
   libQuery: string;
   libSelected: string | null;
@@ -96,6 +105,13 @@ export const useApp = create<AppState>((set, get) => ({
   pwrMenuOpen: false,
   selection: [],
   labelPrompt: null,
+  sheetId: null,
+  wireDraft: null,
+  busDraft: null,
+  drawMode: 'line',
+  drawDraft: null,
+  drawMenuOpen: false,
+  pasting: null,
   cursorWorld: { x: 0, y: 0 },
   libQuery: '',
   libSelected: 'part:esp32-wroom-32e',
@@ -131,7 +147,7 @@ export const useApp = create<AppState>((set, get) => ({
         try { await get().store.save(editor.project); set({ lastSavedAt: Date.now(), saving: false }); } catch (e) { set({ saving: false }); get().toast(`保存失败：${(e as Error).message}`, 'error'); }
       }, 600);
     });
-    set({ editor, screen: 'sch', rightTab: null, selection: [], pcbSelection: [], placing: null, pendingPin: null, routing: null, schTool: 'select', pcbTool: 'select', lastSavedAt: Date.now(), projMenuOpen: false, wizardOpen: false, highlightNet: null, checkHighlight: null });
+    set({ editor, screen: 'sch', rightTab: null, selection: [], pcbSelection: [], placing: null, pendingPin: null, routing: null, schTool: 'select', pcbTool: 'select', lastSavedAt: Date.now(), projMenuOpen: false, wizardOpen: false, highlightNet: null, checkHighlight: null, sheetId: p.schematic.sheets[0].id, wireDraft: null, busDraft: null, drawDraft: null, pasting: null });
     void get().store.save(p).then(() => get().refreshProjects());
   },
   closeProject() {
@@ -144,7 +160,7 @@ export const useApp = create<AppState>((set, get) => ({
     await get().refreshProjects();
   },
   go(screen) {
-    set({ screen, rightTab: null, projMenuOpen: false, hoverTool: -1, pwrMenuOpen: false, placing: null, pendingPin: null, routing: null, zoneDraft: null, outlineDraft: null, measure: null, labelPrompt: null, cursorWorld: { x: 0, y: 0 } });
+    set({ screen, rightTab: null, projMenuOpen: false, hoverTool: -1, pwrMenuOpen: false, placing: null, pendingPin: null, routing: null, zoneDraft: null, outlineDraft: null, measure: null, labelPrompt: null, wireDraft: null, busDraft: null, drawDraft: null, pasting: null, drawMenuOpen: false, cursorWorld: { x: 0, y: 0 } });
   },
   set(key, value) { set({ [key]: value } as Partial<AppState>); },
   patch(p) { set(p); },
@@ -155,7 +171,7 @@ export const useApp = create<AppState>((set, get) => ({
   },
   dismissToast(id) { set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })); },
   setSchTool(t) {
-    const patch: Partial<AppState> = { schTool: t, pwrMenuOpen: t === 'pwr' ? !get().pwrMenuOpen : false, labelPrompt: null };
+    const patch: Partial<AppState> = { schTool: t, pwrMenuOpen: t === 'pwr' ? !get().pwrMenuOpen : false, drawMenuOpen: t === 'draw' ? !get().drawMenuOpen : false, labelPrompt: null, wireDraft: null, busDraft: null, drawDraft: null, measure: null, pasting: null };
     if (t !== 'place') patch.placing = null;
     if (t !== 'wire') patch.pendingPin = null;
     if (t === 'place') patch.rightTab = 'lib';
@@ -185,4 +201,14 @@ export function useEditor(): ProjectEditor {
   const editor = useApp((s) => s.editor);
   if (!editor) throw new Error('没有打开的项目');
   return editor;
+}
+
+/** 当前图纸（多页）。 */
+export function getSheet(project: Project, sheetId: string | null): Sheet {
+  return project.schematic.sheets.find((s) => s.id === sheetId) ?? project.schematic.sheets[0];
+}
+export function useSheet(): Sheet {
+  const project = useProject();
+  const sheetId = useApp((s) => s.sheetId);
+  return getSheet(project, sheetId);
 }

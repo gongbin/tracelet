@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { create } from 'zustand';
 import { sch, findPin, searchParts, BUILTIN_PARTS, type ReviewSuggestion, type ProjectEditor } from '@tracelet/kernel';
-import { useApp, useEditor, useProject } from '../store/app.js';
+import { useApp, useEditor, useProject, useSheet } from '../store/app.js';
 import { getAnalysis } from '../store/analysis.js';
 import { locateItem } from './CheckPanel.js';
 
@@ -16,8 +16,8 @@ const loadCfg = (): AiConfig => { try { return JSON.parse(localStorage.getItem(C
 /** 执行审查建议：去耦电容 / 上拉电阻，都是内核命令，可 Undo。 */
 export function applySuggestion(editor: ProjectEditor, s: ReviewSuggestion): boolean {
   const act = s.action; if (!act) return false;
-  const sheetId = editor.project.schematic.sheets[0].id;
-  const comp = () => editor.project.schematic.sheets[0].components;
+  const sheetId = editor.project.schematic.sheets.find((sh) => sh.components.some((c) => c.id === act.componentId))?.id ?? editor.project.schematic.sheets[0].id;
+  const comp = () => editor.project.schematic.sheets.find((sh) => sh.id === sheetId)!.components;
   const c = comp().find((x) => x.id === act.componentId); if (!c) return false;
   const g = findPin(c, act.pinNumber); if (!g) return false;
   const dir = g.horizontal ? Math.sign(g.end.x - g.base.x) || 1 : 1;
@@ -57,7 +57,7 @@ export function AiPanel() {
   const [input, setInput] = useState('');
   const [cfg, setCfg] = useState<AiConfig>(loadCfg);
   const [showCfg, setShowCfg] = useState(false);
-  const sheet = project.schematic.sheets[0];
+  const sheet = useSheet();
   const selRef = app.screen === 'pcb' ? project.board.footprints.filter((f) => app.pcbSelection.includes(f.id)).map((f) => f.ref).join(', ') : sheet.components.filter((c) => app.selection.includes(c.id)).map((c) => c.ref).join(', ');
   const configured = !!cfg.apiKey;
 
