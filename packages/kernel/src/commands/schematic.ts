@@ -1,5 +1,5 @@
 import type { Project } from '../model/project.js';
-import type { Sheet, SchComponent, Wire, Graphic, NetLabel, Bus, SheetFrame } from '../model/schematic.js';
+import type { Sheet, SchComponent, Wire, Graphic, NetLabel, Bus, SheetFrame, SymbolDef } from '../model/schematic.js';
 import { DEFAULT_FRAME } from '../model/schematic.js';
 import { type Vec, eq } from '../geometry.js';
 import { SCH_GRID, snapTo } from '../units.js';
@@ -248,4 +248,14 @@ export function pasteClipboard(project: Project, sheetId: string, clip: Clipboar
     return { ...next, schematic: { ...next.schematic, counters } };
   });
   return { command: cmd, ids: newIds };
+}
+
+/** 把生成 / 导入的图纸加入项目，并把用到的符号存进项目内库。 */
+export function addGeneratedSheet(sheet: Sheet, symbols: SymbolDef[]): Command {
+  return command(`新建图纸 ${sheet.name}（AI 识别）`, (proj) => {
+    const counters = { ...proj.schematic.counters };
+    for (const c of sheet.components) { const m = /^([A-Za-z#]+)(\d+)/.exec(c.ref); if (m) counters[m[1]] = Math.max(counters[m[1]] ?? 1, Number(m[2]) + 1); }
+    const known = new Set(proj.library.symbols.map((s) => s.id));
+    return { ...proj, schematic: { ...proj.schematic, sheets: [...proj.schematic.sheets, sheet], counters }, library: { ...proj.library, symbols: [...proj.library.symbols, ...symbols.filter((s) => !known.has(s.id))] } };
+  });
 }

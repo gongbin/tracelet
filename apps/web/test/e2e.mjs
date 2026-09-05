@@ -52,6 +52,10 @@ await page.click('button:has-text("AI")');
 await page.click('text=帮我检查电源部分有没有问题');
 await page.waitForTimeout(200);
 await page.screenshot({ path: `${outDir}/06-ai.png` });
+await page.click('.rightpanel .seg-opt:has-text("参考设计")');
+await page.waitForTimeout(200);
+await page.screenshot({ path: `${outDir}/06b-ai-refdesign.png` });
+await page.click('.rightpanel .seg-opt:has-text("对话")');
 
 await page.click('.ws-tab:has-text("PCB")');
 await page.waitForTimeout(500);

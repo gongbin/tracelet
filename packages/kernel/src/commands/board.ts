@@ -3,7 +3,7 @@ import type { Board, BoardText, CopperLayer, Layer, Trace, Via, Zone } from '../
 import type { Vec } from '../geometry.js';
 import { newId } from '../ids.js';
 import { command, type Command } from './types.js';
-import { syncBoardFromSchematic } from '../board/sync.js';
+import { syncBoardDetailed } from '../board/sync.js';
 
 function updateBoard(p: Project, fn: (b: Board) => Board): Project {
   return { ...p, board: fn(p.board) };
@@ -111,5 +111,10 @@ export function setLayerHidden(layer: Layer, hidden: boolean): Command {
 
 /** 原理图 → PCB 同步：新增/删除封装、更新焊盘网络。 */
 export function syncFromSchematic(): Command {
-  return command('同步到 PCB', (proj) => ({ ...proj, board: syncBoardFromSchematic(proj) }));
+  return command('同步到 PCB', (proj) => {
+    const r = syncBoardDetailed(proj);
+    const known = new Set(proj.library.footprints.map((f) => f.id));
+    const add = r.createdFootprints.filter((f) => !known.has(f.id));
+    return { ...proj, board: r.board, library: add.length ? { ...proj.library, footprints: [...proj.library.footprints, ...add] } : proj.library };
+  });
 }

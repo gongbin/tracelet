@@ -3,6 +3,8 @@ import type { Board, BoardFootprint } from '../model/board.js';
 import { buildSchematicNetlist } from '../schematic/connectivity.js';
 import { getSymbol } from '../library/symbols.js';
 import { findFootprint } from '../library/footprints.js';
+import { resolveFootprint } from './footprintResolve.js';
+import type { FootprintDef } from '../model/board.js';
 import { newId } from '../ids.js';
 import { boardBounds } from './geometry.js';
 
@@ -24,8 +26,17 @@ export function diffBoardFromSchematic(project: Project): SyncDiff {
   };
 }
 
+export interface SyncOutcome { board: Board; createdFootprints: FootprintDef[]; placeholders: string[]; mapped: string[] }
+
 export function syncBoardFromSchematic(project: Project): Board {
+  return syncBoardDetailed(project).board;
+}
+
+/** 同步并返回细节：新建的占位封装、使用占位/映射封装的位号。 */
+export function syncBoardDetailed(project: Project): SyncOutcome {
   const board = project.board;
+  const createdFootprints: FootprintDef[] = [];
+  const placeholders: string[] = [], mapped: string[] = [];
   const netlist = buildSchematicNetlist(project.schematic);
   const comps = project.schematic.sheets.flatMap((s) => s.components).filter((c) => !getSymbol(c.symbolId).power);
   const compIds = new Set(comps.map((c) => c.id));
@@ -43,7 +54,11 @@ export function syncBoardFromSchematic(project: Project): Board {
 
   const out: BoardFootprint[] = [];
   for (const c of comps) {
-    const fpId = c.footprint && findFootprint(c.footprint) ? c.footprint : getSymbol(c.symbolId).defaultFootprint;
+    const res = resolveFootprint(c);
+    const fpId = res.id;
+    if (res.created) createdFootprints.push(res.created);
+    if (res.placeholder) placeholders.push(c.ref);
+    if (res.mapped) mapped.push(c.ref);
     const def = findFootprint(fpId);
     if (!def) continue;
     const padNets: Record<string, string> = {};
@@ -59,6 +74,5 @@ export function syncBoardFromSchematic(project: Project): Board {
   }
   for (const f of kept) if (!f.componentId) out.push(f);
 
-  // 走线网络名可能因标签变化而改变：按起点焊盘重新标注
-  return { ...board, footprints: out };
+  return { board: { ...board, footprints: out }, createdFootprints, placeholders, mapped };
 }

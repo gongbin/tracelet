@@ -70,3 +70,21 @@ describe('导出', () => {
     expect(nl.components.length).toBe(4);
   });
 });
+
+describe('封装解析', () => {
+  it('KiCad 封装名映射到内置封装；未知封装生成占位并存入项目库', async () => {
+    const { createProject, ProjectEditor, sch, pcb } = await import('../src/index.js');
+    const ed = new ProjectEditor(createProject({ name: 't' }));
+    const sheet = ed.project.schematic.sheets[0].id;
+    const r = sch.placeComponent(ed.project, { sheetId: sheet, symbolId: 'sym:R', center: { x: 1000, y: 1000 }, footprint: 'fp:kicad:R_0603_1608Metric', props: { kicadFootprint: 'Resistor_SMD:R_0603_1608Metric' } });
+    ed.dispatch(r.command);
+    const u = sch.placeComponent(ed.project, { sheetId: sheet, symbolId: 'sym:ESP32-C3-MINI-1', center: { x: 4000, y: 2000 }, footprint: 'fp:kicad:Weird_Module', props: { kicadFootprint: 'Lib:Weird_Module' } });
+    ed.dispatch(u.command);
+    ed.dispatch(pcb.syncFromSchematic());
+    const fps = ed.project.board.footprints;
+    expect(fps.find((f) => f.ref === 'R1')!.footprintId).toBe('fp:R_0603');
+    const uf = fps.find((f) => f.ref === 'U1')!;
+    expect(uf.footprintId).toBe('fp:ESP32-C3-MINI-1'); // 符号默认封装优先于占位
+    expect(ed.project.board.footprints.length).toBe(2);
+  });
+});

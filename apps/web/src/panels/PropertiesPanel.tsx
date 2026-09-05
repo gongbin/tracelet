@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { sch, pcb, getSymbol, BUILTIN_FOOTPRINTS, BUILTIN_PARTS, findFootprint, footprintPads, milToMm, formatLength, copperLayers } from '@tracelet/kernel';
+import { sch, pcb, getSymbol, BUILTIN_FOOTPRINTS, BUILTIN_PARTS, findFootprint, footprintPads, milToMm, formatLength, copperLayers, registeredFootprints } from '@tracelet/kernel';
 import { useApp, useEditor, useProject, useSheet } from '../store/app.js';
 import { getAnalysis } from '../store/analysis.js';
 
@@ -143,7 +143,8 @@ export function PropertiesPanel() {
         <span className="k">值</span><ValueInput value={comp.value} onCommit={(v) => editor.dispatch(sch.setComponentValue(sheet.id, comp.id, v))} />
         {!sym.power && <><span className="k">封装</span>
           <select className="input mono" value={comp.footprint} onChange={(e) => editor.dispatch(sch.setComponentFootprint(sheet.id, comp.id, e.target.value))}>
-            {BUILTIN_FOOTPRINTS.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+            {[...BUILTIN_FOOTPRINTS, ...registeredFootprints()].map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+            {comp.footprint && !findFootprint(comp.footprint) && <option value={comp.footprint}>{comp.footprint.replace(/^fp:kicad:/, '')}（未解析，同步时映射/占位）</option>}
           </select></>}
         {part && <>
           <span className="k">数据手册</span><a href="#" onClick={(e) => e.preventDefault()}>{part.datasheet ?? `${part.mpn}.pdf`} ↗</a>

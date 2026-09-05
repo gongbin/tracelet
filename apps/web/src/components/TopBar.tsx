@@ -1,4 +1,4 @@
-import { pcb, sch, diffBoardFromSchematic } from '@tracelet/kernel';
+import { pcb, sch, diffBoardFromSchematic, syncBoardDetailed } from '@tracelet/kernel';
 import { exportProjectFile, backupAllProjects, importProjectFiles } from '../store/backup.js';
 import { useRef } from 'react';
 import { useApp, useEditor, useProject, type Screen } from '../store/app.js';
@@ -30,8 +30,10 @@ export function TopBar() {
 
   const sync = () => {
     const d = diffBoardFromSchematic(project);
+    const detail = syncBoardDetailed(project);
     editor.dispatch(pcb.syncFromSchematic());
-    toast(`已同步到 PCB：新增 ${d.added.length}，删除 ${d.removed.length}，更新 ${d.updated.length}`, 'success');
+    toast(`已同步到 PCB：新增 ${d.added.length}，删除 ${d.removed.length}，更新 ${d.updated.length}${detail.mapped.length ? `；${detail.mapped.length} 个 KiCad 封装已映射为内置封装` : ''}`, 'success');
+    if (detail.placeholders.length) toast(`${detail.placeholders.length} 个元件没有可用封装，已生成占位封装（${detail.placeholders.slice(0, 4).join('、')}${detail.placeholders.length > 4 ? '…' : ''}），请在属性面板替换`);
     go('pcb');
   };
 

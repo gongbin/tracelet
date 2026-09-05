@@ -55,6 +55,8 @@ export async function importProjectFiles(files: File[]): Promise<void> {
     try {
       const r = importKicadProject({ name: base, schematics: schs.map((s) => ({ name: s.name.replace(/\.kicad_sch$/i, ''), text: s.text })), pcb: pcbFile?.text });
       projects.push(r.project);
+      const comps = r.project.schematic.sheets.reduce((n, sh) => n + sh.components.length, 0);
+      app.toast(`KiCad：${schs.length} 页原理图 · ${comps} 元件${pcbFile ? ` · PCB ${r.project.board.footprints.length} 封装 / ${r.project.board.traces.length} 走线` : ' · 未选 .kicad_pcb，PCB 为空，可用「同步到 PCB」按封装名生成'}`, 'success');
       for (const w of r.warnings.slice(0, 3)) app.toast(`KiCad 导入提示 · ${w.where}: ${w.message}`);
     } catch (err) { errors.push(`KiCad: ${(err as Error).message}`); }
   }

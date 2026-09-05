@@ -36,6 +36,7 @@ pnpm cli import kicad board.kicad_sch board.kicad_pcb -o board.eda.json
 - 原理图：多页与图纸模板（A4/A3/A2 边框 + 标题栏）、总线、结点、图形注释、测量、复制粘贴、⌥拖动复制
 - PCB：框选、板框编辑、走线顶点/线段拖动、走线中实时间距检查、对齐分布、内置 A* 自动布线（建议预览后接受）
 - 手势：触控板双指平移 / 捏合缩放（可切回滚轮缩放）、右键或双指轻触结束当前操作
+- AI 助手：配置自己的 Anthropic API Key 后，模型可通过内核工具读取网表 / 运行 ERC、DRC / 放置连线 / 自动布线（全部可 Undo）；「参考设计」模式：搜索厂商开发板原理图 PDF（内置目录 + 联网搜索）→ 识别元件与连接 → 一键生成新图纸；也可上传自己的 PDF / 截图识别
 - 界面：深色 / 浅色 / 跟随系统；简体中文 / English（`t()` 词典，`apps/web/src/i18n`）
 - CLI：`tracelet erc | drc | review | sync | export gerber | export zip`，退出码可用于 CI
 
