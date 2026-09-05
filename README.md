@@ -51,14 +51,23 @@ pnpm cli footprint gen demo.eda.json LQFP-48_7x7mm_P0.5mm                       
 
 ## MCP server
 
-把 Tracelet 内核暴露给 Claude Code / Claude Desktop 等 MCP 客户端（stdio）：
+把 Tracelet 内核暴露给 Claude Code / Claude Desktop / Cursor 等 MCP 客户端（stdio）。两种目标：
+
+**1. 浏览器里正在打开的项目（推荐，类似 Figma 的实时桥）**
 
 ```bash
-# Claude Code
+claude mcp add tracelet -- pnpm --dir /path/to/tracelet cli serve --mcp --live
+```
+
+然后在网页 头像菜单 → 「本地 Agent（MCP 实时桥）」→ 开启连接（默认端口 8790，只连 127.0.0.1）。顶栏出现「✨ Agent 已连接」后，Agent 就能按项目 ID 操作你当前打开的项目：`list_open_projects` 看到 `prj_xxx`，`use_project` 选择（只开一个时自动选中），之后所有工具直接作用在浏览器里，每次修改是一条可撤销的「Agent 修改」；`undo` 会转发给浏览器；`new_project` / `new_from_template` 省略 `file` 时直接在浏览器里打开。本地存储与远程存储模式都可用。
+
+**2. 本地文件**
+
+```bash
 claude mcp add tracelet -- pnpm --dir /path/to/tracelet cli serve --mcp -f /path/to/project.eda.json
 ```
 
-工具：`open_project / new_project / new_from_template / list_templates / import_kicad / import_easyeda / import_library / generate_footprint / project_summary / get_netlist / get_component / run_erc / run_drc / review_schematic / search_parts / place_component / connect_pins / add_net_label / set_component_value / sync_to_pcb / move_footprint / set_board_outline / autoroute / export_fab / export_pdf / undo`。每次修改自动保存到打开的文件。
+工具：`open_project / new_project / new_from_template / list_templates / list_open_projects / use_project / import_kicad / import_easyeda / import_library / generate_footprint / project_summary / get_netlist / get_component / run_erc / run_drc / review_schematic / search_parts / place_component / connect_pins / add_net_label / set_component_value / sync_to_pcb / move_footprint / set_board_outline / autoroute / export_fab / export_pdf / undo`。文件模式下每次修改自动保存到打开的文件。
 
 ## 存储模式
 

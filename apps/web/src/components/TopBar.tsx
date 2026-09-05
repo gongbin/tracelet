@@ -6,6 +6,7 @@ import { Icon } from './Icon.js';
 import { I } from '../icons.js';
 import { useT } from '../i18n/index.js';
 import { PrefsMenu } from './PrefsMenu.js';
+import { useBridge } from '../store/bridge.js';
 
 const TABS: { id: Screen; key: 'ws.sch' | 'ws.pcb' | 'ws.3d' | 'ws.lib' | 'ws.bom' | 'ws.fab' }[] = [
   { id: 'sch', key: 'ws.sch' }, { id: 'pcb', key: 'ws.pcb' }, { id: '3d', key: 'ws.3d' }, { id: 'lib', key: 'ws.lib' }, { id: 'bom', key: 'ws.bom' }, { id: 'fab', key: 'ws.fab' }
@@ -26,6 +27,7 @@ export function TopBar() {
   const t = useT();
   const fileRef = useRef<HTMLInputElement>(null);
   const { screen, go, projMenuOpen, set, projects, openProject, closeProject, lastSavedAt, saving, toast } = useApp();
+  const bridgeStatus = useBridge((b) => b.status);
   const pendingSync = screen === 'pcb' && (() => { const d = diffBoardFromSchematic(project); return d.added.length + d.removed.length > 0; })();
 
   const sync = () => {
@@ -82,6 +84,7 @@ export function TopBar() {
         <Icon d={I.search} size={13} stroke={2} /><span>{t('ws.search')}</span><span className="ml-auto mono xs">⌘K</span>
       </div>
       <span className="row xs muted" style={{ gap: 5, whiteSpace: 'nowrap', flex: 'none' }}>
+        {bridgeStatus !== 'off' && <span className="xs mono" title="本地 Agent（MCP）连接状态" style={{ color: bridgeStatus === 'connected' ? 'var(--ai)' : 'var(--text-3)', marginRight: 8 }}>{bridgeStatus === 'connected' ? '✨ Agent 已连接' : '✨ Agent 连接中'}</span>}
         <Icon d={I.cloud} size={13} stroke={2} color={saving ? 'var(--text-3)' : 'var(--success)'} />{saving ? t('ws.saving') : `${t('ws.saved')} · ${timeAgo(lastSavedAt)}`}
       </span>
       <PrefsMenu />

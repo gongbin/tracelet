@@ -13,25 +13,50 @@ import {
   , importEasyEdaProject, PROJECT_TEMPLATES, createFromTemplate, exportSchematicPdf, exportAssemblyPdf, footprintFromName, importLibraryFile, lib, type SymbolDef, type FootprintDef
 } from '@tracelet/kernel';
 
-interface State { file: string | null; editor: ProjectEditor | null }
+import { LiveBridge } from './bridge.js';
 
-export function createMcpServer(initialFile?: string): McpServer {
-  const state: State = { file: null, editor: null };
+interface State { file: string | null; editor: ProjectEditor | null; activeId: string | null }
+interface LiveTarget { editor: ProjectEditor; name: string; rev: number }
+export interface McpOptions { live?: { port?: number; host?: string } }
+
+export function createMcpServer(initialFile?: string, opts: McpOptions = {}): McpServer & { bridge?: LiveBridge } {
+  const state: State = { file: null, editor: null, activeId: null };
+  const live = new Map<string, LiveTarget>();
+  const bridge = opts.live ? new LiveBridge(opts.live.port ?? 8790, opts.live.host) : undefined;
+  bridge?.on('project', (p: { id: string; name: string; rev: number; doc: string }, fromAgent: boolean) => {
+    const cur = live.get(p.id);
+    if (cur && fromAgent) { cur.rev = p.rev; return; } // 我们自己推过去的修改回声，镜像已是最新
+    try { live.set(p.id, { editor: new ProjectEditor(parseProject(p.doc)), name: p.name, rev: p.rev }); } catch (e) { console.error(`[live] 无法解析项目 ${p.id}: ${(e as Error).message}`); return; }
+    if (!state.activeId || !live.has(state.activeId)) state.activeId = p.id;
+  });
+  bridge?.on('closed', (id: string) => { live.delete(id); if (state.activeId === id) state.activeId = [...live.keys()][0] ?? null; });
+  const liveActive = () => (state.activeId && live.get(state.activeId)) || null;
   const server = new McpServer({ name: 'tracelet', version: '0.1.0' });
   const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: typeof v === 'string' ? v : JSON.stringify(v, null, 2) }] });
-  const need = (): ProjectEditor => { if (!state.editor) throw new Error('没有打开的项目：先调用 open_project 或 new_project'); return state.editor; };
-  const autosave = () => { if (state.file && state.editor) writeFileSync(state.file, serializeProject(state.editor.project)); };
-  const open = (p: Project, file: string | null) => { state.editor = new ProjectEditor(p); state.file = file; };
+  const need = (): ProjectEditor => {
+    const l = liveActive(); if (l) return l.editor;
+    if (state.editor) return state.editor;
+    throw new Error(bridge ? (live.size ? `有 ${live.size} 个浏览器项目，请先 use_project` : '浏览器还没有连接：在 Tracelet 网页 → 头像菜单 → 本地 Agent 里打开连接；或用 open_project 打开文件') : '没有打开的项目：先调用 open_project 或 new_project');
+  };
+  const autosave = () => {
+    const l = liveActive();
+    if (l && bridge && state.activeId) { l.rev = bridge.apply(state.activeId, serializeProject(l.editor.project, false)); return; }
+    if (state.file && state.editor) writeFileSync(state.file, serializeProject(state.editor.project));
+  };
+  const open = (p: Project, file: string | null) => {
+    if (bridge && !file && bridge.openInBrowser(serializeProject(p, false))) { state.activeId = null; return; }
+    state.editor = new ProjectEditor(p); state.file = file; state.activeId = null;
+  };
   const sheetIdOf = (ed: ProjectEditor, name?: string) => (name ? ed.project.schematic.sheets.find((s) => s.name === name || s.id === name)?.id : undefined) ?? ed.project.schematic.sheets[0].id;
   const findComp = (p: Project, ref: string) => { for (const s of p.schematic.sheets) { const c = s.components.find((x) => x.ref.toLowerCase() === ref.toLowerCase()); if (c) return { c, sheet: s }; } return null; };
   const parsePin = (s: string) => { const m = /^([^.]+)\.(.+)$/.exec(s.trim()); return m ? { ref: m[1], pin: m[2] } : null; };
   const summary = (p: Project) => {
     const nl = buildSchematicNetlist(p.schematic), erc = runSchematicErc(p.schematic, nl), rules = ruleSetOf(p), drc = runDrc(p.board, rules), rats = computeRatsnest(p.board, rules);
-    return { file: state.file, name: p.name, sheets: p.schematic.sheets.map((s) => ({ id: s.id, name: s.name, components: s.components.filter((c) => !getSymbol(c.symbolId).power).length })), components: p.schematic.sheets.flatMap((s) => s.components).filter((c) => !getSymbol(c.symbolId).power).map((c) => `${c.ref} ${c.value}`), nets: nl.nets.length, unconnectedPins: nl.unconnectedPins.map((x) => `${x.ref}.${x.pinName}`), erc: { errors: erc.errors, warnings: erc.warnings }, drc: { errors: drc.errors, warnings: drc.warnings }, pcb: { footprints: p.board.footprints.length, traces: p.board.traces.length, vias: p.board.vias.length, unrouted: `${rats.unrouted}/${rats.total}`, copperCount: p.board.copperCount }, rules: rules.name };
+    return { target: liveActive() ? `浏览器项目 ${state.activeId}` : state.file, name: p.name, sheets: p.schematic.sheets.map((s) => ({ id: s.id, name: s.name, components: s.components.filter((c) => !getSymbol(c.symbolId).power).length })), components: p.schematic.sheets.flatMap((s) => s.components).filter((c) => !getSymbol(c.symbolId).power).map((c) => `${c.ref} ${c.value}`), nets: nl.nets.length, unconnectedPins: nl.unconnectedPins.map((x) => `${x.ref}.${x.pinName}`), erc: { errors: erc.errors, warnings: erc.warnings }, drc: { errors: drc.errors, warnings: drc.warnings }, pcb: { footprints: p.board.footprints.length, traces: p.board.traces.length, vias: p.board.vias.length, unrouted: `${rats.unrouted}/${rats.total}`, copperCount: p.board.copperCount }, rules: rules.name };
   };
 
   server.registerTool('open_project', { title: '打开项目', description: '打开 .eda.json 项目文件', inputSchema: { file: z.string().describe('文件路径') } }, async ({ file }) => { const f = resolve(file); open(parseProject(readFileSync(f, 'utf8')), f); return text(summary(state.editor!.project)); });
-  server.registerTool('new_project', { title: '新建项目', description: '新建项目并保存到文件', inputSchema: { file: z.string(), name: z.string().optional(), layers: z.number().optional().describe('2 或 4'), demo: z.boolean().optional().describe('使用 ESP32 示例内容') } }, async ({ file, name, layers, demo }) => { const p = demo ? createDemoProject() : createProject({ name: name ?? '未命名项目', copperCount: layers === 4 ? 4 : 2 }); if (name && demo) p.name = name; const f = resolve(file); mkdirSync(dirname(f), { recursive: true }); open(p, f); autosave(); return text(summary(p)); });
+  server.registerTool('new_project', { title: '新建项目', description: '新建项目并保存到文件；浏览器已连接时省略 file 则直接在浏览器里打开', inputSchema: { file: z.string().optional(), name: z.string().optional(), layers: z.number().optional().describe('2 或 4'), demo: z.boolean().optional().describe('使用 ESP32 示例内容') } }, async ({ file, name, layers, demo }) => { const p = demo ? createDemoProject() : createProject({ name: name ?? '未命名项目', copperCount: layers === 4 ? 4 : 2 }); if (name && demo) p.name = name; if (!file && !bridge) throw new Error('需要 file 参数（未连接浏览器）'); const f = file ? resolve(file) : null; if (f) mkdirSync(dirname(f), { recursive: true }); open(p, f); autosave(); return text(f ? summary(p) : '已在浏览器中打开新项目，稍后可 list_open_projects 查看'); });
   server.registerTool('save_project', { title: '保存项目', description: '保存当前项目（可指定新路径）', inputSchema: { file: z.string().optional() } }, async ({ file }) => { const ed = need(); if (file) state.file = resolve(file); if (!state.file) throw new Error('未指定文件'); writeFileSync(state.file, serializeProject(ed.project)); return text(`已保存 ${state.file}`); });
   server.registerTool('import_kicad', { title: '导入 KiCad', description: '导入 KiCad 工程（多个 .kicad_sch = 多页，一个 .kicad_pcb）', inputSchema: { files: z.array(z.string()), out: z.string().optional().describe('保存为 .eda.json') } }, async ({ files, out }) => { const schs = files.filter((f) => f.endsWith('.kicad_sch')).map((f) => ({ name: f.split('/').pop()!.replace(/\.kicad_sch$/, ''), text: readFileSync(resolve(f), 'utf8') })); const pcbFile = files.find((f) => f.endsWith('.kicad_pcb')); const r = importKicadProject({ name: (pcbFile ?? files[0]).split('/').pop()!.replace(/\.kicad_(sch|pcb)$/, ''), schematics: schs, pcb: pcbFile ? readFileSync(resolve(pcbFile), 'utf8') : undefined }); open(r.project, out ? resolve(out) : null); autosave(); return text({ warnings: r.warnings, ...summary(r.project) }); });
   server.registerTool('project_summary', { title: '项目概览', description: '图纸、元件、网络、ERC/DRC、PCB 统计', inputSchema: {} }, async () => text(summary(need().project)));
@@ -53,17 +78,20 @@ export function createMcpServer(initialFile?: string): McpServer {
   server.registerTool('export_fab', { title: '导出制造文件', description: 'Gerber + Excellon + BOM + 坐标写入目录', inputSchema: { dir: z.string() } }, async ({ dir }) => { const ed = need(); const files = exportFabFiles(ed.project, { netlist: true }); mkdirSync(resolve(dir), { recursive: true }); for (const f of files) writeFileSync(resolve(dir, f.name), f.content); return text({ dir: resolve(dir), files: files.map((f) => f.name) }); });
   server.registerTool('import_easyeda', { title: '导入嘉立创 EDA', description: '导入 EasyEDA 标准版 JSON（原理图 / PCB / 工程导出）', inputSchema: { files: z.array(z.string()), out: z.string().optional() } }, async ({ files, out }) => { const r = importEasyEdaProject({ name: files[0].split('/').pop()!.replace(/\.json$/i, ''), files: files.map((f) => ({ name: f.split('/').pop()!, text: readFileSync(resolve(f), 'utf8') })) }); open(r.project, out ? resolve(out) : null); autosave(); return text({ warnings: r.warnings, ...summary(r.project) }); });
   server.registerTool('list_templates', { title: '项目模板', description: '可用的新建项目模板（blank / esp32 / stm32 / arduino）', inputSchema: {} }, async () => text(PROJECT_TEMPLATES.map((t) => ({ id: t.id, name: t.name, description: t.description }))));
-  server.registerTool('new_from_template', { title: '按模板新建', description: '用模板新建项目并保存到文件', inputSchema: { file: z.string(), template: z.string().describe('blank | esp32 | stm32 | arduino'), name: z.string().optional(), layers: z.number().optional() } }, async ({ file, template, name, layers }) => { const p = createFromTemplate(template, { name, copperCount: layers === 4 ? 4 : 2 }); const f = resolve(file); mkdirSync(dirname(f), { recursive: true }); open(p, f); autosave(); return text(summary(p)); });
+  server.registerTool('new_from_template', { title: '按模板新建', description: '用模板新建项目并保存到文件；浏览器已连接时省略 file 则直接在浏览器里打开', inputSchema: { file: z.string().optional(), template: z.string().describe('blank | esp32 | stm32 | arduino'), name: z.string().optional(), layers: z.number().optional() } }, async ({ file, template, name, layers }) => { const p = createFromTemplate(template, { name, copperCount: layers === 4 ? 4 : 2 }); if (!file && !bridge) throw new Error('需要 file 参数（未连接浏览器）'); const f = file ? resolve(file) : null; if (f) mkdirSync(dirname(f), { recursive: true }); open(p, f); autosave(); return text(f ? summary(p) : '已在浏览器中打开新项目，稍后可 list_open_projects 查看'); });
   server.registerTool('export_pdf', { title: '导出 PDF', description: '原理图 PDF 与装配图 PDF 写入文件', inputSchema: { schematic: z.string().optional().describe('原理图 PDF 路径'), assembly: z.string().optional().describe('装配图 PDF 路径') } }, async ({ schematic, assembly }) => { const ed = need(); const outp: string[] = []; if (schematic) { writeFileSync(resolve(schematic), exportSchematicPdf(ed.project), 'latin1'); outp.push(resolve(schematic)); } if (assembly) { writeFileSync(resolve(assembly), exportAssemblyPdf(ed.project), 'latin1'); outp.push(resolve(assembly)); } return text({ files: outp }); });
   server.registerTool('generate_footprint', { title: '参数化封装', description: '按 KiCad 风格名（LQFP-48_7x7mm_P0.5mm、SOIC-8_3.9x4.9mm_P1.27mm、R_0603_1608Metric、PinHeader_1x04_P2.54mm_Vertical、SOT-23-5…）生成封装并加入项目库', inputSchema: { name: z.string() } }, async ({ name }) => { const ed = need(); const def = footprintFromName(name); if (!def) throw new Error('无法识别的封装名'); ed.dispatch(lib.addLibraryItems({ footprints: [def] })); autosave(); return text({ id: def.id, name: def.name, pads: def.pads.length, body: def.body }); });
   server.registerTool('import_library', { title: '导入库文件', description: '把 .kicad_sym / .kicad_mod 导入项目库', inputSchema: { files: z.array(z.string()) } }, async ({ files }) => { const ed = need(); const symbols: SymbolDef[] = [], footprints: FootprintDef[] = [], warnings: string[] = []; for (const f of files) { const r = importLibraryFile(f.split('/').pop()!, readFileSync(resolve(f), 'utf8')); symbols.push(...r.symbols); footprints.push(...r.footprints); warnings.push(...r.warnings); } ed.dispatch(lib.addLibraryItems({ symbols, footprints })); autosave(); return text({ symbols: symbols.map((x) => x.id), footprints: footprints.map((x) => x.id), warnings }); });
-  server.registerTool('undo', { title: '撤销', description: '撤销上一步修改', inputSchema: {} }, async () => { const ed = need(); const label = ed.undoLabel; const ok = ed.undo(); autosave(); return text(ok ? `已撤销：${label}` : '没有可撤销的操作'); });
+  server.registerTool('undo', { title: '撤销', description: '撤销上一步修改', inputSchema: {} }, async () => { if (liveActive() && bridge && state.activeId) { bridge.undo(state.activeId); return text('已请求浏览器撤销上一步'); } const ed = need(); const label = ed.undoLabel; const ok = ed.undo(); autosave(); return text(ok ? `已撤销：${label}` : '没有可撤销的操作'); });
+  server.registerTool('list_open_projects', { title: '浏览器中打开的项目', description: '实时模式：列出已连接浏览器里打开的项目（id / 名称），用 use_project 选择', inputSchema: {} }, async () => text({ live: !!bridge, port: bridge?.address(), active: state.activeId, projects: [...live.entries()].map(([id, t]) => ({ id, name: t.name, rev: t.rev })), file: state.file }));
+  server.registerTool('use_project', { title: '选择项目', description: '选择要操作的浏览器项目 id（或 "file" 切回文件模式）', inputSchema: { id: z.string() } }, async ({ id }) => { if (id === 'file') { state.activeId = null; return text(state.file ? `已切回文件 ${state.file}` : '文件模式（尚未打开文件）'); } if (!live.has(id)) throw new Error(`浏览器里没有项目 ${id}，可用：${[...live.keys()].join(', ') || '无'}`); state.activeId = id; return text(summary(live.get(id)!.editor.project)); });
 
   if (initialFile) { try { const f = resolve(initialFile); open(parseProject(readFileSync(f, 'utf8')), f); } catch (e) { console.error(`无法打开 ${initialFile}: ${(e as Error).message}`); } }
-  return server;
+  return Object.assign(server, { bridge });
 }
 
-export async function serveMcp(initialFile?: string) {
-  const server = createMcpServer(initialFile);
+export async function serveMcp(initialFile?: string, opts: McpOptions = {}) {
+  const server = createMcpServer(initialFile, opts);
+  if (server.bridge) console.error(`[tracelet] 实时桥已监听 ws://127.0.0.1:${server.bridge.address()} · 在网页 头像菜单 → 本地 Agent 里连接`);
   await server.connect(new StdioServerTransport());
 }

@@ -108,3 +108,25 @@ describe('新功能冒烟', () => {
     expect(p.board.footprints[0].componentId).toBe(p.schematic.sheets[0].components[0].id);
   });
 });
+
+describe('本地 Agent 桥', () => {
+  it('apply 以可撤销命令应用到当前项目，open 打开新项目，undo 撤销', async () => {
+    const { handle } = await import('../src/store/bridge');
+    const { serializeProject, createFromTemplate } = await import('@tracelet/kernel');
+    cleanup(); act(() => { if (useApp.getState().editor) useApp.getState().closeProject(); });
+    render(<App />); await screen.findByText('ESP32 传感器板');
+    act(() => useApp.getState().openProjectObject(createDemoProject()));
+    const ed = useApp.getState().editor!;
+    const before = ed.project.schematic.sheets[0].components.length;
+    const modified = { ...ed.project, name: 'Agent 改过' };
+    act(() => handle({ type: 'apply', id: ed.project.id, rev: 5, doc: serializeProject(modified, false) }));
+    expect(useApp.getState().editor!.project.name).toBe('Agent 改过');
+    expect(useApp.getState().editor!.undoLabel).toBe('Agent 修改');
+    act(() => handle({ type: 'apply', id: 'someone-else', rev: 1, doc: serializeProject(modified, false) }));
+    expect(useApp.getState().editor!.project.schematic.sheets[0].components.length).toBe(before);
+    act(() => handle({ type: 'undo', id: ed.project.id }));
+    expect(useApp.getState().editor!.project.name).toBe('ESP32 传感器板');
+    act(() => handle({ type: 'open', doc: serializeProject(createFromTemplate('arduino'), false) }));
+    expect(useApp.getState().editor!.project.name).toBe('Arduino 扩展板');
+  });
+});

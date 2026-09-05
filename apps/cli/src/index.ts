@@ -135,9 +135,9 @@ fpc.command('gen <project> <spec>').description('按 KiCad 风格名（如 LQFP-
   ed.dispatch(lib.addLibraryItems({ footprints: [def] })); save(project, ed.project);
   console.log(`已加入 ${def.id}（${def.pads.length} 焊盘）`);
 });
-program.command('serve').description('以 MCP server（stdio）模式启动，供 Claude Code / Claude Desktop 调用').option('--mcp', 'MCP stdio 模式').option('-f, --file <file>', '启动时打开的项目').action(async (o) => {
+program.command('serve').description('以 MCP server（stdio）模式启动，供 Claude Code / Claude Desktop 调用').option('--mcp', 'MCP stdio 模式').option('-f, --file <file>', '启动时打开的项目').option('--live', '同时开启浏览器实时桥（网页端 头像菜单 → 本地 Agent 连接后，直接操作浏览器里打开的项目）').option('--port <n>', '实时桥端口', '8790').action(async (o) => {
   const { serveMcp } = await import('./mcp.js');
-  await serveMcp(o.file);
+  await serveMcp(o.file, o.live ? { live: { port: Number(o.port) } } : {});
 });
 
 program.parse();

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { usePrefs, useT, LOCALES, type Theme, type WheelMode } from '../i18n/index.js';
 import { useApp } from '../store/app.js';
 import { loadStoreConfig, saveStoreConfig } from '../store/projectStore.js';
+import { useBridge } from '../store/bridge.js';
 
 /** 头像菜单：语言 / 主题 / 存储模式。 */
 export function PrefsMenu({ large }: { large?: boolean }) {
@@ -11,6 +12,7 @@ export function PrefsMenu({ large }: { large?: boolean }) {
   const app = useApp();
   const ref = useRef<HTMLDivElement>(null);
   const [cfg, setCfg] = useState(loadStoreConfig);
+  const bridge = useBridge();
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
@@ -55,6 +57,16 @@ export function PrefsMenu({ large }: { large?: boolean }) {
               </div>
             </div>
           )}
+          <div className="menu-sep" />
+          <div className="menu-head">本地 Agent（MCP 实时桥）</div>
+          <div className="col" style={{ padding: '0 6px 6px', gap: 6 }}>
+            <div className="row" style={{ gap: 8 }}>
+              <span className={`chip${bridge.enabled ? ' on' : ''}`} onClick={() => bridge.set({ enabled: !bridge.enabled })}>{bridge.enabled ? '已开启' : '开启连接'}</span>
+              <span className="row xs mono" style={{ gap: 4 }}>端口<input className="input mono" style={{ width: 64, height: 22 }} defaultValue={bridge.port} onBlur={(e) => { const n = Number(e.target.value); if (n > 0 && n < 65536 && n !== bridge.port) bridge.set({ port: n }); }} /></span>
+              <span className="ml-auto xs" style={{ color: bridge.status === 'connected' ? 'var(--success)' : bridge.status === 'error' ? 'var(--error)' : 'var(--text-3)' }}>● {{ off: '未连接', connecting: '连接中…', connected: `已连接${bridge.agentEdits ? ` · Agent 修改 ${bridge.agentEdits} 次` : ''}`, error: '连不上' }[bridge.status]}</span>
+            </div>
+            <div className="dim xs">让 Claude Code 等 MCP 客户端直接操作当前浏览器里打开的项目（按项目 ID）：<code>pnpm cli serve --mcp --live</code>，Agent 的每次修改都是一条可撤销的「Agent 修改」。</div>
+          </div>
           <div className="row" style={{ padding: '4px 6px 2px' }}>
             <button className="btn sm primary" onClick={() => { saveStoreConfig(cfg); setOpen(false); app.toast('已保存偏好；存储模式在重新加载后生效', 'success'); }}>保存</button>
             <span className="ml-auto dim xs mono">v0.1.0</span>
