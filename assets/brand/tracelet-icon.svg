@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Tracelet</title>
+  <desc id="desc">A letter T formed by copper traces and three plated pads on a dark rounded square.</desc>
+  <rect x="16" y="16" width="480" height="480" rx="120" fill="#102C32"/>
+  <path d="M136 164H328Q376 164 376 212V228M256 164V348" stroke="#57E0B5" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="136" cy="164" r="34" fill="#57E0B5"/>
+  <circle cx="376" cy="228" r="34" fill="#57E0B5"/>
+  <circle cx="256" cy="348" r="34" fill="#57E0B5"/>
+  <circle cx="136" cy="164" r="12" fill="#102C32"/>
+  <circle cx="376" cy="228" r="12" fill="#102C32"/>
+  <circle cx="256" cy="348" r="12" fill="#102C32"/>
+</svg>

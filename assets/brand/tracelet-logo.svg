@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1056" height="256" viewBox="0 0 1056 256" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Tracelet</title>
+  <desc id="desc">Tracelet circuit-trace symbol with the Tracelet wordmark.</desc>
+  <g transform="translate(8 8) scale(.46875)">
+  <rect x="16" y="16" width="480" height="480" rx="120" fill="#102C32"/>
+  <path d="M136 164H328Q376 164 376 212V228M256 164V348" stroke="#57E0B5" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="136" cy="164" r="34" fill="#57E0B5"/>
+  <circle cx="376" cy="228" r="34" fill="#57E0B5"/>
+  <circle cx="256" cy="348" r="34" fill="#57E0B5"/>
+  <circle cx="136" cy="164" r="12" fill="#102C32"/>
+  <circle cx="376" cy="228" r="12" fill="#102C32"/>
+  <circle cx="256" cy="348" r="12" fill="#102C32"/>
+  </g>
+  <text x="292" y="174" fill="#102C32" font-family="Inter, Avenir Next, Segoe UI, Arial, sans-serif" font-size="132" font-weight="600" letter-spacing="-5">Tracelet</text>
+</svg>

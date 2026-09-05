@@ -1,0 +1,296 @@
+[
+  {
+    "id": "capacitor",
+    "name": "电容",
+    "group": "无源器件",
+    "linear": "linear/capacitor.svg",
+    "solid45": "solid-45/capacitor.svg"
+  },
+  {
+    "id": "resistor",
+    "name": "电阻",
+    "group": "无源器件",
+    "linear": "linear/resistor.svg",
+    "solid45": "solid-45/resistor.svg"
+  },
+  {
+    "id": "inductor",
+    "name": "电感",
+    "group": "无源器件",
+    "linear": "linear/inductor.svg",
+    "solid45": "solid-45/inductor.svg"
+  },
+  {
+    "id": "microcontroller",
+    "name": "微控制器",
+    "group": "集成电路",
+    "linear": "linear/microcontroller.svg",
+    "solid45": "solid-45/microcontroller.svg"
+  },
+  {
+    "id": "logic",
+    "name": "逻辑器件",
+    "group": "集成电路",
+    "linear": "linear/logic.svg",
+    "solid45": "solid-45/logic.svg"
+  },
+  {
+    "id": "diode",
+    "name": "二极管",
+    "group": "半导体",
+    "linear": "linear/diode.svg",
+    "solid45": "solid-45/diode.svg"
+  },
+  {
+    "id": "transistor",
+    "name": "晶体管",
+    "group": "半导体",
+    "linear": "linear/transistor.svg",
+    "solid45": "solid-45/transistor.svg"
+  },
+  {
+    "id": "circuit-protection",
+    "name": "板级电路保护",
+    "group": "电源与保护",
+    "linear": "linear/circuit-protection.svg",
+    "solid45": "solid-45/circuit-protection.svg"
+  },
+  {
+    "id": "power-management",
+    "name": "电源管理",
+    "group": "电源与保护",
+    "linear": "linear/power-management.svg",
+    "solid45": "solid-45/power-management.svg"
+  },
+  {
+    "id": "interface-ic",
+    "name": "接口芯片",
+    "group": "集成电路",
+    "linear": "linear/interface-ic.svg",
+    "solid45": "solid-45/interface-ic.svg"
+  },
+  {
+    "id": "clock-timing",
+    "name": "时钟和计时",
+    "group": "集成电路",
+    "linear": "linear/clock-timing.svg",
+    "solid45": "solid-45/clock-timing.svg"
+  },
+  {
+    "id": "connector",
+    "name": "连接器",
+    "group": "机电与连接",
+    "linear": "linear/connector.svg",
+    "solid45": "solid-45/connector.svg"
+  },
+  {
+    "id": "terminal",
+    "name": "端子",
+    "group": "机电与连接",
+    "linear": "linear/terminal.svg",
+    "solid45": "solid-45/terminal.svg"
+  },
+  {
+    "id": "switch",
+    "name": "开关",
+    "group": "机电与连接",
+    "linear": "linear/switch.svg",
+    "solid45": "solid-45/switch.svg"
+  },
+  {
+    "id": "data-converter",
+    "name": "数据转换芯片",
+    "group": "集成电路",
+    "linear": "linear/data-converter.svg",
+    "solid45": "solid-45/data-converter.svg"
+  },
+  {
+    "id": "rf-wireless",
+    "name": "射频无线",
+    "group": "通信",
+    "linear": "linear/rf-wireless.svg",
+    "solid45": "solid-45/rf-wireless.svg"
+  },
+  {
+    "id": "optoelectronics",
+    "name": "光电器件",
+    "group": "光电与显示",
+    "linear": "linear/optoelectronics.svg",
+    "solid45": "solid-45/optoelectronics.svg"
+  },
+  {
+    "id": "display",
+    "name": "显示模块",
+    "group": "光电与显示",
+    "linear": "linear/display.svg",
+    "solid45": "solid-45/display.svg"
+  },
+  {
+    "id": "filter",
+    "name": "滤波器",
+    "group": "无源器件",
+    "linear": "linear/filter.svg",
+    "solid45": "solid-45/filter.svg"
+  },
+  {
+    "id": "crystal",
+    "name": "晶体",
+    "group": "无源器件",
+    "linear": "linear/crystal.svg",
+    "solid45": "solid-45/crystal.svg"
+  },
+  {
+    "id": "oscillator",
+    "name": "振荡器",
+    "group": "无源器件",
+    "linear": "linear/oscillator.svg",
+    "solid45": "solid-45/oscillator.svg"
+  },
+  {
+    "id": "memory",
+    "name": "存储器",
+    "group": "集成电路",
+    "linear": "linear/memory.svg",
+    "solid45": "solid-45/memory.svg"
+  },
+  {
+    "id": "sensor",
+    "name": "传感器",
+    "group": "集成电路",
+    "linear": "linear/sensor.svg",
+    "solid45": "solid-45/sensor.svg"
+  },
+  {
+    "id": "isolator",
+    "name": "隔离器件",
+    "group": "集成电路",
+    "linear": "linear/isolator.svg",
+    "solid45": "solid-45/isolator.svg"
+  },
+  {
+    "id": "relay",
+    "name": "继电器",
+    "group": "机电与连接",
+    "linear": "linear/relay.svg",
+    "solid45": "solid-45/relay.svg"
+  },
+  {
+    "id": "buzzer",
+    "name": "蜂鸣器",
+    "group": "机电与连接",
+    "linear": "linear/buzzer.svg",
+    "solid45": "solid-45/buzzer.svg"
+  },
+  {
+    "id": "motor",
+    "name": "马达",
+    "group": "机电与连接",
+    "linear": "linear/motor.svg",
+    "solid45": "solid-45/motor.svg"
+  },
+  {
+    "id": "functional-module",
+    "name": "功能模块",
+    "group": "模块与开发",
+    "linear": "linear/functional-module.svg",
+    "solid45": "solid-45/functional-module.svg"
+  },
+  {
+    "id": "communication-module",
+    "name": "通信模块",
+    "group": "模块与开发",
+    "linear": "linear/communication-module.svg",
+    "solid45": "solid-45/communication-module.svg"
+  },
+  {
+    "id": "amplifier",
+    "name": "放大器",
+    "group": "集成电路",
+    "linear": "linear/amplifier.svg",
+    "solid45": "solid-45/amplifier.svg"
+  },
+  {
+    "id": "development-board",
+    "name": "开发板",
+    "group": "模块与开发",
+    "linear": "linear/development-board.svg",
+    "solid45": "solid-45/development-board.svg"
+  },
+  {
+    "id": "tools",
+    "name": "工具",
+    "group": "工具与工业",
+    "linear": "linear/tools.svg",
+    "solid45": "solid-45/tools.svg"
+  },
+  {
+    "id": "instruments",
+    "name": "仪器仪表",
+    "group": "工具与工业",
+    "linear": "linear/instruments.svg",
+    "solid45": "solid-45/instruments.svg"
+  },
+  {
+    "id": "consumables",
+    "name": "耗材",
+    "group": "工具与工业",
+    "linear": "linear/consumables.svg",
+    "solid45": "solid-45/consumables.svg"
+  },
+  {
+    "id": "industrial",
+    "name": "工业品",
+    "group": "工具与工业",
+    "linear": "linear/industrial.svg",
+    "solid45": "solid-45/industrial.svg"
+  },
+  {
+    "id": "battery",
+    "name": "电池",
+    "group": "电源与保护",
+    "linear": "linear/battery.svg",
+    "solid45": "solid-45/battery.svg"
+  },
+  {
+    "id": "fuse",
+    "name": "保险丝",
+    "group": "电源与保护",
+    "linear": "linear/fuse.svg",
+    "solid45": "solid-45/fuse.svg"
+  },
+  {
+    "id": "transformer",
+    "name": "变压器",
+    "group": "无源器件",
+    "linear": "linear/transformer.svg",
+    "solid45": "solid-45/transformer.svg"
+  },
+  {
+    "id": "antenna",
+    "name": "天线",
+    "group": "通信",
+    "linear": "linear/antenna.svg",
+    "solid45": "solid-45/antenna.svg"
+  },
+  {
+    "id": "audio",
+    "name": "音频器件",
+    "group": "光电与显示",
+    "linear": "linear/audio.svg",
+    "solid45": "solid-45/audio.svg"
+  },
+  {
+    "id": "thermal",
+    "name": "散热器件",
+    "group": "工具与工业",
+    "linear": "linear/thermal.svg",
+    "solid45": "solid-45/thermal.svg"
+  },
+  {
+    "id": "mechanical",
+    "name": "机械与紧固件",
+    "group": "工具与工业",
+    "linear": "linear/mechanical.svg",
+    "solid45": "solid-45/mechanical.svg"
+  }
+]

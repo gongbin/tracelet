@@ -1,0 +1,27 @@
+{
+  "name": "tracelet",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Tracelet —— 面向个人与创客的开源在线 PCB 设计工具（TypeScript 无头内核 + Web 编辑器 + CLI + MCP）",
+  "license": "MIT",
+  "packageManager": "pnpm@10.30.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @tracelet/web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "cli": "tsx apps/cli/src/index.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "tsx": "^4.19.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
