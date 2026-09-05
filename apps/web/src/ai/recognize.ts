@@ -33,7 +33,13 @@ const PROMPT = `请把这份原理图（可能是多页 PDF 或截图）抽取�
 4. 只抽取电气连接，不要虚构没画出来的连接；不确定的地方写进 notes。
 5. 位号必须唯一。`;
 
-export async function recognizeSchematic(cfg: AiConfig, src: RecognizeSource, opts: { hint?: string } = {}): Promise<ExtractedSchematic> {
+export interface RecognizeProgress { chars: number; thinking: boolean }
+
+/**
+ * 识别原理图。必须走流式：SDK 对 max_tokens 较大的非流式请求会直接拒绝
+ * （"Streaming is required for operations that may take longer than 10 minutes"）。
+ */
+export async function recognizeSchematic(cfg: AiConfig, src: RecognizeSource, opts: { hint?: string; onProgress?: (p: RecognizeProgress) => void; signal?: AbortSignal } = {}): Promise<ExtractedSchematic> {
   const client = createClient(cfg);
   const doc: Anthropic.ContentBlockParam = src.kind === 'pdf'
     ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: src.data } }
@@ -41,14 +47,23 @@ export async function recognizeSchematic(cfg: AiConfig, src: RecognizeSource, op
       ? { type: 'document', source: { type: 'url', url: src.url } }
       : { type: 'image', source: { type: 'base64', media_type: src.mediaType, data: src.data } };
   try {
-    const response = await client.messages.parse({
+    const stream = client.messages.stream({
       model: cfg.model,
       max_tokens: 32000,
       thinking: { type: 'adaptive' },
       output_config: { format: zodOutputFormat(ExtractedSchema), effort: 'high' },
       messages: [{ role: 'user', content: [doc, { type: 'text', text: PROMPT + (opts.hint ? `\n补充说明：${opts.hint}` : '') }] }]
+    }, { signal: opts.signal });
+    let chars = 0, thinking = false;
+    stream.on('streamEvent', (ev) => {
+      if (ev.type === 'content_block_start') thinking = ev.content_block.type === 'thinking';
+      else if (ev.type === 'content_block_delta' && ev.delta.type === 'text_delta') chars += ev.delta.text.length;
+      else return;
+      opts.onProgress?.({ chars, thinking });
     });
+    const response = await stream.finalMessage();
     if (response.stop_reason === 'refusal') throw new Error('模型拒绝处理该文件');
+    if (response.stop_reason === 'max_tokens') throw new Error('图纸太大，输出被截断：请拆页识别或裁剪到需要的部分');
     const out = response.parsed_output;
     if (!out) throw new Error('模型没有返回可解析的结构化结果，请重试或换一页');
     return out;

@@ -24,7 +24,8 @@ export async function chatWithTools(cfg: AiConfig, history: Anthropic.Beta.BetaM
   for (let iter = 0; iter < 12; iter++) {
     let response: Anthropic.Beta.BetaMessage;
     try {
-      response = await client.beta.messages.create({
+      // 流式请求：避免 SDK 对长请求的非流式限制，也能边生成边显示
+      response = await client.beta.messages.stream({
         model: cfg.model,
         max_tokens: 16000,
         system: SYSTEM_PROMPT,
@@ -34,7 +35,7 @@ export async function chatWithTools(cfg: AiConfig, history: Anthropic.Beta.BetaM
         output_config: { effort: cfg.effort },
         // 服务端 fallback：模型因安全策略拒绝时自动改用备用模型（仅 Opus 5 / Fable 系列支持）
         ...(isOpus5 ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const } : {})
-      });
+      }).on('text', (delta, snapshot) => { if (delta) onText?.(snapshot); }).finalMessage();
     } catch (e) { throw new Error(describeError(e)); }
     if (response.stop_reason === 'refusal') { return { reply: { text: '模型拒绝了这个请求（安全策略）。', steps, refused: true }, history: messages }; }
     const text = response.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text').map((b) => b.text).join('\n');

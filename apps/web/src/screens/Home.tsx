@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { PROJECT_TEMPLATES, createDemoProject } from '@tracelet/kernel';
 import { importProjectFiles, backupAllProjects } from '../store/backup.js';
 import { useApp } from '../store/app.js';
 import { Icon } from '../components/Icon.js';
@@ -15,14 +16,13 @@ function timeAgo(iso: string) {
   return new Date(iso).toLocaleDateString();
 }
 
-const COMMUNITY = [
-  { name: 'ESP32-C3 SuperMini 克隆', meta: '★ 1.2k · Fork 340' },
-  { name: 'RP2040 开发板', meta: '★ 860 · Fork 210' },
-  { name: 'USB-C PD 触发板', meta: '★ 540 · Fork 98' }
+const SAMPLES = [
+  ...PROJECT_TEMPLATES.filter((t) => t.id !== 'blank').map((t) => ({ id: t.id, name: t.name, meta: t.description, create: () => t.create() })),
+  { id: 'demo', name: 'ESP32 传感器板（示例）', meta: '带走线、铺铜与过孔的完整小板，适合先看看 PCB / 3D / 制造页', create: () => createDemoProject() }
 ];
 
 export function Home() {
-  const { projects, openProject, deleteProject, set, toast, store } = useApp();
+  const { projects, openProject, deleteProject, set, toast, store, openProjectObject } = useApp();
   const fileRef = useRef<HTMLInputElement>(null);
   const t = useT();
 
@@ -84,13 +84,13 @@ export function Home() {
           </div>
         </div>
         <div className="col" style={{ gap: 14 }}>
-          <div><h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>{t('home.community')}</h2><div className="small muted" style={{ marginTop: 2 }}>开源项目，可一键 Fork</div></div>
+          <div><h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>{t('home.community')}</h2><div className="small muted" style={{ marginTop: 2 }}>一键生成到你的项目里，随意改</div></div>
           <div className="community-grid">
-            {COMMUNITY.map((c) => (
-              <div key={c.name} className="card row" style={{ gap: 12, padding: 12 }}>
-                <div style={{ width: 56, height: 40, borderRadius: 4, background: 'var(--bg-canvas)', border: '1px solid var(--border)', flex: 'none' }} />
-                <div className="col" style={{ gap: 2, minWidth: 0 }}><div className="nowrap" style={{ fontWeight: 500 }}>{c.name}</div><div className="small muted">{c.meta}</div></div>
-                <button className="btn ml-auto" onClick={() => toast('社区功能在后续里程碑开放')}>Fork</button>
+            {SAMPLES.map((c) => (
+              <div key={c.id} className="card row" style={{ gap: 12, padding: 12 }}>
+                <div style={{ width: 56, height: 40, borderRadius: 4, background: 'var(--bg-canvas)', border: '1px solid var(--border)', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon d={I.file} size={16} stroke={2} color="var(--text-3)" /></div>
+                <div className="col" style={{ gap: 2, minWidth: 0 }}><div className="nowrap" style={{ fontWeight: 500 }}>{c.name}</div><div className="small muted" title={c.meta} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.meta}</div></div>
+                <button className="btn ml-auto" style={{ flex: 'none' }} onClick={() => { openProjectObject(c.create()); toast(`已从「${c.name}」创建项目`, 'success'); }}>创建</button>
               </div>
             ))}
           </div>

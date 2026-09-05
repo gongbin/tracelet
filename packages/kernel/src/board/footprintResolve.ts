@@ -6,6 +6,7 @@ import type { FootprintDef, PadDef } from '../model/board.js';
 import { findFootprint } from '../library/footprints.js';
 import { getSymbol } from '../library/symbols.js';
 import { registerFootprints } from '../library/registry.js';
+import { footprintFromName, generateFootprint } from '../library/generators.js';
 
 const KICAD_MAP: [RegExp, string][] = [
   [/^R_0402/i, 'fp:R_0402'], [/^R_0603/i, 'fp:R_0603'], [/^R_0805/i, 'fp:R_0805'],
@@ -29,15 +30,9 @@ export function placeholderFootprint(pinNumbers: string[], name: string): Footpr
   return { id: `fp:placeholder:${name}`, name: `占位_${name}`, body: { w: span - 2, h: half * pitch + 1 }, pads, height: 1.5, description: '占位封装（按引脚数生成，请替换）' };
 }
 
-/** 2.54mm 排针 / 排母：PinHeader_1x04_P2.54mm_Vertical 等直接生成真实封装。 */
+/** 2.54mm 排针 / 排母：PinHeader_1x04_P2.54mm_Vertical 等直接生成真实封装（委托参数化生成器）。 */
 export function pinHeaderFootprint(rows: number, cols: number, pitch = 2.54): FootprintDef {
-  const pads: PadDef[] = [];
-  let n = 1;
-  for (let i = 0; i < cols; i++) for (let r = 0; r < rows; r++) {
-    pads.push({ number: String(n++), x: r * pitch, y: i * pitch, w: 1.7, h: 1.7, shape: n === 2 ? 'rect' : 'oval', drill: 1.0, npth: false });
-  }
-  const name = `PinHeader_${rows}x${String(cols).padStart(2, '0')}_P${pitch}mm_Vertical`;
-  return { id: `fp:gen:${name}`, name, body: { w: rows * pitch, h: cols * pitch }, pads, height: 8.5, description: `${rows}×${cols} 排针 ${pitch}mm` };
+  return generateFootprint({ kind: 'header', rows: rows === 2 ? 2 : 1, cols, pitch });
 }
 
 export function resolveFootprint(c: SchComponent): ResolvedFootprint {
@@ -51,8 +46,13 @@ export function resolveFootprint(c: SchComponent): ResolvedFootprint {
     if (!existing) registerFootprints([def]);
     return { id: def.id, created: existing ?? def, mapped: true, placeholder: false };
   }
+  // KiCad 风格命名的常见封装（0603 / SOIC / LQFP / QFN / DIP / SOT-23…）按参数直接生成真实几何
+  const gen = kicadName ? footprintFromName(kicadName) : undefined;
+  if (gen) { const existing = findFootprint(gen.id); if (!existing) registerFootprints([gen]); return { id: gen.id, created: existing ?? gen, mapped: true, placeholder: false }; }
   const sym = getSymbol(c.symbolId);
   if (sym.defaultFootprint && findFootprint(sym.defaultFootprint)) return { id: sym.defaultFootprint, mapped: false, placeholder: false };
+  const genDefault = sym.defaultFootprint ? footprintFromName(sym.defaultFootprint) : undefined;
+  if (genDefault) { const existing = findFootprint(genDefault.id); if (!existing) registerFootprints([genDefault]); return { id: genDefault.id, created: existing ?? genDefault, mapped: true, placeholder: false }; }
   const pins = sym.pins.map((p) => p.number);
   const key = `${pins.length}p_${(kicadName || sym.name).replace(/[^\w.-]+/g, '_')}`.slice(0, 60);
   const existing = findFootprint(`fp:placeholder:${key}`);

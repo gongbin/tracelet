@@ -29,10 +29,15 @@ const PIN_TYPES: Record<string, PinType> = { input: 'input', output: 'output', b
 interface RawSymbol { id: string; name: string; power: boolean; pinNamesHidden: boolean; pinNumbersHidden: boolean; units: Map<number, SList[]>; props: Record<string, string> }
 
 function parseLibSymbols(root: SList): Map<string, RawSymbol> {
-  const out = new Map<string, RawSymbol>();
   const lib = child(root, 'lib_symbols');
-  if (!lib) return out;
-  for (const sym of children(lib, 'symbol')) {
+  return lib ? parseSymbolNodes(children(lib, 'symbol')) : new Map();
+}
+
+/** 解析一组 (symbol ...) 节点（lib_symbols 内或 .kicad_sym 顶层）。派生符号（extends）继承父符号图形与引脚。 */
+export function parseSymbolNodes(nodes: SList[]): Map<string, RawSymbol> {
+  const out = new Map<string, RawSymbol>();
+  const pending: [RawSymbol, string][] = [];
+  for (const sym of nodes) {
     const name = str(sym[1]);
     const props: Record<string, string> = {};
     for (const p of children(sym, 'property')) props[str(p[1])] = str(p[2]);
@@ -47,13 +52,23 @@ function parseLibSymbols(root: SList): Map<string, RawSymbol> {
     // 兼容旧格式：图形直接放在 symbol 下
     const direct = sym.filter((x): x is SList => isList(x) && ['polyline', 'rectangle', 'circle', 'arc', 'pin', 'text'].includes(String(x[0])));
     if (direct.length) raw.units.set(0, [...(raw.units.get(0) ?? []), direct as unknown as SList]);
+    const ext = child(sym, 'extends');
+    if (ext) pending.push([raw, str(ext[1])]);
     out.set(name, raw);
+  }
+  for (const [raw, parentName] of pending) {
+    const parent = out.get(parentName);
+    if (!parent) continue;
+    raw.units = new Map(parent.units);
+    raw.pinNamesHidden = parent.pinNamesHidden; raw.pinNumbersHidden = parent.pinNumbersHidden; raw.power = raw.power || parent.power;
+    raw.props = { ...parent.props, ...raw.props };
   }
   return out;
 }
+export type { RawSymbol };
 
 /** 把一个库符号（指定 unit）转成通用 SymbolDef（局部坐标：外接框左上角，mil，y 向下）。 */
-function buildSymbolDef(raw: RawSymbol, unit: number, libId: string): SymbolDef {
+export function buildSymbolDef(raw: RawSymbol, unit: number, libId: string): SymbolDef {
   const shapes: SymbolShape[] = [];
   const pins: (PinDef & { _base: Vec })[] = [];
   const P = (x: SExpr | undefined, y: SExpr | undefined): Vec => ({ x: mil(num(x)), y: -mil(num(y)) });
@@ -209,6 +224,55 @@ function chainOutline(segs: Vec[][]): Vec[] {
   return poly.map((p) => ({ x: Math.round(p.x * 1000) / 1000, y: Math.round(p.y * 1000) / 1000 }));
 }
 
+export interface ParsedFootprintNode { def: Omit<FootprintDef, 'id'>; shortName: string; libName: string; props: Record<string, string>; padNets: Record<string, string>; at: Vec; angle: number; side: 'F' | 'B'; locked: boolean }
+
+/** 解析一个 (footprint ...) / (module ...) 节点：焊盘、本体尺寸、属性。板内节点与 .kicad_mod 通用。 */
+export function parseFootprintNode(fp: SList, netName: (node: SList | undefined) => string = () => ''): ParsedFootprintNode {
+  const P = (node: SList | undefined): Vec => ({ x: num(node?.[1]), y: num(node?.[2]) });
+  const libName = str(fp[1]);
+  const shortName = libName.split(':').pop() || libName;
+  const at = child(fp, 'at');
+  const fpAngle = num(at?.[3]);
+  const layer = str(child(fp, 'layer')?.[1]);
+  const side: 'F' | 'B' = layer.startsWith('B') ? 'B' : 'F';
+  const props: Record<string, string> = {};
+  for (const p of children(fp, 'property')) props[str(p[1])] = str(p[2]);
+  for (const t of children(fp, 'fp_text')) { const k = str(t[1]); if (k === 'reference') props.Reference = str(t[2]); if (k === 'value') props.Value = str(t[2]); }
+  const descr = child(fp, 'descr');
+  const pads: PadDef[] = [];
+  const padNets: Record<string, string> = {};
+  const seen = new Map<string, number>();
+  for (const pad of children(fp, 'pad')) {
+    let number = str(pad[1]);
+    const kind = str(pad[2]), shape = str(pad[3]);
+    const pat = child(pad, 'at'); const size = child(pad, 'size'); const drill = child(pad, 'drill');
+    const padAngle = num(pat?.[3]);
+    const rel = ((padAngle - fpAngle) % 180 + 180) % 180;
+    let w = num(size?.[1]), h = num(size?.[2]);
+    if (Math.abs(rel - 90) < 1e-6) [w, h] = [h, w];
+    const npth = kind === 'np_thru_hole';
+    if (!number) number = npth ? `NPTH${pads.length + 1}` : `P${pads.length + 1}`;
+    const dup = seen.get(number) ?? 0; seen.set(number, dup + 1);
+    const drillD = drill ? (typeof drill[1] === 'number' ? num(drill[1]) : num(drill[2])) : 0;
+    pads.push({ number, x: num(pat?.[1]), y: num(pat?.[2]), w, h, shape: shape === 'circle' ? 'circle' : shape === 'oval' ? 'oval' : shape === 'roundrect' ? 'roundrect' : 'rect', drill: kind === 'smd' ? 0 : drillD, npth });
+    const nn = netName(child(pad, 'net'));
+    if (nn && !padNets[number]) padNets[number] = nn;
+  }
+  // 本体：优先 courtyard，其次 fab，其次焊盘外接框
+  const boxFrom = (layerName: string): { w: number; h: number } | null => {
+    const pts: Vec[] = [];
+    for (const ln of children(fp, 'fp_line')) if (str(child(ln, 'layer')?.[1]) === layerName) pts.push(P(child(ln, 'start')), P(child(ln, 'end')));
+    for (const r of children(fp, 'fp_rect')) if (str(child(r, 'layer')?.[1]) === layerName) pts.push(P(child(r, 'start')), P(child(r, 'end')));
+    for (const c of children(fp, 'fp_circle')) if (str(child(c, 'layer')?.[1]) === layerName) { const ce = P(child(c, 'center')), en = P(child(c, 'end')); const r = dist(ce, en); pts.push({ x: ce.x - r, y: ce.y - r }, { x: ce.x + r, y: ce.y + r }); }
+    if (!pts.length) return null;
+    return { w: Math.max(...pts.map((p) => p.x)) - Math.min(...pts.map((p) => p.x)), h: Math.max(...pts.map((p) => p.y)) - Math.min(...pts.map((p) => p.y)) };
+  };
+  const body = boxFrom('F.CrtYd') ?? boxFrom('B.CrtYd') ?? boxFrom('F.Fab') ?? boxFrom('B.Fab') ?? boxFrom('F.SilkS') ?? (pads.length ? { w: Math.max(...pads.map((p) => Math.abs(p.x) + p.w / 2)) * 2 + 0.2, h: Math.max(...pads.map((p) => Math.abs(p.y) + p.h / 2)) * 2 + 0.2 } : { w: 2, h: 2 });
+  const isTht = pads.some((p) => p.drill > 0 && !p.npth);
+  const def: Omit<FootprintDef, 'id'> = { name: shortName, body: { w: Math.round(body.w * 100) / 100, h: Math.round(body.h * 100) / 100 }, pads, height: isTht ? 4 : 1, description: descr ? str(descr[1]) : `KiCad ${libName}` };
+  return { def, shortName, libName, props, padNets, at: { x: num(at?.[1]), y: num(at?.[2]) }, angle: fpAngle, side, locked: fp.includes('locked') || str(child(fp, 'locked')?.[1]) === 'yes' };
+}
+
 export function importKicadPcb(text: string): PcbImportResult {
   const root = parseSExpr(text);
   if (root[0] !== 'kicad_pcb') throw new Error('不是 KiCad PCB 文件（kicad_pcb）');
@@ -229,49 +293,12 @@ export function importKicadPcb(text: string): PcbImportResult {
   const fpDefs = new Map<string, FootprintDef>();
   const fpNodes = [...children(root, 'footprint'), ...children(root, 'module')];
   for (const fp of fpNodes) {
-    const libName = str(fp[1]);
-    const shortName = libName.split(':').pop() || libName;
-    const at = child(fp, 'at');
-    const fpAngle = num(at?.[3]);
-    const layer = str(child(fp, 'layer')?.[1]);
-    const side: 'F' | 'B' = layer.startsWith('B') ? 'B' : 'F';
-    const props: Record<string, string> = {};
-    for (const p of children(fp, 'property')) props[str(p[1])] = str(p[2]);
-    for (const t of children(fp, 'fp_text')) { const k = str(t[1]); if (k === 'reference') props.Reference = str(t[2]); if (k === 'value') props.Value = str(t[2]); }
-    const pads: PadDef[] = [];
-    const padNets: Record<string, string> = {};
-    const seen = new Map<string, number>();
-    for (const pad of children(fp, 'pad')) {
-      let number = str(pad[1]);
-      const kind = str(pad[2]), shape = str(pad[3]);
-      const pat = child(pad, 'at'); const size = child(pad, 'size'); const drill = child(pad, 'drill');
-      const padAngle = num(pat?.[3]);
-      const rel = ((padAngle - fpAngle) % 180 + 180) % 180;
-      let w = num(size?.[1]), h = num(size?.[2]);
-      if (Math.abs(rel - 90) < 1e-6) [w, h] = [h, w];
-      const npth = kind === 'np_thru_hole';
-      if (!number) number = npth ? `NPTH${pads.length + 1}` : `P${pads.length + 1}`;
-      const dup = seen.get(number) ?? 0; seen.set(number, dup + 1);
-      const drillD = drill ? (typeof drill[1] === 'number' ? num(drill[1]) : num(drill[2])) : 0;
-      pads.push({ number, x: num(pat?.[1]), y: num(pat?.[2]), w, h, shape: shape === 'circle' ? 'circle' : shape === 'oval' ? 'oval' : shape === 'roundrect' ? 'roundrect' : 'rect', drill: kind === 'smd' ? 0 : drillD, npth });
-      const nn = netName(child(pad, 'net'));
-      if (nn && !padNets[number]) padNets[number] = nn;
-    }
-    // 本体：优先 courtyard，其次 fab，其次焊盘外接框
-    const boxFrom = (layerName: string): { w: number; h: number } | null => {
-      const pts: Vec[] = [];
-      for (const ln of children(fp, 'fp_line')) if (str(child(ln, 'layer')?.[1]) === layerName) pts.push(P(child(ln, 'start')), P(child(ln, 'end')));
-      for (const r of children(fp, 'fp_rect')) if (str(child(r, 'layer')?.[1]) === layerName) pts.push(P(child(r, 'start')), P(child(r, 'end')));
-      for (const c of children(fp, 'fp_circle')) if (str(child(c, 'layer')?.[1]) === layerName) { const ce = P(child(c, 'center')), en = P(child(c, 'end')); const r = dist(ce, en); pts.push({ x: ce.x - r, y: ce.y - r }, { x: ce.x + r, y: ce.y + r }); }
-      if (!pts.length) return null;
-      return { w: Math.max(...pts.map((p) => p.x)) - Math.min(...pts.map((p) => p.x)), h: Math.max(...pts.map((p) => p.y)) - Math.min(...pts.map((p) => p.y)) };
-    };
-    const body = boxFrom('F.CrtYd') ?? boxFrom('B.CrtYd') ?? boxFrom('F.Fab') ?? boxFrom('B.Fab') ?? boxFrom('F.SilkS') ?? (pads.length ? { w: Math.max(...pads.map((p) => Math.abs(p.x) + p.w / 2)) * 2 + 0.2, h: Math.max(...pads.map((p) => Math.abs(p.y) + p.h / 2)) * 2 + 0.2 } : { w: 2, h: 2 });
-    const sig = JSON.stringify(pads.map((p) => [p.number, p.x, p.y, p.w, p.h, p.shape, p.drill]));
-    let id = `fp:kicad:${shortName}`;
-    for (let k = 2; fpDefs.has(id) && JSON.stringify(fpDefs.get(id)!.pads.map((p) => [p.number, p.x, p.y, p.w, p.h, p.shape, p.drill])) !== sig; k++) id = `fp:kicad:${shortName}#${k}`;
-    if (!fpDefs.has(id)) fpDefs.set(id, { id, name: shortName, body: { w: Math.round(body.w * 100) / 100, h: Math.round(body.h * 100) / 100 }, pads, height: 1, description: `KiCad ${libName}` });
-    board.footprints.push({ id: newId('fp'), ref: props.Reference ?? 'REF?', footprintId: id, value: props.Value ?? '', x: num(at?.[1]), y: num(at?.[2]), rotation: ((-fpAngle) % 360 + 360) % 360, side, padNets });
+    const r = parseFootprintNode(fp, netName);
+    const sig = JSON.stringify(r.def.pads.map((p) => [p.number, p.x, p.y, p.w, p.h, p.shape, p.drill]));
+    let id = `fp:kicad:${r.shortName}`;
+    for (let k = 2; fpDefs.has(id) && JSON.stringify(fpDefs.get(id)!.pads.map((p) => [p.number, p.x, p.y, p.w, p.h, p.shape, p.drill])) !== sig; k++) id = `fp:kicad:${r.shortName}#${k}`;
+    if (!fpDefs.has(id)) fpDefs.set(id, { ...r.def, id });
+    board.footprints.push({ id: newId('fp'), ref: r.props.Reference ?? 'REF?', footprintId: id, value: r.props.Value ?? '', x: r.at.x, y: r.at.y, rotation: ((-r.angle) % 360 + 360) % 360, side: r.side, padNets: r.padNets, locked: r.locked });
   }
   // 走线 / 过孔
   for (const s of children(root, 'segment')) {
@@ -348,8 +375,16 @@ export function importKicadProject(input: KicadImportInput): KicadImportResult {
       const byRef = new Map<string, SchComponent>();
       for (const sh of project.schematic.sheets) for (const c of sh.components) if (!getSymbol(c.symbolId).power) byRef.set(c.ref, c);
       for (const f of project.board.footprints) { const c = byRef.get(f.ref); if (c) { f.componentId = c.id; if (!c.footprint || !footprints.some((d) => d.id === c.footprint)) c.footprint = f.footprintId; } }
-      // 用原理图网表补全未命名焊盘网络
-      if (sheets.length) { const nl = buildSchematicNetlist(project.schematic); for (const f of project.board.footprints) if (f.componentId) for (const k of Object.keys(f.padNets)) if (!f.padNets[k]) f.padNets[k] = nl.pinNet.get(`${f.componentId}:${k}`) ?? ''; }
+      // 用原理图网表补全焊盘网络（PCB 尚未“从原理图更新”时 pad 上没有 net）
+      if (sheets.length) {
+        const nl = buildSchematicNetlist(project.schematic);
+        for (const f of project.board.footprints) {
+          if (!f.componentId) continue;
+          const def = footprints.find((d) => d.id === f.footprintId);
+          const numbers = new Set([...(def?.pads.map((pd) => pd.number) ?? []), ...Object.keys(f.padNets)]);
+          for (const k of numbers) if (!f.padNets[k]) { const n = nl.pinNet.get(`${f.componentId}:${k}`); if (n) f.padNets[k] = n; }
+        }
+      }
     } catch (e) { warnings.push({ where: 'pcb', message: (e as Error).message }); }
   }
   project.library = { symbols, footprints };

@@ -110,18 +110,34 @@ export const GraphicSchema = z.discriminatedUnion('kind', [
 ]);
 export type Graphic = z.infer<typeof GraphicSchema>;
 
-/** 图纸边框 / 标题栏模板。 */
+/** 图纸边框 / 标题栏模板。size=custom 时使用 width/height（mil）。标题栏文字均可编辑，空字符串表示使用默认（项目名 / 保存日期）。 */
 export const SheetFrameSchema = z.object({
-  size: z.enum(['none', 'A4', 'A3', 'A2']).default('A4'),
+  size: z.enum(['none', 'A5', 'A4', 'A3', 'A2', 'A1', 'custom']).default('A4'),
   landscape: z.boolean().default(true),
+  /** 自定义尺寸（mil），仅 size === 'custom' 时使用 */
+  width: z.number().optional(),
+  height: z.number().optional(),
   title: z.string().default(''),
   revision: z.string().default('1.0'),
-  company: z.string().default('')
+  company: z.string().default(''),
+  author: z.string().default(''),
+  /** 空 = 使用项目最近保存日期 */
+  date: z.string().default(''),
+  comment: z.string().default(''),
+  /** 标题栏标签文字（可改成英文等） */
+  labels: z.object({ sheet: z.string().default('图纸'), date: z.string().default('日期'), revision: z.string().default('版本'), page: z.string().default('页'), author: z.string().default('作者') }).default({})
 });
 export type SheetFrame = z.infer<typeof SheetFrameSchema>;
-export const DEFAULT_FRAME: SheetFrame = { size: 'A4', landscape: true, title: '', revision: '1.0', company: '' };
+export const DEFAULT_FRAME: SheetFrame = { size: 'A4', landscape: true, title: '', revision: '1.0', company: '', author: '', date: '', comment: '', labels: { sheet: '图纸', date: '日期', revision: '版本', page: '页', author: '作者' } };
 /** 纸张尺寸（mil，横向）。 */
-export const PAPER_SIZES: Record<'A4' | 'A3' | 'A2', { w: number; h: number }> = { A4: { w: 11693, h: 8268 }, A3: { w: 16535, h: 11693 }, A2: { w: 23386, h: 16535 } };
+export const PAPER_SIZES: Record<'A5' | 'A4' | 'A3' | 'A2' | 'A1', { w: number; h: number }> = { A5: { w: 8268, h: 5827 }, A4: { w: 11693, h: 8268 }, A3: { w: 16535, h: 11693 }, A2: { w: 23386, h: 16535 }, A1: { w: 33071, h: 23386 } };
+/** 当前图纸的实际页面尺寸（mil，已考虑横竖与自定义）；无边框返回 null。 */
+export function paperSize(frame: SheetFrame): { w: number; h: number } | null {
+  if (frame.size === 'none') return null;
+  if (frame.size === 'custom') { const w = frame.width ?? PAPER_SIZES.A4.w, h = frame.height ?? PAPER_SIZES.A4.h; return { w: Math.max(2000, w), h: Math.max(2000, h) }; }
+  const p = PAPER_SIZES[frame.size];
+  return frame.landscape ? { w: p.w, h: p.h } : { w: p.h, h: p.w };
+}
 
 export const SheetSchema = z.object({
   id: z.string(),

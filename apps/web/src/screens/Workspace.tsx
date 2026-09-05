@@ -1,5 +1,7 @@
+import { modelFor, needsModel } from '../editors/three/models.js';
 import { useEffect } from 'react';
-import { sch, pcb, copperLayers, LAYER_COLORS, netClassFor, milToMm, formatLength, snapTo, SCH_GRID, getSymbol, boardBounds, PAPER_SIZES, type CheckItem } from '@tracelet/kernel';
+import { sch, pcb, copperLayers, LAYER_COLORS, netClassFor, milToMm, formatLength, snapTo, SCH_GRID, getSymbol, boardBounds, paperSize, type CheckItem } from '@tracelet/kernel';
+import { SheetFrameDialog } from '../components/SheetFrameDialog.js';
 type Clipboard = sch.Clipboard;
 import { useState } from 'react';
 import { useApp, useEditor, useProject, useSheet } from '../store/app.js';
@@ -55,6 +57,7 @@ export function Workspace() {
   const { screen, focusMode } = app;
   const sheet = useSheet();
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [frameDialog, setFrameDialog] = useState(false);
   const unit = project.settings.unit;
   const cu = copperLayers(project.board.copperCount);
 
@@ -114,14 +117,14 @@ export function Workspace() {
         else return;
         e.preventDefault();
       } else if (S.screen === 'pcb') {
-        if (e.key === 'Escape') { if (S.autoroute.status === 'done') S.patch({ autoroute: { status: 'idle', result: null } }); else if (S.routing || S.zoneDraft || S.outlineDraft || S.measure) S.patch({ routing: null, zoneDraft: null, outlineDraft: null, measure: null }); else if (S.pcbTool !== 'select') S.setPcbTool('select'); else S.patch({ pcbSelection: [], highlightNet: null, checkHighlight: null }); }
+        if (e.key === 'Escape') { if (S.autoroute.status !== 'idle') S.patch({ autoroute: { status: 'idle', result: null } }); else if (S.pcbPlacing) S.patch({ pcbPlacing: null }); else if (S.routing || S.zoneDraft || S.outlineDraft || S.measure) S.patch({ routing: null, zoneDraft: null, outlineDraft: null, measure: null }); else if (S.pcbTool !== 'select') S.setPcbTool('select'); else S.patch({ pcbSelection: [], highlightNet: null, checkHighlight: null }); }
         else if (k === 'v') {
           if (S.routing) {
             const r = S.routing; const last = r.points[r.points.length - 1];
             const nc = netClassFor(editor.project.board, r.net);
             editor.begin('过孔换层');
             if (r.points.length >= 2) editor.dispatch(pcb.addTrace({ layer: r.layer, net: r.net, width: r.width, points: r.points }).command);
-            editor.dispatch(pcb.addVia({ x: last.x, y: last.y, size: nc?.viaSize ?? 0.6, drill: nc?.viaDrill ?? 0.3, net: r.net }));
+            editor.dispatch(pcb.addVia({ x: last.x, y: last.y, size: S.viaOverride?.size ?? nc?.viaSize ?? 0.6, drill: S.viaOverride?.drill ?? nc?.viaDrill ?? 0.3, net: r.net }));
             editor.commit();
             const next = r.layer === 'F.Cu' ? 'B.Cu' : 'F.Cu';
             S.patch({ routing: { ...r, points: [last], layer: next, startPad: undefined }, activeLayer: next });
@@ -136,14 +139,16 @@ export function Workspace() {
         else if (k === 'm') S.setPcbTool('measure');
         else if (k === 'b') S.toast('铺铜实时计算，无需重填');
         else if (k === 'f') { const id = S.pcbSelection[0]; if (id && editor.project.board.footprints.some((f) => f.id === id)) editor.dispatch(pcb.flipFootprint(id)); else S.setPcbTool('flip'); }
-        else if (k === 'r') { const id = S.pcbSelection[0]; if (id && editor.project.board.footprints.some((f) => f.id === id)) editor.dispatch(pcb.rotateFootprint(id, 90)); }
+        else if (k === 'r') { if (S.pcbPlacing) S.patch({ pcbPlacing: { ...S.pcbPlacing, rotation: (S.pcbPlacing.rotation + 90) % 360 } }); else { const id = S.pcbSelection[0]; if (id && editor.project.board.footprints.some((f) => f.id === id)) editor.dispatch(pcb.rotateFootprint(id, 90)); } }
         else if (/^[1-9]$/.test(k) && cu[Number(k) - 1]) S.set('activeLayer', cu[Number(k) - 1]);
         else if ((e.key === 'Delete' || e.key === 'Backspace') && S.pcbSelection.length) {
           const b = editor.project.board;
           const tr = S.pcbSelection.filter((id) => b.traces.some((t) => t.id === id)), vi = S.pcbSelection.filter((id) => b.vias.some((v) => v.id === id)), zo = S.pcbSelection.filter((id) => b.zones.some((z) => z.id === id)), tx = S.pcbSelection.filter((id) => b.texts.some((t) => t.id === id));
-          if (!tr.length && !vi.length && !zo.length && !tx.length) { S.toast('封装由原理图决定：请在原理图删除元件后同步'); return; }
+          const boardOnly = S.pcbSelection.filter((id) => b.footprints.some((f) => f.id === id && !f.componentId)), linked = S.pcbSelection.filter((id) => b.footprints.some((f) => f.id === id && f.componentId));
+          if (!tr.length && !vi.length && !zo.length && !tx.length && !boardOnly.length) { if (linked.length) S.toast('该封装来自原理图：请在原理图删除元件后「同步到 PCB」'); return; }
+          if (linked.length) S.toast(`${linked.length} 个来自原理图的封装未删除（请在原理图中删除）`);
           editor.begin('删除');
-          if (tr.length) editor.dispatch(pcb.deleteTraces(tr)); if (vi.length) editor.dispatch(pcb.deleteVias(vi)); if (zo.length) editor.dispatch(pcb.deleteZones(zo)); if (tx.length) editor.dispatch(pcb.deleteTexts(tx));
+          if (tr.length) editor.dispatch(pcb.deleteTraces(tr)); if (vi.length) editor.dispatch(pcb.deleteVias(vi)); if (zo.length) editor.dispatch(pcb.deleteZones(zo)); if (tx.length) editor.dispatch(pcb.deleteTexts(tx)); if (boardOnly.length) editor.dispatch(pcb.deleteFootprints(boardOnly));
           editor.commit(); S.patch({ pcbSelection: [] });
         }
         else return;
@@ -173,11 +178,31 @@ export function Workspace() {
   const sel = sheet.components.find((c) => app.selection.includes(c.id));
   const nc = netClassFor(project.board, app.routing?.net ?? '');
   const bb = boardBounds(project.board);
+  const PCB_GRIDS = [0.05, 0.1, 0.125, 0.25, 0.5, 1];
+  const SCH_GRIDS = [25, 50, 100];
+  const WIDTHS = [0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.8, 1.0, 1.5, 2.0];
+  const VIAS: [number, number][] = [[0.5, 0.25], [0.6, 0.3], [0.7, 0.35], [0.8, 0.4], [1.0, 0.5], [1.2, 0.6]];
+  const curWidth = app.routing?.width ?? app.traceWidthOverride ?? nc?.traceWidth ?? 0.25;
+  const curVia = app.viaOverride ?? { size: nc?.viaSize ?? 0.6, drill: nc?.viaDrill ?? 0.3 };
   const statusItems = screen === 'pcb'
-    ? [{ text: `X ${pos(app.cursorWorld.x, 'pcb')}  Y ${pos(app.cursorWorld.y, 'pcb')} ${unit}` }, { text: '栅格 0.25 ▾' }, { text: `● ${app.activeLayer} ▾`, color: LAYER_COLORS[app.activeLayer], onClick: () => app.set('activeLayer', cu[(cu.indexOf(app.activeLayer) + 1) % cu.length]) }, { text: `走线 ${(app.routing?.width ?? nc?.traceWidth ?? 0.25).toFixed(2)} ▾` }, { text: `过孔 ${nc?.viaSize ?? 0.6}/${nc?.viaDrill ?? 0.3} ▾` }, { text: `${cu.length} 层` }, { text: a.drc.errors ? `DRC ● ${a.drc.errors} 错误` : a.drc.warnings ? `DRC ⚠ ${a.drc.warnings} 警告` : 'DRC ✓ 通过', color: drcColor, onClick: () => app.set('rightTab', 'check') }]
+    ? [
+      { text: `X ${pos(app.cursorWorld.x, 'pcb')}  Y ${pos(app.cursorWorld.y, 'pcb')} ${unit}` },
+      { text: `栅格 ${app.pcbGrid} ▾`, title: '捕捉栅格 (mm)', options: PCB_GRIDS.map((g) => ({ label: `${g} mm`, value: String(g) })), value: String(app.pcbGrid), onSelect: (v: string) => app.set('pcbGrid', Number(v)) },
+      { text: `● ${app.activeLayer} ▾`, color: LAYER_COLORS[app.activeLayer], title: '当前层', options: cu.map((l) => ({ label: l, value: l })), value: app.activeLayer, onSelect: (v: string) => app.set('activeLayer', v as typeof app.activeLayer) },
+      { text: `走线 ${curWidth.toFixed(2)}${app.traceWidthOverride === null && !app.routing ? '' : ' ✎'} ▾`, title: '新走线宽度（"跟随网络类"为默认）', options: [{ label: '跟随网络类', value: 'auto' }, ...WIDTHS.map((w) => ({ label: `${w.toFixed(2)} mm`, value: String(w) }))], value: app.traceWidthOverride === null ? 'auto' : String(app.traceWidthOverride), onSelect: (v: string) => { const w = v === 'auto' ? null : Number(v); app.patch({ traceWidthOverride: w, routing: app.routing && w ? { ...app.routing, width: w } : app.routing }); } },
+      { text: `过孔 ${curVia.size}/${curVia.drill}${app.viaOverride ? ' ✎' : ''} ▾`, title: '过孔外径 / 钻孔', options: [{ label: '跟随网络类', value: 'auto' }, ...VIAS.map(([a, b]) => ({ label: `${a} / ${b} mm`, value: `${a}/${b}` }))], value: app.viaOverride ? `${app.viaOverride.size}/${app.viaOverride.drill}` : 'auto', onSelect: (v: string) => { if (v === 'auto') app.set('viaOverride', null); else { const [a, b] = v.split('/').map(Number); app.set('viaOverride', { size: a, drill: b }); } } },
+      { text: `${cu.length} 层 · ${project.board.thickness} mm`, title: '层数 / 板厚（在图层面板「层叠」修改）', onClick: () => app.set('rightTab', 'layers') },
+      { text: a.drc.errors ? `DRC ● ${a.drc.errors} 错误` : a.drc.warnings ? `DRC ⚠ ${a.drc.warnings} 警告` : 'DRC ✓ 通过', color: drcColor, onClick: () => app.set('rightTab', 'check') }
+    ]
     : screen === '3d'
-      ? [{ text: { iso: '等轴视图', top: '俯视', front: '正面', back: '背面' }[app.view3d] }, { text: `元件 ${project.board.footprints.length} · 占位模型 ${project.board.footprints.length}`, color: 'var(--warning)' }, { text: `尺寸 ${bb.w.toFixed(0)}×${bb.h.toFixed(0)} mm` }]
-      : [{ text: `X ${pos(app.cursorWorld.x, 'sch')}  Y ${pos(app.cursorWorld.y, 'sch')} ${unit}` }, { text: unit === 'mm' ? '栅格 2.54 ▾' : '栅格 100 ▾' }, { text: `页 ${project.schematic.sheets.findIndex((x) => x.id === sheet.id) + 1}/${project.schematic.sheets.length}` }, { text: sel ? `选中 ${sel.ref}` : app.selection.length ? `选中 ${app.selection.length} 项` : '未选中' }, { text: a.erc.errors ? `ERC ● ${a.erc.errors} 错误` : a.erc.warnings ? `ERC ⚠ ${a.erc.warnings} 警告` : 'ERC ✓ 通过', color: ercColor, onClick: () => app.set('rightTab', 'check') }];
+      ? [{ text: { iso: '等轴视图', top: '俯视', front: '正面', back: '背面' }[app.view3d] }, { text: `元件 ${project.board.footprints.length} · 未匹配 ${project.board.footprints.filter(f => needsModel(f) && !modelFor(f, project.board)).length}`, color: 'var(--warning)' }, { text: `尺寸 ${bb.w.toFixed(0)}×${bb.h.toFixed(0)} mm` }]
+      : [
+        { text: `X ${pos(app.cursorWorld.x, 'sch')}  Y ${pos(app.cursorWorld.y, 'sch')} ${unit}` },
+        { text: unit === 'mm' ? `栅格 ${(app.schGrid * 0.0254).toFixed(2)} ▾` : `栅格 ${app.schGrid} ▾`, title: '导线 / 图形捕捉栅格（元件引脚始终对齐 100 mil）', options: SCH_GRIDS.map((g) => ({ label: unit === 'mm' ? `${(g * 0.0254).toFixed(2)} mm` : `${g} mil`, value: String(g) })), value: String(app.schGrid), onSelect: (v: string) => app.set('schGrid', Number(v)) },
+        { text: `页 ${project.schematic.sheets.findIndex((x) => x.id === sheet.id) + 1}/${project.schematic.sheets.length}` },
+        { text: sel ? `选中 ${sel.ref}` : app.selection.length ? `选中 ${app.selection.length} 项` : '未选中' },
+        { text: a.erc.errors ? `ERC ● ${a.erc.errors} 错误` : a.erc.warnings ? `ERC ⚠ ${a.erc.warnings} 警告` : 'ERC ✓ 通过', color: ercColor, onClick: () => app.set('rightTab', 'check') }
+      ];
 
   const toRow = (i: CheckItem, space: 'sch' | 'pcb') => ({ id: i.id, mark: i.severity === 'error' ? '●' : '⚠', color: i.severity === 'error' ? 'var(--error)' : 'var(--warning)', text: i.message, where: i.refs.join(' · '), onLocate: () => locateItem(i, space) });
   const problems = screen === 'pcb' ? a.drc.items.map((i) => toRow(i, 'pcb')) : a.erc.items.map((i) => toRow(i, 'sch'));
@@ -228,13 +253,18 @@ export function Workspace() {
                 ))}
                 <span className="pill dim" onClick={addSheet}>+ 新页</span>
                 <span style={{ width: 1, height: 16, background: 'var(--border)', margin: '0 6px' }} />
-                <select className="input" style={{ width: 'auto', height: 24, fontSize: 11 }} value={sheet.frame.size} onChange={(e) => editor.dispatch(sch.setSheetFrame(sheet.id, { size: e.target.value as 'A4' }))} title="图纸模板">
-                  {(['A4', 'A3', 'A2', 'none'] as const).map((sz) => <option key={sz} value={sz}>{sz === 'none' ? '无边框' : `${sz} ${PAPER_SIZES[sz].w > 0 ? '' : ''}`.trim()}</option>)}
+                <select className="input" style={{ width: 'auto', height: 24, fontSize: 11 }} value={sheet.frame.size} onChange={(e) => { const v = e.target.value as typeof sheet.frame.size; if (v === 'custom') { const cur = paperSize(sheet.frame) ?? { w: 11693, h: 8268 }; editor.dispatch(sch.setSheetFrame(sheet.id, { size: 'custom', width: sheet.frame.width ?? cur.w, height: sheet.frame.height ?? cur.h })); } else editor.dispatch(sch.setSheetFrame(sheet.id, { size: v })); }} title="图纸模板">
+                  {(['A5', 'A4', 'A3', 'A2', 'A1', 'custom', 'none'] as const).map((sz) => <option key={sz} value={sz}>{sz === 'none' ? '无边框' : sz === 'custom' ? '自定义尺寸' : sz}</option>)}
                 </select>
-                {sheet.frame.size !== 'none' && <span className="seg sm" style={{ height: 24 }}><span className={`seg-opt${sheet.frame.landscape ? ' on' : ''}`} style={{ padding: '0 8px' }} onClick={() => editor.dispatch(sch.setSheetFrame(sheet.id, { landscape: true }))}>横</span><span className={`seg-opt${!sheet.frame.landscape ? ' on' : ''}`} style={{ padding: '0 8px' }} onClick={() => editor.dispatch(sch.setSheetFrame(sheet.id, { landscape: false }))}>纵</span></span>}
+                {sheet.frame.size !== 'none' && sheet.frame.size !== 'custom' && <span className="seg sm" style={{ height: 24 }}><span className={`seg-opt${sheet.frame.landscape ? ' on' : ''}`} style={{ padding: '0 8px' }} onClick={() => editor.dispatch(sch.setSheetFrame(sheet.id, { landscape: true }))}>横</span><span className={`seg-opt${!sheet.frame.landscape ? ' on' : ''}`} style={{ padding: '0 8px' }} onClick={() => editor.dispatch(sch.setSheetFrame(sheet.id, { landscape: false }))}>纵</span></span>}
+                {sheet.frame.size === 'custom' && (() => { const p = paperSize(sheet.frame)!; const mm = (v: number) => Math.round(v * 0.0254); return <span className="row mono xs" style={{ gap: 4 }}>
+                  <input className="input mono" style={{ width: 56, height: 22 }} key={`w${p.w}`} defaultValue={mm(p.w)} onBlur={(e) => { const v = Number(e.target.value); if (v >= 50 && v <= 2000) editor.dispatch(sch.setSheetFrame(sheet.id, { width: Math.round(v / 0.0254) })); }} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />×
+                  <input className="input mono" style={{ width: 56, height: 22 }} key={`h${p.h}`} defaultValue={mm(p.h)} onBlur={(e) => { const v = Number(e.target.value); if (v >= 50 && v <= 2000) editor.dispatch(sch.setSheetFrame(sheet.id, { height: Math.round(v / 0.0254) })); }} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} /> mm</span>; })()}
+                {sheet.frame.size !== 'none' && <button className="btn sm" style={{ height: 24 }} onClick={() => setFrameDialog(true)} title="标题、公司、版本、作者、日期与标签文字">标题栏…</button>}
                 <span className="ml-auto dim xs">{sheet.components.filter((c) => !getSymbol(c.symbolId).power).length} 元件 · {sheet.wires.length} 导线 · {a.netlist.nets.length} 网络（全部页）</span>
               </div>
             )}
+            {frameDialog && screen === 'sch' && <SheetFrameDialog close={() => setFrameDialog(false)} />}
             {screen === 'sch' ? <SchematicCanvas /> : screen === 'pcb' ? <PcbCanvas /> : <ThreeView />}
             {!focusMode && screen !== '3d' && <BottomBar summary={summary} problems={problems} nets={nets} />}
           </div>

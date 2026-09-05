@@ -1,17 +1,19 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { footprintBody, footprintDef, footprintPads, boardBounds, type Board, type Project } from '@tracelet/kernel';
 import { useApp, useProject } from '../../store/app.js';
 import { getAnalysis } from '../../store/analysis.js';
+import { disposeObject, loadModel, modelFor, modelInstance, needsModel } from './models.js';
+import { ModelMatcher } from './ModelMatcher.js';
 
 export const MASK_COLORS: Record<string, [string, string, string]> = {
-  '绿': ['#1E6B3A', '#144A28', '#0F3A1F'], '黑': ['#2B2B2B', '#1C1C1C', '#141414'], '白': ['#E8E8E4', '#BDBDB8', '#9E9E99'],
+  '绿': ['#124A29', '#0D351E', '#092817'], '黑': ['#2B2B2B', '#1C1C1C', '#141414'], '白': ['#E8E8E4', '#BDBDB8', '#9E9E99'],
   '蓝': ['#1F4E8C', '#153661', '#0F2846'], '红': ['#8C1F1F', '#611515', '#460F0F'], '黄': ['#B59A1E', '#7F6B15', '#5C4D0F'], '紫': ['#5B2D8C', '#3F1F61', '#2D1646']
 };
 
-interface View3dState { components: boolean; silk: boolean; mask: boolean; copper: boolean; autoRotate: boolean; maskColor: string; silkColor: string; finish: string; set: (p: Partial<View3dState>) => void }
+interface View3dState { components: boolean; silk: boolean; mask: boolean; copper: boolean; autoRotate: boolean; maskColor: string; silkColor: string; finish: string; capture?: () => void; exportGlb?: () => Promise<void>; set: (p: Partial<View3dState>) => void }
 export const use3d = create<View3dState>((set) => ({ components: true, silk: true, mask: true, copper: false, autoRotate: false, maskColor: '绿', silkColor: '白', finish: 'HASL', set: (p) => set(p) }));
 
 const hasWebGL = () => { try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch { return false; } };
@@ -28,13 +30,14 @@ function labelSprite(text: string, color: string, size = 1.6): THREE.Sprite {
 }
 
 /** 由内核数据构建场景：板体（含孔）、焊盘、走线、铺铜、元件占位、丝印文字。板坐标 (x, y) → three (x, -y)，z 向上。 */
-function buildScene(project: Project, s: View3dState, selection: string[]): { group: THREE.Group; pick: Map<THREE.Object3D, string> } {
+function buildScene(project: Project, s: View3dState, selection: string[], models: Map<string, THREE.Group>): { group: THREE.Group; pick: Map<THREE.Object3D, string> } {
   const board: Board = project.board;
   const bb = boardBounds(board);
   const g = new THREE.Group();
+  const maskColor = board.stackup?.maskColor ?? s.maskColor, silkColor = board.stackup?.silkColor ?? s.silkColor;
   const pick = new Map<THREE.Object3D, string>();
   const T = board.thickness;
-  const [maskHex] = MASK_COLORS[s.maskColor] ?? MASK_COLORS['绿'];
+  const [maskHex] = MASK_COLORS[maskColor] ?? MASK_COLORS['绿'];
   const copperColor = s.finish === 'ENIG' ? 0xd4af37 : 0xc8c8c8;
   const X = (x: number) => x - (bb.x + bb.w / 2), Y = (y: number) => -(y - (bb.y + bb.h / 2));
 
@@ -79,18 +82,25 @@ function buildScene(project: Project, s: View3dState, selection: string[]): { gr
   }
   for (const v of board.vias) { const m = new THREE.Mesh(new THREE.CylinderGeometry(v.size / 2, v.size / 2, T + 0.06, 20).rotateX(Math.PI / 2), padMat); m.position.set(X(v.x), Y(v.y), T / 2); g.add(m); }
 
-  // 元件占位（灰色盒子；选中黄色）
+  // Library models are placed at the footprint origin; fallback boxes stay explicitly marked.
   if (s.components) for (const f of board.footprints) {
-    const def = footprintDef(f); const b = footprintBody(f);
-    const h = Math.max(0.3, def.height);
-    if (def.pads.every((p) => p.npth)) continue;
-    const sel = selection.includes(f.id);
-    const m = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, h), new THREE.MeshStandardMaterial({ color: sel ? 0xffd84d : 0x9aa1ad, roughness: 0.7 }));
-    m.position.set(X(f.x), Y(f.y), f.side === 'F' ? T + h / 2 + 0.05 : -h / 2 - 0.05);
-    g.add(m); pick.set(m, f.id);
-    if (s.silk) { const sp = labelSprite(f.ref, s.silkColor === '黑' ? '#111' : '#fff', Math.max(1.2, Math.min(2.5, b.w / 3))); sp.position.set(X(f.x), Y(f.y), (f.side === 'F' ? T + h : -h) + 1.2); g.add(sp); }
+    if (!needsModel(f)) continue;
+    const def = footprintDef(f), b = footprintBody(f), h = Math.max(.3, def.height);
+    const config = modelFor(f, board), loaded = config && models.get(config.source);
+    const root = new THREE.Group();
+    if (loaded && config) root.add(modelInstance(loaded, config));
+    else {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(def.body.w, def.body.h, h), new THREE.MeshStandardMaterial({ color: 0x9aa1ad, roughness: .7 }));
+      m.position.z = h / 2; root.add(m);
+    }
+    root.position.set(X(f.x), Y(f.y), f.side === 'F' ? T + .015 : -.015);
+    root.rotation.z = -f.rotation * Math.PI / 180;
+    if (f.side === 'B') root.rotation.y = Math.PI;
+    root.traverse(o => { if (o instanceof THREE.Mesh) { pick.set(o, f.id); if (selection.includes(f.id)) for (const mat of Array.isArray(o.material) ? o.material : [o.material]) { if ('emissive' in mat) (mat as THREE.MeshStandardMaterial).emissive.set(0x665000); } } });
+    g.add(root);
+    if (s.silk) { const sp = labelSprite(f.ref, silkColor === '黑' ? '#111' : '#fff', Math.max(1.2, Math.min(2.5, b.w / 3))); sp.position.set(X(f.x), Y(f.y), f.side === 'F' ? T + h + 1.2 : -h - 1.2); g.add(sp); }
   }
-  if (s.silk) for (const t of board.texts) { const sp = labelSprite(t.text, s.silkColor === '黑' ? '#111' : '#fff', t.size * 1.5); sp.position.set(X(t.x), Y(t.y), t.layer === 'F.Silk' ? T + 0.4 : -0.4); g.add(sp); }
+  if (s.silk) for (const t of board.texts) { const sp = labelSprite(t.text, silkColor === '黑' ? '#111' : '#fff', t.size * 1.5); sp.position.set(X(t.x), Y(t.y), t.layer === 'F.Silk' ? T + 0.4 : -0.4); g.add(sp); }
   return { group: g, pick };
 }
 
@@ -98,6 +108,21 @@ export function ThreeView() {
   const project = useProject();
   const app = useApp();
   const s3 = use3d();
+  const [matching, setMatching] = useState(false);
+  const [models, setModels] = useState<Map<string, THREE.Group>>(new Map());
+  const [failed, setFailed] = useState<string[]>([]);
+  const sources = [...new Set(project.board.footprints.filter(needsModel).map(f => modelFor(f, project.board)?.source).filter((x): x is string => !!x))];
+  const sourcesKey = JSON.stringify(sources);
+  useEffect(() => {
+    let cancelled = false;
+    const loaded = new Map<string, THREE.Group>();
+    setModels(new Map()); setFailed([]);
+    void Promise.all(sources.map(async source => {
+      try { const model = await loadModel(source); if (cancelled) disposeObject(model); else { loaded.set(source, model); setModels(new Map(loaded)); } }
+      catch { if (!cancelled) setFailed(prev => [...prev, source]); }
+    }));
+    return () => { cancelled = true; loaded.forEach(disposeObject); };
+  }, [sourcesKey]);
   const host = useRef<HTMLDivElement>(null);
   const three = useRef<{ renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; controls: OrbitControls; group?: THREE.Group; pick: Map<THREE.Object3D, string>; raf: number } | null>(null);
   const ok = typeof document !== 'undefined' && hasWebGL();
@@ -120,8 +145,18 @@ export function ThreeView() {
     const fill = new THREE.DirectionalLight(0xffffff, 0.4); fill.position.set(-50, 40, 40); scene.add(fill);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = 0.08; controls.autoRotateSpeed = 1.2;
-    const state = { renderer, scene, camera, controls, pick: new Map<THREE.Object3D, string>(), raf: 0 };
+    const state: NonNullable<typeof three.current> = { renderer, scene, camera, controls, pick: new Map<THREE.Object3D, string>(), raf: 0 };
     three.current = state;
+    const save = (name: string, blob: Blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); };
+    const slug = () => useApp.getState().editor?.project.name.replace(/[^\w一-龥-]+/g, '-') || 'board';
+    use3d.setState({
+      capture: () => { renderer.render(scene, camera); renderer.domElement.toBlob((blob) => { if (blob) { save(`${slug()}-3d.png`, blob); useApp.getState().toast('已保存 3D 截图 PNG', 'success'); } }, 'image/png'); },
+      exportGlb: async () => {
+        const grp = three.current?.group; if (!grp) return;
+        const { GLTFExporter } = await import('three/examples/jsm/exporters/GLTFExporter.js');
+        await new Promise<void>((resolve) => new GLTFExporter().parse(grp, (res) => { save(`${slug()}.glb`, new Blob([res as ArrayBuffer], { type: 'model/gltf-binary' })); useApp.getState().toast('已导出 GLB（可导入 Blender / Fusion / 网页查看器）', 'success'); resolve(); }, (err) => { useApp.getState().toast(`导出失败：${(err as unknown as { message?: string }).message ?? String(err)}`, 'error'); resolve(); }, { binary: true }));
+      }
+    });
     const loop = () => { controls.update(); renderer.render(scene, camera); state.raf = requestAnimationFrame(loop); };
     loop();
     const ro = new ResizeObserver(() => { const w = el.clientWidth, h = el.clientHeight; if (!w || !h) return; renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); });
@@ -135,16 +170,16 @@ export function ThreeView() {
       useApp.getState().patch({ pcbSelection: hits.length ? [st.pick.get(hits[0].object)!] : [] });
     };
     renderer.domElement.addEventListener('click', onClick);
-    return () => { cancelAnimationFrame(state.raf); ro.disconnect(); renderer.domElement.removeEventListener('click', onClick); controls.dispose(); renderer.dispose(); el.removeChild(renderer.domElement); three.current = null; };
+    return () => { use3d.setState({ capture: undefined, exportGlb: undefined }); cancelAnimationFrame(state.raf); ro.disconnect(); renderer.domElement.removeEventListener('click', onClick); controls.dispose(); if (state.group) disposeObject(state.group); renderer.dispose(); el.removeChild(renderer.domElement); three.current = null; };
   }, [ok]);
 
   // 场景内容
   useEffect(() => {
     const st = three.current; if (!st) return;
-    if (st.group) { st.scene.remove(st.group); st.group.traverse((o) => { const m = o as THREE.Mesh; m.geometry?.dispose?.(); const mat = m.material as THREE.Material | THREE.Material[] | undefined; if (Array.isArray(mat)) mat.forEach((x) => x.dispose()); else mat?.dispose?.(); }); }
-    const { group, pick } = buildScene(project, s3, app.pcbSelection);
+    if (st.group) { st.scene.remove(st.group); disposeObject(st.group); }
+    const { group, pick } = buildScene(project, s3, app.pcbSelection, models);
     st.scene.add(group); st.group = group; st.pick = pick;
-  }, [project, s3, app.pcbSelection]);
+  }, [project, s3, app.pcbSelection, models]);
 
   // 视角
   useEffect(() => {
@@ -155,7 +190,11 @@ export function ThreeView() {
   }, [view, bb.w, bb.h]);
   useEffect(() => { if (three.current) three.current.controls.autoRotate = s3.autoRotate; }, [s3.autoRotate]);
 
-  const placeholderCount = board.footprints.length;
+  const parts = board.footprints.filter(needsModel);
+  const loadedCount = parts.filter(f => { const m = modelFor(f, board); return m && models.has(m.source); }).length;
+  const missingCount = parts.filter(f => !modelFor(f, board)).length;
+  const failedCount = parts.filter(f => { const m = modelFor(f, board); return m && failed.includes(m.source); }).length;
+  const pendingCount = parts.length - loadedCount - missingCount - failedCount;
   return (
     <div className="canvas-wrap" style={{ background: 'radial-gradient(ellipse at 50% 40%,#2A2F38,#1A1D23 70%)' }}>
       {ok ? <div ref={host} style={{ position: 'absolute', inset: 0 }} /> : <div className="empty-state"><div className="muted">当前环境不支持 WebGL，无法显示 3D 视图</div></div>}
@@ -164,9 +203,10 @@ export function ThreeView() {
         <span style={{ padding: '4px 12px', borderRadius: 4, cursor: 'pointer', background: s3.autoRotate ? 'var(--bg-raised)' : 'transparent', color: s3.autoRotate ? 'var(--text)' : 'var(--text-2)' }} onClick={() => s3.set({ autoRotate: !s3.autoRotate })}>⟲ 自动旋转</span>
       </div>
       <div className="float" style={{ left: 12, top: 12, fontFamily: 'var(--font-ui)', fontSize: 12, padding: '6px 10px' }}>
-        <span style={{ color: 'var(--warning)' }}>⚠</span>{placeholderCount} 个元件使用占位模型（STEP → glTF 在后续接入）<a href="#" onClick={(e) => { e.preventDefault(); app.toast('3D 模型匹配在后续里程碑'); }}>去匹配 →</a>
+        <span>{loadedCount} 个元件模型已加载{pendingCount > 0 && ` · ${pendingCount} 个加载中`}{missingCount > 0 && ` · ${missingCount} 个未匹配`}{failedCount > 0 && ` · ${failedCount} 个加载失败`}</span><button className="btn sm" onClick={() => setMatching(true)}>模型匹配</button>
       </div>
-      <div className="float" style={{ right: 12, top: 12 }}><span className="dim">板</span><span>{bb.w.toFixed(1)}×{bb.h.toFixed(1)}×{board.thickness} mm</span><span className="dim">· 拖动旋转 · 滚轮缩放 · 右键平移</span></div>
+      {matching && <ModelMatcher close={() => setMatching(false)} />}
+      <div className="float" style={{ right: 12, top: 52 }}><span className="dim">板</span><span>{bb.w.toFixed(1)}×{bb.h.toFixed(1)}×{board.thickness} mm</span><span className="dim">· 拖动旋转 · 滚轮缩放 · 右键平移</span></div>
     </div>
   );
 }

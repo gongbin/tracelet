@@ -8,7 +8,8 @@ import { resolve, dirname } from 'node:path';
 import { Command } from 'commander';
 import {
   parseProject, serializeProject, createProject, createDemoProject, buildNetlist, runErc, runDrc, computeRatsnest, reviewSchematic, ruleSetOf, RULE_SETS,
-  exportBomCsv, exportNetlistJson, exportPickAndPlaceCsv, exportFabFiles, exportFabZip, importKicadProject, ProjectEditor, pcb, sch, diffBoardFromSchematic, getSymbol, type Project, type CheckReport
+  exportBomCsv, exportNetlistJson, exportPickAndPlaceCsv, exportFabFiles, exportFabZip, importKicadProject, ProjectEditor, pcb, sch, lib, diffBoardFromSchematic, getSymbol, type Project, type CheckReport,
+  PROJECT_TEMPLATES, createFromTemplate, exportSchematicPdf, exportAssemblyPdf, importLibraryFile, footprintFromName, generateFootprint, type FootprintSpec
 } from '@tracelet/kernel';
 import { basename } from 'node:path';
 
@@ -30,12 +31,15 @@ function reportText(rep: CheckReport, title: string): string {
   return lines.join('\n');
 }
 
-program.command('new <file>').description('创建新项目文件').option('-n, --name <name>', '项目名', '未命名项目').option('-l, --layers <n>', '铜层数 2|4', '2').option('--demo', '使用 ESP32 示例内容')
+program.command('new <file>').description('创建新项目文件').option('-n, --name <name>', '项目名').option('-l, --layers <n>', '铜层数 2|4', '2').option('-t, --template <id>', `模板 ${PROJECT_TEMPLATES.map((t) => t.id).join('|')}`, 'blank').option('--demo', '使用 ESP32 示例内容')
   .action((file, o) => {
-    const p = o.demo ? createDemoProject() : createProject({ name: o.name, copperCount: Number(o.layers) === 4 ? 4 : 2 });
-    save(file, o.demo ? { ...p, name: o.name === '未命名项目' ? p.name : o.name } : p);
-    console.log(`已创建 ${file}`);
+    if (o.demo) { const p = createDemoProject(); if (o.name) p.name = o.name; save(file, p); console.log(`已创建示例项目 ${file}`); return; }
+    if (!PROJECT_TEMPLATES.some((t) => t.id === o.template)) { console.error(`未知模板 ${o.template}；可用：${PROJECT_TEMPLATES.map((t) => `${t.id}（${t.name}）`).join('、')}`); process.exit(1); }
+    const p = createFromTemplate(o.template, { name: o.name, copperCount: o.layers === '4' ? 4 : 2 });
+    mkdirSync(dirname(resolve(file)), { recursive: true }); save(file, p);
+    console.log(`已创建 ${file}（模板 ${o.template}，${p.schematic.sheets.reduce((n, sh) => n + sh.components.length, 0)} 元件）`);
   });
+program.command('templates').description('列出项目模板').option('--json').action((o) => out(PROJECT_TEMPLATES.map((t) => ({ id: t.id, name: t.name, description: t.description })), o.json, () => PROJECT_TEMPLATES.map((t) => `${t.id.padEnd(10)} ${t.name} — ${t.description}`).join('\n')));
 
 program.command('info <file>').description('项目概览').option('--json', 'JSON 输出').action((file, o) => {
   const p = load(file); const sheet = p.schematic.sheets[0]; const nl = buildNetlist(sheet); const rats = computeRatsnest(p.board);
@@ -82,12 +86,14 @@ const exp = program.command('export').description('导出制造/物料文件');
 exp.command('bom <file>').option('-o, --out <path>').action((file, o) => { const csv = exportBomCsv(load(file)); if (o.out) { mkdirSync(dirname(resolve(o.out)), { recursive: true }); writeFileSync(o.out, csv); console.log(`已写入 ${o.out}`); } else process.stdout.write(csv); });
 exp.command('pnp <file>').description('坐标文件').option('-o, --out <path>').action((file, o) => { const csv = exportPickAndPlaceCsv(load(file)); if (o.out) { writeFileSync(o.out, csv); console.log(`已写入 ${o.out}`); } else process.stdout.write(csv); });
 exp.command('netlist <file>').option('-o, --out <path>').action((file, o) => { const s = JSON.stringify(exportNetlistJson(load(file)), null, 2); if (o.out) { writeFileSync(o.out, s); console.log(`已写入 ${o.out}`); } else process.stdout.write(s + '\n'); });
-exp.command('gerber <file>').description('Gerber + Excellon + BOM + 坐标（目录）').option('-o, --out <dir>', '输出目录', 'fab').action((file, o) => {
+exp.command('gerber <file>').description('Gerber + Excellon + BOM + 坐标 + 装配图（目录）').option('-o, --out <dir>', '输出目录', 'fab').action((file, o) => {
   const files = exportFabFiles(load(file), { netlist: true });
   mkdirSync(resolve(o.out), { recursive: true });
   for (const f of files) writeFileSync(resolve(o.out, f.name), f.content);
   console.log(`已写入 ${files.length} 个文件到 ${o.out}/`);
 });
+exp.command('pdf <file>').description('原理图 PDF（每页一张图纸）').option('-o, --out <path>').action((file, o) => { const pdf = exportSchematicPdf(load(file)); const outp = o.out ?? file.replace(/\.eda\.json$|\.json$/i, '') + '-schematic.pdf'; writeFileSync(outp, pdf, 'latin1'); console.log(`已写入 ${outp}`); });
+exp.command('assembly <file>').description('装配图 PDF（顶 / 底）').option('-o, --out <path>').action((file, o) => { const pdf = exportAssemblyPdf(load(file)); const outp = o.out ?? file.replace(/\.eda\.json$|\.json$/i, '') + '-assembly.pdf'; writeFileSync(outp, pdf, 'latin1'); console.log(`已写入 ${outp}`); });
 exp.command('zip <file>').description('打包全部制造文件为 zip').option('-o, --out <path>').action((file, o) => {
   const z = exportFabZip(load(file), { netlist: true, project: true });
   const out = o.out ?? z.name;
@@ -108,6 +114,21 @@ imp.command('kicad <files...>').description('导入 KiCad 工程（.kicad_sch �
   console.log(`已导入 ${schs.length} 页原理图（${comps} 元件）${pcbFile ? `、PCB（${r.project.board.footprints.length} 封装 / ${r.project.board.traces.length} 走线）` : ''} → ${out}`);
 });
 
+imp.command('lib <project> <files...>').description('把 KiCad 库文件（.kicad_sym / .kicad_mod）导入项目库').action((project: string, files: string[]) => {
+  const ed = new ProjectEditor(load(project));
+  const symbols = [] as ReturnType<typeof importLibraryFile>['symbols'], footprints = [] as ReturnType<typeof importLibraryFile>['footprints'];
+  for (const f of files) { const r = importLibraryFile(basename(f), readFileSync(resolve(f), 'utf8')); symbols.push(...r.symbols); footprints.push(...r.footprints); for (const w of r.warnings) console.warn(w); }
+  ed.dispatch(lib.addLibraryItems({ symbols, footprints })); save(project, ed.project);
+  console.log(`已导入 ${symbols.length} 符号 · ${footprints.length} 封装 → ${project}`);
+});
+const fpc = program.command('footprint').description('参数化封装');
+fpc.command('gen <project> <spec>').description('按 KiCad 风格名（如 LQFP-48_7x7mm_P0.5mm）或 JSON spec 生成并加入项目库').action((project: string, spec: string) => {
+  const ed = new ProjectEditor(load(project));
+  const def = spec.trim().startsWith('{') ? generateFootprint(JSON.parse(spec) as FootprintSpec) : footprintFromName(spec);
+  if (!def) { console.error('无法识别的封装名；示例：R_0603_1608Metric、SOIC-8_3.9x4.9mm_P1.27mm、LQFP-48_7x7mm_P0.5mm、QFN-32-1EP_5x5mm_P0.5mm、DIP-8_W7.62mm、PinHeader_1x04_P2.54mm_Vertical、SOT-23-5'); process.exit(1); }
+  ed.dispatch(lib.addLibraryItems({ footprints: [def] })); save(project, ed.project);
+  console.log(`已加入 ${def.id}（${def.pads.length} 焊盘）`);
+});
 program.command('serve').description('以 MCP server（stdio）模式启动，供 Claude Code / Claude Desktop 调用').option('--mcp', 'MCP stdio 模式').option('-f, --file <file>', '启动时打开的项目').action(async (o) => {
   const { serveMcp } = await import('./mcp.js');
   await serveMcp(o.file);

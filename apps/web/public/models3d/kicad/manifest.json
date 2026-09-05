@@ -1,0 +1,66 @@
+{
+  "R_0805_2012Metric": {
+    "file": "R_0805_2012Metric.glb",
+    "source": "Resistor_SMD.3dshapes/R_0805_2012Metric.step"
+  },
+  "SOT-23": {
+    "file": "SOT-23.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/SOT-23.step"
+  },
+  "DIP-4_W7.62mm": {
+    "file": "DIP-4_W7.62mm.glb",
+    "source": "Package_DIP.3dshapes/DIP-4_W7.62mm.step"
+  },
+  "C_0805_2012Metric": {
+    "file": "C_0805_2012Metric.glb",
+    "source": "Capacitor_SMD.3dshapes/C_0805_2012Metric.step"
+  },
+  "SOIC-16_3.9x9.9mm_P1.27mm": {
+    "file": "SOIC-16_3.9x9.9mm_P1.27mm.glb",
+    "source": "Package_SO.3dshapes/SOIC-16_3.9x9.9mm_P1.27mm.step"
+  },
+  "PinHeader_1x02_P2.54mm_Vertical": {
+    "file": "PinHeader_1x02_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x02_P2.54mm_Vertical.step"
+  },
+  "Fuse_1206_3216Metric": {
+    "file": "Fuse_1206_3216Metric.glb",
+    "source": "Fuse.3dshapes/Fuse_1206_3216Metric.step"
+  },
+  "C_1206_3216Metric": {
+    "file": "C_1206_3216Metric.glb",
+    "source": "Capacitor_SMD.3dshapes/C_1206_3216Metric.step"
+  },
+  "TSOT-23-6": {
+    "file": "TSOT-23-6.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/TSOT-23-6.step"
+  },
+  "SW_Tactile_SPST_Angled_PTS645Vx58-2LFS": {
+    "file": "SW_Tactile_SPST_Angled_PTS645Vx58-2LFS.glb",
+    "source": "Button_Switch_THT.3dshapes/SW_Tactile_SPST_Angled_PTS645Vx58-2LFS.step"
+  },
+  "PinHeader_1x04_P2.54mm_Vertical": {
+    "file": "PinHeader_1x04_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x04_P2.54mm_Vertical.step"
+  },
+  "LED_RGB_Wuerth-PLCC4_3.2x2.8mm_150141M173100": {
+    "file": "LED_RGB_Wuerth-PLCC4_3.2x2.8mm_150141M173100.glb",
+    "source": "LED_SMD.3dshapes/LED_RGB_Wuerth-PLCC4_3.2x2.8mm_150141M173100.step"
+  },
+  "L_Bourns_SRP5030T": {
+    "file": "L_Bourns_SRP5030T.glb",
+    "source": "Inductor_SMD.3dshapes/L_Bourns_SRP5030T.step"
+  },
+  "SOT-23-6": {
+    "file": "SOT-23-6.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/SOT-23-6.step"
+  },
+  "LED_0805_2012Metric": {
+    "file": "LED_0805_2012Metric.glb",
+    "source": "LED_SMD.3dshapes/LED_0805_2012Metric.step"
+  },
+  "SOT-583-8": {
+    "file": "SOT-583-8.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/SOT-583-8.step"
+  }
+}

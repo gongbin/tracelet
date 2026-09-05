@@ -1,0 +1,362 @@
+{
+  "R_0805_2012Metric": [
+    {
+      "path": "Resistor_SMD.3dshapes/R_0805_2012Metric.step",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "SOT-23": [
+    {
+      "path": "Package_TO_SOT_SMD.3dshapes/SOT-23.step",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "DIP-4_W7.62mm": [
+    {
+      "path": "Package_DIP.3dshapes/DIP-4_W7.62mm.step",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "C_0805_2012Metric": [
+    {
+      "path": "Capacitor_SMD.3dshapes/C_0805_2012Metric.step",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "SOIC-16_3.9x9.9mm_P1.27mm": [
+    {
+      "path": "Package_SO.3dshapes/SOIC-16_3.9x9.9mm_P1.27mm.step",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "PinHeader_1x02_P2.54mm_Vertical": [
+    {
+      "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x02_P2.54mm_Vertical.step",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "Fuse_1206_3216Metric": [
+    {
+      "path": "Fuse.3dshapes/Fuse_1206_3216Metric.step",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "C_1206_3216Metric": [
+    {
+      "path": "Capacitor_SMD.3dshapes/C_1206_3216Metric.step",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "TSOT-23-6": [
+    {
+      "path": "Package_TO_SOT_SMD.3dshapes/TSOT-23-6.step",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "SW_Tactile_SPST_Angled_PTS645Vx58-2LFS": [
+    {
+      "path": "Button_Switch_THT.3dshapes/SW_Tactile_SPST_Angled_PTS645Vx58-2LFS.step",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "PinHeader_1x04_P2.54mm_Vertical": [
+    {
+      "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x04_P2.54mm_Vertical.step",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "USB_C_Receptacle_HRO_TYPE-C-31-M-12": [
+    {
+      "path": "Connector_USB.3dshapes/USB_C_Receptacle_HRO_TYPE-C-31-M-12.step",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "LED_RGB_Wuerth-PLCC4_3.2x2.8mm_150141M173100": [
+    {
+      "path": "LED_SMD.3dshapes/LED_RGB_Wuerth-PLCC4_3.2x2.8mm_150141M173100.step",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "L_Bourns_SRP5030T": [
+    {
+      "path": "Inductor_SMD.3dshapes/L_Bourns_SRP5030T.step",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "SOT-23-6": [
+    {
+      "path": "Package_TO_SOT_SMD.3dshapes/SOT-23-6.step",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "LED_0805_2012Metric": [
+    {
+      "path": "LED_SMD.3dshapes/LED_0805_2012Metric.step",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "ESP32-C6-WROOM-1": [
+    {
+      "path": "3dmodels/com_github_espressif_kicad-libraries/espressif.3dshapes/ESP32-C6-WROOM-1.STEP",
+      "offset": [
+        -9,
+        -9.75,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "SOT-583-8": [
+    {
+      "path": "Package_TO_SOT_SMD.3dshapes/SOT-583-8.step",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ]
+    }
+  ]
+}

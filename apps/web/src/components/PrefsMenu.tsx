@@ -49,7 +49,10 @@ export function PrefsMenu({ large }: { large?: boolean }) {
             <div className="col" style={{ padding: '0 6px 6px', gap: 6 }}>
               <input className="input mono" placeholder="https://your-server/api" value={cfg.url ?? ''} onChange={(e) => setCfg({ ...cfg, url: e.target.value })} />
               <input className="input mono" type="password" placeholder="访问令牌（可选）" value={cfg.token ?? ''} onChange={(e) => setCfg({ ...cfg, token: e.target.value })} />
-              <div className="dim xs">服务端（apps/server）在后续里程碑提供；配置会保存，届时生效。</div>
+              <div className="row" style={{ gap: 6 }}>
+                <button className="btn sm" disabled={!cfg.url} onClick={() => { const base = (cfg.url ?? '').replace(/\/$/, ''); void fetch(`${base}/api/health`, { headers: cfg.token ? { authorization: `Bearer ${cfg.token}` } : {} }).then(async (r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); const j = await r.json() as { kind?: string; projects?: number }; app.toast(`连接成功：${j.kind === 'postgres' ? 'PostgreSQL' : '文件存储'} · ${j.projects ?? 0} 个项目`, 'success'); }).catch((e: Error) => app.toast(`连接失败：${e.message}（检查地址、令牌与 CORS）`, 'error')); }}>测试连接</button>
+                <span className="dim xs">自建：仓库 apps/server，<code>pnpm --filter @tracelet/server start</code>；设 DATABASE_URL 用 PostgreSQL，不设则存 JSON 文件；TRACELET_TOKEN 为访问令牌。</span>
+              </div>
             </div>
           )}
           <div className="row" style={{ padding: '4px 6px 2px' }}>

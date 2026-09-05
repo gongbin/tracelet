@@ -7,6 +7,9 @@ import { DEFAULT_FRAME } from '../model/schematic.js';
 import { newId } from '../ids.js';
 import { registerSymbols } from '../library/registry.js';
 import { getSymbol, findSymbol } from '../library/symbols.js';
+import { findFootprint } from '../library/footprints.js';
+import { registerFootprints } from '../library/registry.js';
+import { footprintFromName } from '../library/generators.js';
 import { pinGeoms, snapComponentOrigin, componentBounds } from './geometry.js';
 import type { Vec } from '../geometry.js';
 
@@ -34,6 +37,13 @@ function footprintFor(c: ExtractedComponent, builtin: string | null): string {
   if (builtin === 'sym:R') return `fp:R_${size ?? '0402'}`;
   if (builtin === 'sym:C') return `fp:C_${size ?? '0402'}`;
   if (builtin === 'sym:LED') return `fp:LED_${size === '0805' ? '0805' : '0603'}`;
+  const name = (c.footprint ?? '').trim();
+  if (!name) return '';
+  // 已知 id / 内置名 → 直接用；KiCad 风格名（LQFP-48_7x7mm_P0.5mm、PinHeader_1x04…）→ 参数化生成
+  const direct = findFootprint(name) ?? findFootprint(`fp:${name}`) ?? findFootprint(`fp:gen:${name}`);
+  if (direct) return direct.id;
+  const gen = footprintFromName(name);
+  if (gen) { if (!findFootprint(gen.id)) registerFootprints([gen]); return gen.id; }
   return '';
 }
 

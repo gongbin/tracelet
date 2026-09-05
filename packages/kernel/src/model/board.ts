@@ -53,6 +53,8 @@ export const BoardFootprintSchema = z.object({
   y: z.number(),
   rotation: z.number().default(0),
   side: z.enum(['F', 'B']).default('F'),
+  /** Fixed placement imported from CAD or set by the user. */
+  locked: z.boolean().optional(),
   /** 焊盘号 -> 网络名 */
   padNets: z.record(z.string()).default({})
 });
@@ -111,7 +113,37 @@ export const NetClassSchema = z.object({
 });
 export type NetClass = z.infer<typeof NetClassSchema>;
 
+export const Model3dSchema = z.object({
+  name: z.string(),
+  source: z.string().refine(s => s.startsWith('catalog:') || /^data:model\/gltf-binary;base64,[A-Za-z0-9+/=]+$/.test(s), 'Expected catalog model or embedded GLB'),
+  scale: z.number().positive().finite().default(1000),
+  offset: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),
+  rotation: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0])
+});
+export type Model3d = z.infer<typeof Model3dSchema>;
+
+/** 板叠层 / 工艺参数（用于制造说明、3D 外观与 README）。 */
+export const StackupSchema = z.object({
+  material: z.string().default('FR-4'),
+  /** 外层铜厚（oz） */
+  copperWeight: z.number().default(1),
+  /** 内层铜厚（oz），4 层时有效 */
+  innerCopperWeight: z.number().default(0.5),
+  finish: z.enum(['HASL', 'LeadFreeHASL', 'ENIG', 'OSP']).default('HASL'),
+  maskColor: z.enum(['绿', '黑', '白', '蓝', '红', '黄', '紫']).default('绿'),
+  silkColor: z.enum(['白', '黑', '黄']).default('白'),
+  /** 阻抗控制需求（仅记录，导出到 README） */
+  impedance: z.boolean().default(false),
+  /** 过孔盖油 */
+  viaTenting: z.boolean().default(true)
+});
+export type Stackup = z.infer<typeof StackupSchema>;
+export const DEFAULT_STACKUP: Stackup = { material: 'FR-4', copperWeight: 1, innerCopperWeight: 0.5, finish: 'HASL', maskColor: '绿', silkColor: '白', impedance: false, viaTenting: true };
+
 export const BoardSchema = z.object({
+  stackup: StackupSchema.optional(),
+  /** Optional per-footprint-library model overrides, included in project backups. */
+  models3d: z.record(Model3dSchema).optional(),
   copperCount: z.union([z.literal(2), z.literal(4)]).default(2),
   thickness: z.number().default(1.6),
   outline: z.array(VecSchema),

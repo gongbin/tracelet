@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from 'react';
-import { sch, getSymbol, findPin, previewRoute, snapComponentOrigin, componentBounds, SCH_GRID, snapTo, pointOnSeg, pointSegDist, rectsOverlap, milToMm, PAPER_SIZES, type Vec, type Rect, type Wire } from '@tracelet/kernel';
+import { sch, getSymbol, findPin, previewRoute, snapComponentOrigin, componentBounds, SCH_GRID, snapTo, pointOnSeg, pointSegDist, rectsOverlap, milToMm, paperSize, type SheetFrame as SheetFrameDef, type Vec, type Rect, type Wire } from '@tracelet/kernel';
 import { useApp, useEditor, useProject, useSheet } from '../../store/app.js';
 import { getAnalysis } from '../../store/analysis.js';
 import { useViewport, gridStep } from '../../hooks/useViewport.js';
 import { SymbolGlyph } from './SymbolGlyph.js';
 import { Hint } from '../../components/Hint.js';
 
-const G = (v: number) => snapTo(v, SCH_GRID);
+let SCH_SNAP = SCH_GRID;
+const G = (v: number) => snapTo(v, SCH_SNAP);
 const gp = (p: Vec): Vec => ({ x: G(p.x), y: G(p.y) });
 const pathD = (pts: Vec[]) => pts.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${p.y}`).join('');
 const ptsBox = (pts: Vec[], m = 0): Rect => { const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y); const x = Math.min(...xs) - m, y = Math.min(...ys) - m; return { x, y, w: Math.max(...xs) + m - x, h: Math.max(...ys) + m - y }; };
@@ -27,17 +28,22 @@ type Drag =
   | { kind: 'wirePt'; id: string; index: number }
   | { kind: 'wireSeg'; id: string; index: number; start: Vec; orig: Vec[] }
   | { kind: 'label'; id: string; dx: number; dy: number }
+  | { kind: 'poly'; id: string; type: 'bus' | 'graphic'; start: Vec; orig: Vec[] }
+  | { kind: 'rectG'; id: string; start: Vec; a: Vec; b: Vec }
+  | { kind: 'point'; id: string; type: 'junction' | 'text'; dx: number; dy: number }
   | { kind: 'marquee'; start: Vec; add: boolean };
 
 /** 图纸边框 + 标题栏（A4/A3/A2）。 */
-function SheetFrame({ project, sheetName, index, total, frame }: { project: { name: string; updatedAt: string }; sheetName: string; index: number; total: number; frame: { size: 'none' | 'A4' | 'A3' | 'A2'; landscape: boolean; title: string; revision: string; company: string } }) {
-  if (frame.size === 'none') return null;
-  const paper = PAPER_SIZES[frame.size];
-  const W = frame.landscape ? paper.w : paper.h, H = frame.landscape ? paper.h : paper.w;
+function SheetFrame({ project, sheetName, index, total, frame }: { project: { name: string; updatedAt: string }; sheetName: string; index: number; total: number; frame: SheetFrameDef }) {
+  const paper = paperSize(frame);
+  if (!paper) return null;
+  const W = paper.w, H = paper.h;
   const m = 200, ink = '#8E8B84', text = '#6B6862';
-  const cols = Math.round(W / 2000), rows = Math.round(H / 2000);
-  const tbW = 4400, tbH = 900, tx = W - m - tbW, ty = H - m - tbH;
-  const date = project.updatedAt.slice(0, 10);
+  const cols = Math.max(1, Math.round(W / 2000)), rows = Math.max(1, Math.round(H / 2000));
+  const tbW = Math.min(4400, W - 2 * m - 200), tbH = 900, tx = W - m - tbW, ty = H - m - tbH;
+  const date = frame.date || project.updatedAt.slice(0, 10);
+  const L = frame.labels;
+  const sizeText = frame.size === 'custom' ? `${Math.round(W * 0.0254)}×${Math.round(H * 0.0254)} mm` : `${frame.size}${frame.landscape ? '' : ' 纵向'}`;
   return (
     <g pointerEvents="none" fontFamily="Inter,'Noto Sans SC',sans-serif">
       <rect x={0} y={0} width={W} height={H} fill="none" stroke={ink} strokeWidth={10} />
@@ -56,11 +62,12 @@ function SheetFrame({ project, sheetName, index, total, frame }: { project: { na
       <g fill={text} fontSize={100}>
         <text x={tx + 80} y={ty + 110}>{frame.company || 'Tracelet'}</text>
         <text x={tx + 80} y={ty + 240} fontSize={170} fontWeight={600} fill="#3A3835">{frame.title || project.name}</text>
-        <text x={tx + 80} y={ty + 410}>图纸</text><text x={tx + 80} y={ty + 540} fontSize={140} fill="#3A3835">{sheetName}</text>
-        <text x={tx + 80} y={ty + 700}>日期</text><text x={tx + 80} y={ty + 840} fontSize={130} fill="#3A3835">{date}</text>
-        <text x={tx + 2680} y={ty + 700}>版本</text><text x={tx + 2680} y={ty + 840} fontSize={130} fill="#3A3835">{frame.revision}</text>
-        <text x={tx + 3580} y={ty + 700}>页</text><text x={tx + 3580} y={ty + 840} fontSize={130} fill="#3A3835">{index + 1} / {total}</text>
-        <text x={tx + 2680} y={ty + 240} fontSize={100}>{frame.size}{frame.landscape ? '' : ' 纵向'}</text>
+        <text x={tx + 80} y={ty + 410}>{L.sheet}</text><text x={tx + 80} y={ty + 540} fontSize={140} fill="#3A3835">{sheetName}</text>
+        <text x={tx + 80} y={ty + 700}>{L.date}</text><text x={tx + 80} y={ty + 840} fontSize={130} fill="#3A3835">{date}</text>
+        <text x={tx + 2680} y={ty + 700}>{L.revision}</text><text x={tx + 2680} y={ty + 840} fontSize={130} fill="#3A3835">{frame.revision}</text>
+        <text x={tx + 3580} y={ty + 700}>{L.page}</text><text x={tx + 3580} y={ty + 840} fontSize={130} fill="#3A3835">{index + 1} / {total}</text>
+        <text x={tx + 2680} y={ty + 240} fontSize={100}>{sizeText}{frame.author ? `  ${L.author}: ${frame.author}` : ''}</text>
+        <text x={tx + 2680} y={ty + 540} fontSize={100}>{frame.comment}</text>
       </g>
     </g>
   );
@@ -89,7 +96,7 @@ export function SchematicCanvas() {
     fitted.current = key;
     const rects = sheet.components.map((c) => componentBounds(c));
     const u = unionRect(rects);
-    setTimeout(() => { if (u) view.fit(u, 80); else if (sheet.frame.size !== 'none') { const p = PAPER_SIZES[sheet.frame.size]; view.fit({ x: 0, y: 0, w: sheet.frame.landscape ? p.w : p.h, h: sheet.frame.landscape ? p.h : p.w }, 40); } else view.centerOn({ x: 4000, y: 2500 }, 0.1); }, 0);
+    setTimeout(() => { if (u) view.fit(u, 80); else if (paperSize(sheet.frame)) { const p = paperSize(sheet.frame)!; view.fit({ x: 0, y: 0, w: p.w, h: p.h }, 40); } else view.centerOn({ x: 4000, y: 2500 }, 0.1); }, 0);
   }, [project.id, sheet.id, sheet.components, sheet.frame, view]);
 
   useEffect(() => {
@@ -123,6 +130,7 @@ export function SchematicCanvas() {
 
   const tool = app.schTool;
   const wireMode = tool === 'wire' || !!app.pendingPin;
+  SCH_SNAP = app.schGrid;
   const placingSym = app.placing ? getSymbol(app.placing.symbolId) : null;
   const ghostOrigin = placingSym ? snapComponentOrigin(placingSym, app.cursorWorld) : null;
   const cursorSnap = gp(app.cursorWorld);
@@ -231,6 +239,18 @@ export function SchematicCanvas() {
       const l = cur.labels.find((x) => x.id === d.id); if (!l) return;
       const nx = G(raw.x - d.dx), ny = G(raw.y - d.dy);
       if (nx !== l.x || ny !== l.y) { editor.dispatch(sch.deleteLabels(sheet.id, [l.id])); editor.dispatch(sch.addLabel(sheet.id, l.text, { x: nx, y: ny })); }
+    } else if (d.kind === 'poly') {
+      // 总线 / 线条整体平移（栅格对齐）
+      const ox = G(raw.x - d.start.x), oy = G(raw.y - d.start.y);
+      const pts = d.orig.map((q) => ({ x: q.x + ox, y: q.y + oy }));
+      if (d.type === 'bus') editor.dispatch(sch.setBusPoints(sheet.id, d.id, pts)); else editor.dispatch(sch.updateGraphic(sheet.id, d.id, { points: pts }));
+    } else if (d.kind === 'rectG') {
+      const ox = G(raw.x - d.start.x), oy = G(raw.y - d.start.y);
+      editor.dispatch(sch.updateGraphic(sheet.id, d.id, { a: { x: d.a.x + ox, y: d.a.y + oy }, b: { x: d.b.x + ox, y: d.b.y + oy } }));
+    } else if (d.kind === 'point') {
+      const nx = G(raw.x - d.dx), ny = G(raw.y - d.dy);
+      if (d.type === 'junction') { const j = cur.junctions.find((x) => x.id === d.id); if (j && (j.x !== nx || j.y !== ny)) editor.dispatch(sch.moveJunction(sheet.id, d.id, { x: nx, y: ny })); }
+      else { const g = (cur.graphics ?? []).find((x) => x.id === d.id); if (g && g.kind === 'text' && (g.x !== nx || g.y !== ny)) editor.dispatch(sch.updateGraphic(sheet.id, d.id, { x: nx, y: ny })); }
     }
   };
 
@@ -324,6 +344,21 @@ export function SchematicCanvas() {
     selectId(id, e); beginDrag('移动标签', { kind: 'label', id, dx: p.x - l.x, dy: p.y - l.y }, e);
   };
   const onSimpleDown = (id: string) => (e: RPE<SVGElement>) => { if (e.button !== 0 || !editable) return; e.stopPropagation(); selectId(id, e); };
+  /** 总线 / 结点 / 图形：选中并开始拖动（整体平移）。 */
+  const onMovableDown = (id: string) => (e: RPE<SVGElement>) => {
+    if (e.button !== 0 || !editable) { if (e.button === 0) e.stopPropagation(); return; }
+    const p = view.toWorld(e.clientX, e.clientY);
+    selectId(id, e);
+    const bus = (sheet.buses ?? []).find((b) => b.id === id);
+    if (bus) { beginDrag('移动总线', { kind: 'poly', id, type: 'bus', start: p, orig: bus.points }, e); return; }
+    const j = sheet.junctions.find((x) => x.id === id);
+    if (j) { beginDrag('移动结点', { kind: 'point', id, type: 'junction', dx: p.x - j.x, dy: p.y - j.y }, e); return; }
+    const g = (sheet.graphics ?? []).find((x) => x.id === id);
+    if (!g) { e.stopPropagation(); return; }
+    if (g.kind === 'line') beginDrag('移动线条', { kind: 'poly', id, type: 'graphic', start: p, orig: g.points }, e);
+    else if (g.kind === 'rect') beginDrag('移动矩形', { kind: 'rectG', id, start: p, a: g.a, b: g.b }, e);
+    else beginDrag('移动文字', { kind: 'point', id, type: 'text', dx: p.x - g.x, dy: p.y - g.y }, e);
+  };
 
   const onPinDown = (componentId: string) => (pin: string, e: RPE<SVGElement>) => {
     if (e.button !== 0 || view.spaceDown) return;
@@ -370,12 +405,12 @@ export function SchematicCanvas() {
           {/* 图形 */}
           {(sheet.graphics ?? []).map((g) => {
             const sel = app.selection.includes(g.id); const stroke = sel ? '#E5B800' : '#5B6472';
-            if (g.kind === 'line') return <path key={g.id} d={pathD(g.points)} stroke={stroke} strokeWidth={14} fill="none" strokeLinecap="round" onPointerDown={onSimpleDown(g.id)} style={{ cursor: 'pointer' }} />;
-            if (g.kind === 'rect') { const b = ptsBox([g.a, g.b]); return <rect key={g.id} x={b.x} y={b.y} width={b.w} height={b.h} stroke={stroke} strokeWidth={14} fill="rgba(91,100,114,.04)" strokeDasharray="60 30" onPointerDown={onSimpleDown(g.id)} style={{ cursor: 'pointer' }} />; }
-            return <text key={g.id} x={g.x} y={g.y} fontSize={g.size} fill={sel ? '#B58900' : '#3A3835'} onPointerDown={onSimpleDown(g.id)} style={{ cursor: 'pointer' }}>{g.text}</text>;
+            if (g.kind === 'line') return <path key={g.id} d={pathD(g.points)} stroke={stroke} strokeWidth={14} fill="none" strokeLinecap="round" onPointerDown={onMovableDown(g.id)} style={{ cursor: editable ? 'move' : 'pointer' }} />;
+            if (g.kind === 'rect') { const b = ptsBox([g.a, g.b]); return <rect key={g.id} x={b.x} y={b.y} width={b.w} height={b.h} stroke={stroke} strokeWidth={14} fill="rgba(91,100,114,.04)" strokeDasharray="60 30" onPointerDown={onMovableDown(g.id)} style={{ cursor: editable ? 'move' : 'pointer' }} />; }
+            return <text key={g.id} x={g.x} y={g.y} fontSize={g.size} fill={sel ? '#B58900' : '#3A3835'} onPointerDown={onMovableDown(g.id)} style={{ cursor: editable ? 'move' : 'pointer' }}>{g.text}</text>;
           })}
           {/* 总线 */}
-          {(sheet.buses ?? []).map((b) => <path key={b.id} d={pathD(b.points)} stroke={app.selection.includes(b.id) ? '#E5B800' : '#2C5AA0'} strokeWidth={44} fill="none" strokeLinejoin="round" strokeLinecap="round" onPointerDown={onSimpleDown(b.id)} style={{ cursor: 'pointer' }} />)}
+          {(sheet.buses ?? []).map((b) => <path key={b.id} d={pathD(b.points)} stroke={app.selection.includes(b.id) ? '#E5B800' : '#2C5AA0'} strokeWidth={44} fill="none" strokeLinejoin="round" strokeLinecap="round" onPointerDown={onMovableDown(b.id)} style={{ cursor: editable ? 'move' : 'pointer' }} />)}
           {/* 导线 */}
           {sheet.wires.map((w) => {
             const isPwr = w.auto && w.auto.some((k) => { const c = sheet.components.find((x) => x.id === k.split(':')[0]); return c && c.symbolId === 'sym:PWR'; });
@@ -388,7 +423,7 @@ export function SchematicCanvas() {
             </g>;
           })}
           {autoJunctions.map((p, i) => <circle key={'aj' + i} cx={p.x} cy={p.y} r={35} fill="#1F5F2B" pointerEvents="none" />)}
-          {sheet.junctions.map((j) => <circle key={j.id} cx={j.x} cy={j.y} r={app.selection.includes(j.id) ? 48 : 40} fill={app.selection.includes(j.id) ? '#E5B800' : '#1F5F2B'} onPointerDown={onSimpleDown(j.id)} style={{ cursor: 'pointer' }} />)}
+          {sheet.junctions.map((j) => <circle key={j.id} cx={j.x} cy={j.y} r={app.selection.includes(j.id) ? 48 : 40} fill={app.selection.includes(j.id) ? '#E5B800' : '#1F5F2B'} onPointerDown={onMovableDown(j.id)} style={{ cursor: editable ? 'move' : 'pointer' }} />)}
           {/* 预览：引脚连线 / 自由画线 / 总线 / 图形 */}
           {pending && <path d={pathD(pending)} stroke="#3D8BFF" strokeWidth={16} strokeDasharray="50 40" fill="none" pointerEvents="none" />}
           {app.wireDraft && <path d={pathD([...app.wireDraft, ...ortho(app.wireDraft[app.wireDraft.length - 1], cursorSnap).slice(1)])} stroke="#3D8BFF" strokeWidth={16} strokeDasharray="50 40" fill="none" pointerEvents="none" />}

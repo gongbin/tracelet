@@ -1,5 +1,9 @@
 import type { Project } from '../model/project.js';
-import type { Board, BoardText, CopperLayer, Layer, Trace, Via, Zone } from '../model/board.js';
+import type { Board, BoardText, CopperLayer, Layer, Trace, Via, Zone, Stackup } from '../model/board.js';
+import { DEFAULT_STACKUP } from '../model/board.js';
+import { findFootprint, BUILTIN_FOOTPRINTS } from '../library/footprints.js';
+import { registeredFootprint } from '../library/registry.js';
+import { ensureFootprintDef } from '../board/footprintResolve.js';
 import type { Vec } from '../geometry.js';
 import { newId } from '../ids.js';
 import { command, type Command } from './types.js';
@@ -90,9 +94,10 @@ export function moveFootprints(moves: { id: string; x: number; y: number }[]): C
 }
 
 /** 应用自动布线结果。 */
-export function applyRoutes(traces: Omit<Trace, 'id'>[], vias: Omit<Via, 'id'>[]): Command {
+export function applyRoutes(traces: Omit<Trace, 'id'>[], vias: Omit<Via, 'id'>[], moves: { id: string; x: number; y: number }[] = []): Command {
   return command(`自动布线（${traces.length} 段）`, (proj) => updateBoard(proj, (b) => ({
     ...b,
+    footprints: b.footprints.map(fp => { const move = moves.find(m => m.id === fp.id); return move && !fp.locked ? { ...fp, x: move.x, y: move.y } : fp; }),
     traces: [...b.traces, ...traces.map((t) => ({ id: newId('t'), ...t }))],
     vias: [...b.vias, ...vias.map((v) => ({ id: newId('v'), ...v }))]
   })));
@@ -119,6 +124,58 @@ export function syncFromSchematic(): Command {
     const r = syncBoardDetailed(proj);
     const known = new Set(proj.library.footprints.map((f) => f.id));
     const add = r.createdFootprints.filter((f) => !known.has(f.id));
+    // 板上引用的、仅存在于运行时注册表的封装（参数化生成 / 库导入）也写入项目库，避免重新打开后丢失
+    for (const f of r.board.footprints) {
+      if (known.has(f.footprintId) || add.some((d) => d.id === f.footprintId) || BUILTIN_FOOTPRINTS.some((d) => d.id === f.footprintId)) continue;
+      const def = registeredFootprint(f.footprintId); if (def) add.push(def);
+    }
     return { ...proj, board: r.board, library: add.length ? { ...proj.library, footprints: [...proj.library.footprints, ...add] } : proj.library };
   });
+}
+
+/** Assign a model to all instances of one footprint definition; undoable and serialized. */
+export function setFootprintModel(footprintId: string, model?: import('../model/board.js').Model3d): Command {
+  return command('匹配 3D 模型', proj => updateBoard(proj, b => {
+    const models3d = { ...b.models3d };
+    if (model) models3d[footprintId] = model; else delete models3d[footprintId];
+    return { ...b, models3d };
+  }));
+}
+
+/** 板厚 / 叠层参数。 */
+export function setBoardProps(props: { thickness?: number; stackup?: Partial<Stackup> }): Command {
+  return command('板参数', (proj) => updateBoard(proj, (b) => ({
+    ...b,
+    thickness: props.thickness && props.thickness > 0 ? props.thickness : b.thickness,
+    stackup: props.stackup ? { ...DEFAULT_STACKUP, ...(b.stackup ?? {}), ...props.stackup } : b.stackup
+  })));
+}
+
+export interface AddBoardFootprintArgs { footprintId: string; x: number; y: number; ref?: string; prefix?: string; value?: string; side?: 'F' | 'B'; rotation?: number }
+
+/**
+ * 在 PCB 上直接放置一个"仅板级"封装（定位孔、基准点、Logo、测试点等），不出现在原理图 / BOM。
+ * 同步原理图时保留。位号按前缀自动递增（默认 H 定位孔、FID 基准点、其余 M）。
+ */
+export function addBoardFootprint(p: Project, args: AddBoardFootprintArgs): { command: Command; id: string; ref: string } {
+  const def = findFootprint(args.footprintId) ?? ensureFootprintDef({ footprintId: args.footprintId, padNets: {}, ref: '' });
+  const npthOnly = def.pads.length > 0 && def.pads.every((pd) => pd.npth);
+  const prefix = args.prefix ?? (npthOnly ? 'H' : /fiducial/i.test(def.name) ? 'FID' : /test/i.test(def.name) ? 'TP' : 'M');
+  let ref = args.ref;
+  if (!ref) {
+    const used = new Set(p.board.footprints.map((f) => f.ref));
+    let n = 1; while (used.has(`${prefix}${n}`)) n++;
+    ref = `${prefix}${n}`;
+  }
+  const id = newId('fp');
+  const padNets: Record<string, string> = {};
+  for (const pd of def.pads) padNets[pd.number] = '';
+  const cmd = command(`放置 ${ref}`, (proj) => updateBoard(proj, (b) => ({ ...b, footprints: [...b.footprints, { id, ref: ref!, footprintId: args.footprintId, value: args.value ?? def.name, x: args.x, y: args.y, rotation: args.rotation ?? 0, side: args.side ?? 'F', padNets }] })));
+  return { command: cmd, id, ref };
+}
+
+/** 删除板上封装（仅板级封装可直接删除；来自原理图的封装应在原理图中删除后同步）。 */
+export function deleteFootprints(ids: string[]): Command {
+  const set = new Set(ids);
+  return command('删除封装', (proj) => updateBoard(proj, (b) => ({ ...b, footprints: b.footprints.filter((f) => !set.has(f.id)) })));
 }

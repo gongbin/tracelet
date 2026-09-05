@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { StackupDialog } from '../components/StackupDialog.js';
 import { pcb, LAYER_COLORS, copperLayers, type Layer } from '@tracelet/kernel';
 import { useApp, useEditor, useProject } from '../store/app.js';
 import { Icon } from '../components/Icon.js';
@@ -11,11 +12,13 @@ export function LayersPanel() {
   const board = project.board;
   const cu = copperLayers(board.copperCount);
   const layers: Layer[] = [...cu, 'F.Silk', 'B.Silk', 'F.Mask', 'B.Mask', 'Edge.Cuts'];
+  const [stackup, setStackup] = useState(false);
   const [filters, setFilters] = useState<Record<string, boolean>>({ 元件: true, 走线: true, 过孔: true, 文字: false, 铺铜: false });
   const hidden = (l: Layer) => board.hiddenLayers.includes(l);
   return (
     <div className="panel-pad">
-      <div className="row"><span className="kicker">图层 · 点击切换当前层</span><span className="ml-auto mono muted">{board.copperCount} 层板</span></div>
+      <div className="row"><span className="kicker">图层 · 点击切换当前层</span><span className="ml-auto mono muted">{board.copperCount} 层 · {board.thickness} mm{board.stackup ? ` · ${board.stackup.finish}` : ''}</span></div>
+      {stackup && <StackupDialog close={() => setStackup(false)} />}
       <div className="col" style={{ gap: 0 }}>
         {layers.map((l) => {
           const ki = (cu as string[]).indexOf(l);
@@ -33,7 +36,7 @@ export function LayersPanel() {
       </div>
       <div className="row" style={{ gap: 6 }}>
         <button className="btn grow" style={{ justifyContent: 'center' }} onClick={() => { const n = board.copperCount === 4 ? 2 : 4; if (app.activeLayer.startsWith('In')) app.set('activeLayer', 'F.Cu'); editor.dispatch(pcb.setCopperCount(n)); }}>{board.copperCount === 4 ? '− 移除内层（改为 2 层）' : '+ 添加内层 In1 / In2（改为 4 层）'}</button>
-        <button className="btn muted" onClick={() => app.toast('层叠编辑在下一里程碑')}>层叠 →</button>
+        <button className="btn" onClick={() => setStackup(true)} title="板厚、铜厚、表面处理、阻焊 / 丝印颜色">层叠 →</button>
       </div>
       <div className="row muted" style={{ gap: 10 }}>
         <span style={{ flex: 'none' }}>非当前层</span>

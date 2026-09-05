@@ -1,10 +1,10 @@
 import pc from 'polygon-clipping';
-import type { Board, Zone } from '../model/board.js';
+import type { Board, Zone, Trace } from '../model/board.js';
 import type { RuleSet } from '../model/project.js';
 import { RULE_SETS } from '../model/project.js';
-import { pointInPolygon, type Vec } from '../geometry.js';
+import { pointInPolygon, segSegDist, type Vec } from '../geometry.js';
 import { allPads, netClassFor } from './geometry.js';
-import { circlePoly, stadiumPoly, expandedRectPoly, rectPoly, type MultiPolygon, type Ring } from './shapes.js';
+import { circlePoly, stadiumPoly, expandedRectPoly, rectPoly, type MultiPolygon, type Polygon, type Ring } from './shapes.js';
 
 type PcRing = [number, number][];
 type PcMulti = PcRing[][];
@@ -16,20 +16,28 @@ export interface ZoneFill { zone: Zone; polygons: MultiPolygon }
 
 /**
  * 铺铜填充：区域 ∩ 板内区域 − 异网络铜（焊盘/走线/过孔）膨胀间距 − 板边留白，然后移除不与本网络相连的孤岛。
- * 同网络焊盘直接实心连接（热焊盘在后续里程碑）。
+ * 支持实心 / 热焊盘连接；孤岛可通过同层同网络走线连接。
  */
 export function fillZone(board: Board, zone: Zone, rules: RuleSet): MultiPolygon {
+  return fillPreparedZone(board, zone, rules, allPads(board), boardInterior(board, rules));
+}
+
+function boardInterior(board: Board, rules: RuleSet): PcMulti {
+  if (board.outline.length < 3) return [];
+  const outline = closed(toPc(board.outline));
+  if (rules.copperToEdge <= 0) return [[outline]];
+  const bands: PcMulti = board.outline.map((a, i) => [closed(toPc(stadiumPoly(a, board.outline[(i + 1) % board.outline.length], rules.copperToEdge)))]);
+  try { return pc.difference([[outline]], bands); } catch { return []; }
+}
+
+function fillPreparedZone(board: Board, zone: Zone, rules: RuleSet, pads: ReturnType<typeof allPads>, inside: PcMulti): MultiPolygon {
+  if (zone.polygon.length < 3 || !inside.length) return [];
   const nc = netClassFor(board, zone.net);
-  const clearance = zone.clearance && zone.clearance > 0 ? Math.max(rules.minClearance, zone.clearance) : Math.max(rules.minClearance, nc?.clearance ?? 0.2);
-  const pads = allPads(board);
+  const clearance = Math.max(rules.minClearance, zone.clearance ?? 0, nc?.clearance ?? 0.2);
 
   const zonePoly: PcMulti = [[closed(toPc(zone.polygon))]];
-  const outline = closed(toPc(board.outline));
-  const edgeBands: PcMulti = [];
-  for (let i = 0; i < board.outline.length; i++) edgeBands.push([closed(toPc(stadiumPoly(board.outline[i], board.outline[(i + 1) % board.outline.length], rules.copperToEdge)))]);
   let area: PcMulti;
   try {
-    const inside = edgeBands.length ? pc.difference([[outline]], ...edgeBands) : [[outline]];
     area = pc.intersection(zonePoly, inside);
   } catch { return []; }
   if (area.length === 0) return [];
@@ -37,7 +45,7 @@ export function fillZone(board: Board, zone: Zone, rules: RuleSet): MultiPolygon
   const obstacles: PcMulti = [];
   for (const p of pads) {
     if (!p.layers.includes(zone.layer)) continue;
-    if (p.net && p.net === zone.net) {
+    if (!p.def.npth && p.net && p.net === zone.net) {
       // 热焊盘：焊盘外围留 gap 环，只保留 4 条辐条连接
       if ((zone.thermal ?? 'relief') === 'relief') {
         const gap = zone.thermalGap ?? 0.3, sw = zone.spokeWidth ?? 0.4;
@@ -51,28 +59,29 @@ export function fillZone(board: Board, zone: Zone, rules: RuleSet): MultiPolygon
       }
       continue;
     }
-    obstacles.push([closed(toPc(expandedRectPoly(p.rect, clearance)))]);
+    obstacles.push([closed(toPc(expandedRectPoly(p.rect, Math.max(clearance, netClassFor(board, p.net)?.clearance ?? 0))))]);
   }
   for (const t of board.traces) {
     if (t.layer !== zone.layer || (t.net && t.net === zone.net)) continue;
-    for (let i = 0; i < t.points.length - 1; i++) obstacles.push([closed(toPc(stadiumPoly(t.points[i], t.points[i + 1], t.width / 2 + clearance)))]);
+    for (let i = 0; i < t.points.length - 1; i++) obstacles.push([closed(toPc(stadiumPoly(t.points[i], t.points[i + 1], t.width / 2 + Math.max(clearance, netClassFor(board, t.net)?.clearance ?? 0))))]);
   }
   for (const v of board.vias) {
     if (v.net && v.net === zone.net) continue;
-    obstacles.push([closed(toPc(circlePoly(v, v.size / 2 + clearance)))]);
+    obstacles.push([closed(toPc(circlePoly(v, v.size / 2 + Math.max(clearance, netClassFor(board, v.net)?.clearance ?? 0))))]);
   }
 
   let fill: PcMulti;
-  try { fill = obstacles.length ? pc.difference(area, ...obstacles) : area; } catch { return []; }
+  try { fill = obstacles.length ? pc.difference(area, obstacles) : area; } catch { return []; }
   const result = fromPc(fill);
   if (!zone.net) return result;
 
-  // 孤岛移除：保留包含同网络焊盘/过孔的多边形
+  // 孤岛移除：保留连接同网络焊盘、过孔或同层走线的铜块
   const anchors: Vec[] = [
-    ...pads.filter((p) => p.net === zone.net && p.layers.includes(zone.layer)).map((p) => p.center),
+    ...pads.filter((p) => !p.def.npth && p.net === zone.net && p.layers.includes(zone.layer)).map((p) => p.center),
     ...board.vias.filter((v) => v.net === zone.net).map((v) => ({ x: v.x, y: v.y }))
   ];
-  return result.filter((poly) => anchors.some((a) => pointInPolygon(a, poly[0]) && !poly.slice(1).some((hole) => pointInPolygon(a, hole))));
+  const traces = board.traces.filter((t) => t.net === zone.net && t.layer === zone.layer);
+  return result.filter((poly) => anchors.some((a) => pointInCopper(poly, a)) || traces.some((t) => traceTouchesPolygon(t, poly)));
 }
 
 const cache = new WeakMap<Board, Map<string, ZoneFill[]>>();
@@ -80,14 +89,33 @@ const cache = new WeakMap<Board, Map<string, ZoneFill[]>>();
 export function zoneFills(board: Board, rules: RuleSet = RULE_SETS[0]): ZoneFill[] {
   let m = cache.get(board);
   if (!m) { m = new Map(); cache.set(board, m); }
-  const hit = m.get(rules.id);
+  // Rule IDs remain stable while users edit their actual constraints.
+  const key = `${rules.minClearance}|${rules.copperToEdge}`;
+  const hit = m.get(key);
   if (hit) return hit;
-  const fills = board.zones.map((zone) => ({ zone, polygons: fillZone(board, zone, rules) }));
-  m.set(rules.id, fills);
+  if (!board.zones.length) { m.set(key, []); return m.get(key)!; }
+  const pads = allPads(board), inside = boardInterior(board, rules);
+  const fills = board.zones.map((zone) => ({ zone, polygons: fillPreparedZone(board, zone, rules, pads, inside) }));
+  m.set(key, fills);
   return fills;
 }
 
 /** 点是否落在某个网络的铺铜实铜上（用于连通性）。 */
 export function pointInFill(fill: ZoneFill, p: Vec): boolean {
-  return fill.polygons.some((poly) => pointInPolygon(p, poly[0]) && !poly.slice(1).some((hole) => pointInPolygon(p, hole)));
+  return fill.polygons.some((poly) => pointInCopper(poly, p));
+}
+
+function pointInCopper(poly: Polygon, p: Vec): boolean {
+  return pointInPolygon(p, poly[0]) && !poly.slice(1).some((hole) => pointInPolygon(p, hole));
+}
+
+/** Includes contact along the segment body, even if both endpoints lie outside the zone. */
+export function traceTouchesPolygon(trace: Pick<Trace, 'points' | 'width'>, poly: Polygon): boolean {
+  if (trace.points.some((p) => pointInCopper(poly, p))) return true;
+  for (let i = 1; i < trace.points.length; i++) {
+    for (const ring of poly) for (let j = 0; j < ring.length; j++) {
+      if (segSegDist(trace.points[i - 1], trace.points[i], ring[j], ring[(j + 1) % ring.length]) <= trace.width / 2 + 1e-9) return true;
+    }
+  }
+  return false;
 }

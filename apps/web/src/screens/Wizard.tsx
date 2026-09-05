@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { createProject, createDemoProject, RULE_SETS } from '@tracelet/kernel';
+import { RULE_SETS, PROJECT_TEMPLATES, createFromTemplate } from '@tracelet/kernel';
 import { useApp } from '../store/app.js';
 
 const FABS = [
@@ -7,10 +7,9 @@ const FABS = [
   { id: 'jlcpcb', name: 'JLCPCB', rule: '0.127 · 0.3' },
   { id: 'generic', name: '通用（保守）', rule: '0.2 · 0.4' }
 ];
-const TEMPLATES = [['blank', '空白'], ['esp32', 'ESP32'], ['stm32', 'STM32'], ['arduino', 'Arduino 扩展板']] as const;
 
 export function Wizard() {
-  const { set, openProjectObject, toast } = useApp();
+  const { set, openProjectObject } = useApp();
   const [name, setName] = useState('LED 闪灯板');
   const [layers, setLayers] = useState<2 | 4>(2);
   const [fab, setFab] = useState('jlc');
@@ -20,14 +19,9 @@ export function Wizard() {
 
   const create = () => {
     const fabName = RULE_SETS.find((r) => r.id === fab)?.name ?? '嘉立创';
-    let p;
-    if (tpl === 'esp32') { p = createDemoProject(); p = { ...p, name: name || 'ESP32 项目', settings: { ...p.settings, unit, ruleSetId: fab, fab: fabName } }; }
-    else {
-      if (tpl !== 'blank') toast(`${tpl.toUpperCase()} 模板即将提供，已创建空白项目`);
-      p = createProject({ name: name || '未命名项目', copperCount: layers, unit, ruleSetId: fab, fab: fabName });
-    }
-    openProjectObject(p);
+    openProjectObject(createFromTemplate(tpl, { name: name || undefined, copperCount: layers, unit, ruleSetId: fab, fab: fabName }));
   };
+  const tplInfo = PROJECT_TEMPLATES.find((t) => t.id === tpl);
 
   return (
     <div className="overlay" onClick={close}>
@@ -52,8 +46,11 @@ export function Wizard() {
           <span className="k">单位</span>
           <div className="seg" style={{ width: 160 }}><span className={`seg-opt${unit === 'mm' ? ' on' : ''}`} onClick={() => setUnit('mm')}>mm</span><span className={`seg-opt${unit === 'mil' ? ' on' : ''}`} onClick={() => setUnit('mil')}>mil</span></div>
           <span className="k">模板</span>
-          <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-            {TEMPLATES.map(([id, label]) => <span key={id} className={`chip${tpl === id ? ' on' : ''}`} style={{ padding: '5px 10px' }} onClick={() => setTpl(id)}>{label}</span>)}
+          <div className="col" style={{ gap: 6 }}>
+            <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+              {PROJECT_TEMPLATES.map((t) => <span key={t.id} className={`chip${tpl === t.id ? ' on' : ''}`} style={{ padding: '5px 10px' }} onClick={() => { setTpl(t.id); if (t.id !== 'blank' && (name === '' || name === 'LED 闪灯板' || PROJECT_TEMPLATES.some((x) => x.name === name))) setName(t.name); }}>{t.name}</span>)}
+            </div>
+            {tplInfo && tplInfo.id !== 'blank' && <div className="small muted">{tplInfo.description} · 生成后可自由修改</div>}
           </div>
         </div>
         <div className="dialog-foot">

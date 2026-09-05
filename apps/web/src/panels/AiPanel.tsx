@@ -155,6 +155,8 @@ function RefDesigns() {
   const [results, setResults] = useState<RefDesign[]>(searchCatalog('ESP32'));
   const [searching, setSearching] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ chars: number; thinking: boolean } | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const [extracted, setExtracted] = useState<{ spec: ExtractedSchematic; from: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -169,10 +171,11 @@ function RefDesigns() {
   };
   const recognize = async (src: RecognizeSource, label: string) => {
     if (!configured) { app.toast('识别需要先配置模型（右上角 ▾）', 'error'); return; }
-    setBusy(label);
-    try { const spec = await recognizeSchematic(cfg, src); setExtracted({ spec, from: label }); app.toast(`识别完成：${spec.components.length} 个元件`, 'success'); }
-    catch (e) { app.toast(`识别失败：${(e as Error).message}`, 'error'); }
-    finally { setBusy(null); }
+    setBusy(label); setProgress(null);
+    const ac = new AbortController(); abortRef.current = ac;
+    try { const spec = await recognizeSchematic(cfg, src, { onProgress: setProgress, signal: ac.signal }); setExtracted({ spec, from: label }); app.toast(`识别完成：${spec.components.length} 个元件`, 'success'); }
+    catch (e) { if (!ac.signal.aborted) app.toast(`识别失败：${(e as Error).message}`, 'error'); }
+    finally { setBusy(null); setProgress(null); abortRef.current = null; }
   };
   const generate = () => {
     if (!extracted) return;
@@ -216,7 +219,7 @@ function RefDesigns() {
         </div>
         <input ref={fileRef} type="file" accept=".pdf,image/png,image/jpeg,image/webp" hidden onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { await recognize(await fileToSource(f), '上传文件'); } catch (err) { app.toast((err as Error).message, 'error'); } }} />
       </div>
-      {busy && <div className="row muted xs"><span className="spinner" />模型正在阅读「{busy}」并抽取元件与连接，PDF 页数多时可能需要一两分钟…</div>}
+      {busy && <div className="row muted xs"><span className="spinner" />{progress?.chars ? `已输出 ${progress.chars} 字符的结构化结果…` : progress?.thinking ? `模型正在阅读「${busy}」并思考电路结构…` : `模型正在阅读「${busy}」，PDF 页数多时可能需要一两分钟…`}<span className="ml-auto" style={{ cursor: 'pointer' }} onClick={() => abortRef.current?.abort()}>取消</span></div>}
       {extracted && (
         <div className="col" style={{ gap: 8, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
           <div className="kicker">2 · 识别结果 · {extracted.spec.title || extracted.from}</div>

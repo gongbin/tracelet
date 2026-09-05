@@ -158,7 +158,7 @@ export function PropertiesPanel() {
             {comp.footprint && !findFootprint(comp.footprint) && <option value={comp.footprint}>{comp.footprint.replace(/^fp:kicad:/, '')}（未解析，同步时映射/占位）</option>}
           </select></>}
         {part && <>
-          <span className="k">数据手册</span><a href="#" onClick={(e) => e.preventDefault()}>{part.datasheet ?? `${part.mpn}.pdf`} ↗</a>
+          <span className="k">数据手册</span>{/^https?:\/\//.test(comp.props.datasheet ?? '') ? <a href={comp.props.datasheet} target="_blank" rel="noreferrer">{comp.props.datasheet!.replace(/^https?:\/\//, '').slice(0, 40)} ↗</a> : <a href={`https://so.szlcsc.com/global.html?k=${encodeURIComponent(part.mpn)}`} target="_blank" rel="noreferrer" title="在立创商城查找数据手册">{part.datasheet ?? `${part.mpn}.pdf`} ↗</a>}
           <span className="k">供应商</span><span>LCSC {part.lcsc} · <span style={{ color: 'var(--success)' }}>{part.stock}</span> {part.price}</span>
           <span className="k">3D</span><div style={{ height: 64, borderRadius: 4, background: 'var(--bg-canvas)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', fontSize: 11 }}>[3D 预览]</div>
         </>}
@@ -170,7 +170,17 @@ export function PropertiesPanel() {
         <div className="row"><span className="muted">引脚</span><span className="mono">{part?.pinCount ?? sym.pins.length}</span><span className="ml-auto muted">{sym.power ? '' : open ? `${open} 未连接` : '全部已连接'}</span></div>
         {pinNets.map((p, i) => <div key={i} className="pin-row"><span className="dot" style={{ background: p.net || sym.power ? 'var(--success)' : 'var(--error)' }} /><span>{p.name}</span><span className="ml-auto muted">{sym.power ? comp.value : p.net || '—'}</span></div>)}
       </div>
-      <div className="row"><span className="muted">自定义属性</span><span className="ml-auto" style={{ color: 'var(--accent)', cursor: 'pointer' }} onClick={() => app.toast('自定义属性编辑在下一里程碑')}>+ 添加</span></div>
+      <div className="col" style={{ gap: 6 }}>
+        <div className="row"><span className="muted">自定义属性</span><span className="ml-auto" style={{ color: 'var(--accent)', cursor: 'pointer' }} onClick={() => { const k = prompt('属性名（如 mpn、lcsc、datasheet、tolerance、note）'); const key = k?.trim(); if (!key) return; if (key in comp.props) { app.toast('已有同名属性'); return; } editor.dispatch(sch.setComponentProps(sheet.id, comp.id, { ...comp.props, [key]: '' })); }}>+ 添加</span></div>
+        {Object.entries(comp.props).map(([k, v]) => (
+          <div key={k} className="row" style={{ gap: 6 }}>
+            <span className="mono xs muted nowrap" style={{ width: 72, overflow: 'hidden', textOverflow: 'ellipsis' }} title={k}>{k}</span>
+            <div className="grow"><ValueInput value={v} onCommit={(nv) => editor.dispatch(sch.setComponentProps(sheet.id, comp.id, { ...comp.props, [k]: nv }))} /></div>
+            <span className="dim" style={{ cursor: 'pointer' }} title="删除属性" onClick={() => { const n = { ...comp.props }; delete n[k]; editor.dispatch(sch.setComponentProps(sheet.id, comp.id, n)); }}>✕</span>
+          </div>
+        ))}
+        {Object.keys(comp.props).length === 0 && <div className="dim xs">无 · 常用：mpn（型号）、lcsc（立创编号，导出 BOM 会带上）、datasheet（链接）</div>}
+      </div>
     </div>
   );
 }

@@ -21,7 +21,8 @@ function bend45(a: Vec, b: Vec): Vec | null {
   const d = Math.min(ax, ay);
   return { x: a.x + Math.sign(dx) * d, y: a.y + Math.sign(dy) * d };
 }
-const sg = (v: number) => snapTo(v, PCB_GRID);
+let PCB_SNAP = PCB_GRID;
+const sg = (v: number) => snapTo(v, PCB_SNAP);
 const fmt = (v: number) => v.toFixed(2);
 const ptsBox = (pts: Vec[], m = 0): Rect => { const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y); const x = Math.min(...xs) - m, y = Math.min(...ys) - m; return { x, y, w: Math.max(...xs) + m - x, h: Math.max(...ys) + m - y }; };
 const contains = (a: Rect, b: Rect) => b.x >= a.x && b.y >= a.y && b.x + b.w <= a.x + a.w && b.y + b.h <= a.y + a.h;
@@ -51,6 +52,7 @@ export function PcbCanvas() {
   const lastClick = useRef<{ t: number; x: number; y: number }>({ t: 0, x: 0, y: 0 });
   const [marquee, setMarquee] = useState<{ a: Vec; b: Vec } | null>(null);
   const [previewBad, setPreviewBad] = useState(false);
+  PCB_SNAP = app.pcbGrid;
 
   useEffect(() => {
     if (fitted.current === project.id) return;
@@ -120,7 +122,7 @@ export function PcbCanvas() {
         if (!pad) { app.toast('从一个焊盘开始走线'); return; }
         const nc = netClassFor(board, pad.net);
         const layer = pad.layers.includes(app.activeLayer) ? app.activeLayer : pad.layers[0];
-        app.patch({ routing: { points: [pad.center], net: pad.net, layer, width: nc?.traceWidth ?? 0.25, startPad: { footprintId: pad.footprintId, number: pad.number } }, activeLayer: layer });
+        app.patch({ routing: { points: [pad.center], net: pad.net, layer, width: app.traceWidthOverride ?? nc?.traceWidth ?? 0.25, startPad: { footprintId: pad.footprintId, number: pad.number } }, activeLayer: layer });
         return;
       }
       const last = app.routing.points[app.routing.points.length - 1];
@@ -133,7 +135,7 @@ export function PcbCanvas() {
     if (tool === 'via') {
       const pad = padAt(raw);
       const nc = netClassFor(board, pad?.net ?? '');
-      editor.dispatch(pcb.addVia({ x: p.x, y: p.y, size: nc?.viaSize ?? 0.6, drill: nc?.viaDrill ?? 0.3, net: pad?.net ?? '' }));
+      editor.dispatch(pcb.addVia({ x: p.x, y: p.y, size: app.viaOverride?.size ?? nc?.viaSize ?? 0.6, drill: app.viaOverride?.drill ?? nc?.viaDrill ?? 0.3, net: pad?.net ?? '' }));
       return;
     }
     if (tool === 'zone') {
@@ -150,7 +152,12 @@ export function PcbCanvas() {
     }
     if (tool === 'measure') { const m = app.measure ?? []; app.patch({ measure: m.length >= 2 ? [p] : [...m, p] }); return; }
     if (tool === 'text') { const t = prompt('丝印文字', 'v1.0'); if (t) editor.dispatch(pcb.addBoardText({ layer: 'F.Silk', text: t, x: p.x, y: p.y, size: 1 })); return; }
-    if (tool === 'place') { app.toast('PCB 上直接放元件需要同步回原理图，下一里程碑；请在原理图放置后「同步到 PCB」'); return; }
+    if (tool === 'place') {
+      if (!app.pcbPlacing) { app.set('rightTab', 'lib'); app.toast('在右侧库中选择一个封装放到板上：仅板级元件（定位孔 / 基准点 / Logo / 测试点）。带符号的元件请在原理图放置后「同步到 PCB」'); return; }
+      const r = pcb.addBoardFootprint(editor.project, { footprintId: app.pcbPlacing.footprintId, x: p.x, y: p.y, rotation: app.pcbPlacing.rotation, side: app.activeLayer === 'B.Cu' ? 'B' : 'F' });
+      editor.dispatch(r.command); app.toast(`已放置 ${r.ref}（仅板级，不进 BOM）· 继续点击可连续放置，右键 / Esc 结束`);
+      return;
+    }
     // 选择：焊盘 → 高亮网络；空白 → 框选
     const pad = padAt(raw);
     if (pad && pad.net && !e.shiftKey) { app.patch({ highlightNet: hl === pad.net ? null : pad.net, pcbSelection: [] }); return; }
@@ -268,20 +275,78 @@ export function PcbCanvas() {
   };
 
   // ---- 自动布线 ----
+  const workerRef = useRef<Worker | null>(null);
+  const fallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const runIdRef = useRef(0);
+  const sourceBoardRef = useRef<typeof board | null>(null);
+  const stopAutoroute = () => {
+    runIdRef.current++;
+    workerRef.current?.terminate(); workerRef.current = null;
+    if (fallbackRef.current !== null) clearTimeout(fallbackRef.current);
+    fallbackRef.current = null;
+  };
+  const cancelAutoroute = () => {
+    stopAutoroute(); sourceBoardRef.current = null;
+    useApp.getState().patch({ autoroute: { status: 'idle', result: null } });
+  };
+  // Board edits (including layer changes and Undo) invalidate the proposed geometry.
+  useEffect(() => {
+    if (sourceBoardRef.current && sourceBoardRef.current !== board) cancelAutoroute();
+  }, [board]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (app.autoroute.status === 'idle') stopAutoroute();
+  }, [app.autoroute.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => {
+    stopAutoroute(); sourceBoardRef.current = null;
+    useApp.getState().patch({ autoroute: { status: 'idle', result: null } });
+  }, [editor]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const runAutoroute = () => {
-    app.patch({ autoroute: { status: 'running', result: null }, routing: null });
-    setTimeout(() => {
-      try {
-        const r = autoroute(editor.project.board, analysis.rules);
-        app.patch({ autoroute: { status: 'done', result: r } });
-      } catch (err) { app.patch({ autoroute: { status: 'idle', result: null } }); app.toast(`自动布线失败：${(err as Error).message}`, 'error'); }
-    }, 30);
+    stopAutoroute();
+    const runId = runIdRef.current;
+    const snapshot = editor.project;
+    sourceBoardRef.current = snapshot.board;
+    const currentAnalysis = getAnalysis(snapshot);
+    const copperCount = snapshot.board.copperCount;
+    const current = () => runId === runIdRef.current && useApp.getState().editor === editor && editor.project.board === snapshot.board && useApp.getState().autoroute.status === 'running';
+    app.patch({ autoroute: { status: 'running', result: null, copperCount, progress: { done: 0, total: currentAnalysis.ratsnest.unrouted, net: '' } }, routing: null });
+    const finish = (r: ReturnType<typeof autoroute>) => { if (current()) app.patch({ autoroute: { status: 'done', result: r, copperCount } }); };
+    const fail = (msg: string) => { if (!current()) return; app.patch({ autoroute: { status: 'idle', result: null } }); app.toast(`自动布线失败：${msg}`, 'error'); };
+    const fallback = () => {
+      if (!current()) return;
+      fallbackRef.current = setTimeout(() => {
+        fallbackRef.current = null;
+        if (!current()) return;
+        try { finish(autoroute(snapshot.board, currentAnalysis.rules, { allowComponentMoves: true })); } catch (err) { fail((err as Error).message); }
+      }, 30);
+    };
+    try {
+      const w = new Worker(new URL('./autoroute.worker.ts', import.meta.url), { type: 'module' });
+      workerRef.current = w;
+      w.onmessage = (e: MessageEvent<{ type: string; done?: number; total?: number; net?: string; result?: ReturnType<typeof autoroute>; message?: string }>) => {
+        if (!current()) return;
+        const m = e.data;
+        if (m.type === 'progress') app.patch({ autoroute: { status: 'running', result: null, copperCount, progress: { done: m.done!, total: m.total!, net: m.net! } } });
+        else {
+          if (m.type === 'done') finish(m.result!); else fail(m.message ?? '未知错误');
+          w.terminate(); workerRef.current = null;
+        }
+      };
+      w.onerror = () => {
+        w.terminate();
+        if (!current()) return;
+        workerRef.current = null;
+        fallback();
+      };
+      w.postMessage({ board: snapshot.board, rules: currentAnalysis.rules, library: snapshot.library, opts: { allowComponentMoves: true } });
+    } catch { workerRef.current?.terminate(); workerRef.current = null; fallback(); }
   };
   const acceptAutoroute = () => {
     const r = app.autoroute.result; if (!r) return;
-    editor.dispatch(pcb.applyRoutes(r.traces, r.vias));
+    if (sourceBoardRef.current !== editor.project.board) { cancelAutoroute(); app.toast('板子已修改，请重新自动布线'); return; }
+    editor.dispatch(pcb.applyRoutes(r.traces, r.vias, r.moves));
     app.patch({ autoroute: { status: 'idle', result: null } });
-    app.toast(`已接受自动布线：${r.traces.length} 段走线 · ${r.vias.length} 个过孔（可 Undo）`, 'success');
+    app.toast(`已接受自动布线：${r.traces.length} 段走线 · ${r.vias.length} 个过孔${r.moves?.length ? ` · 微调 ${r.moves.length} 个器件` : ''}（可 Undo）`, 'success');
   };
   useEffect(() => { if (tool === 'autoroute' && app.autoroute.status === 'idle') { runAutoroute(); app.set('pcbTool', 'select'); } // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool]);
@@ -381,6 +446,12 @@ export function PcbCanvas() {
               <circle cx={routePreview[routePreview.length - 1].x} cy={routePreview[routePreview.length - 1].y} r={app.routing.width} fill="none" stroke={previewBad ? '#FF3B30' : '#fff'} strokeWidth={0.06} />
             </g>
           )}
+          {/* 板级封装放置预览 */}
+          {tool === 'place' && app.pcbPlacing && (() => { const ghost = { id: 'ghost', ref: '?', footprintId: app.pcbPlacing.footprintId, value: '', x: cursorSnap.x, y: cursorSnap.y, rotation: app.pcbPlacing.rotation, side: (app.activeLayer === 'B.Cu' ? 'B' : 'F') as 'F' | 'B', padNets: {} }; const b = footprintBody(ghost); return (
+            <g pointerEvents="none" opacity={0.75}>
+              <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="rgba(61,139,255,.12)" stroke="#3D8BFF" strokeWidth={0.12} strokeDasharray="0.4 0.3" />
+              {footprintPads(ghost, board).map((pd, i) => pd.def.shape === 'circle' || pd.def.shape === 'oval' ? <ellipse key={i} cx={pd.center.x} cy={pd.center.y} rx={pd.rect.w / 2} ry={pd.rect.h / 2} fill={pd.def.npth ? 'none' : '#3D8BFF'} stroke="#3D8BFF" strokeWidth={0.1} /> : <rect key={i} x={pd.rect.x} y={pd.rect.y} width={pd.rect.w} height={pd.rect.h} fill="#3D8BFF" />)}
+            </g>); })()}
           {/* 铺铜 / 板框草稿 */}
           {app.zoneDraft && app.zoneDraft.length > 0 && (
             <g pointerEvents="none">
@@ -403,6 +474,16 @@ export function PcbCanvas() {
           {/* 自动布线建议 */}
           {ar.status === 'done' && ar.result && (
             <g pointerEvents="none" opacity={0.95}>
+              {ar.result.moves?.map(m => {
+                const original = board.footprints.find(fp => fp.id === m.id); if (!original) return null;
+                const proposed = { ...original, x: m.x, y: m.y }, body = footprintBody(proposed);
+                return <g key={m.id} stroke="#A78BFA" fill="none" pointerEvents="none">
+                  <path d={`M${m.from.x} ${m.from.y}L${m.x} ${m.y}`} strokeWidth={.12} strokeDasharray=".3 .2" />
+                  <rect x={body.x} y={body.y} width={body.w} height={body.h} strokeWidth={.15} strokeDasharray=".4 .2" />
+                  {footprintPads(proposed, board).map((p, i) => <rect key={i} {...{ x: p.rect.x, y: p.rect.y, width: p.rect.w, height: p.rect.h }} strokeWidth={.12} />)}
+                  <text x={m.x} y={body.y - .4} fill="#A78BFA" stroke="none" textAnchor="middle" fontSize={.8}>{m.ref}</text>
+                </g>;
+              })}
               {ar.result.traces.map((t, i) => <path key={i} d={t.points.map((p, j) => `${j ? 'L' : 'M'}${p.x} ${p.y}`).join('')} stroke="#A78BFA" strokeWidth={t.width} strokeDasharray={`${t.width * 2.5} ${t.width * 1.5}`} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={t.layer === app.activeLayer ? 1 : 0.55} />)}
               {ar.result.vias.map((v, i) => <circle key={i} cx={v.x} cy={v.y} r={v.size / 2} fill="none" stroke="#A78BFA" strokeWidth={0.12} />)}
             </g>
@@ -439,15 +520,19 @@ export function PcbCanvas() {
         <div className="banner"><span className="dim">板框：</span>{app.outlineDraft?.length ? `已 ${app.outlineDraft.length} 点 · 双击闭合 · Esc 取消` : '拖动顶点调整当前板框，或点击开始画新板框（双击闭合）'}</div>
       )}
       {ar.status === 'running' && (
-        <div className="banner"><span className="spinner" />自动布线中 · {analysis.ratsnest.unrouted} 条连接</div>
+        <div className="banner" style={{ width: 'max-content', maxWidth: 'calc(100% - 24px)', flexWrap: 'nowrap', gap: 8 }}><span className="spinner" /><span>自动布线中 · {ar.copperCount ?? board.copperCount} 层板</span><span className="mono" style={{ flex: '0 0 auto', width: '9ch', fontVariantNumeric: 'tabular-nums' }}>{ar.progress?.done ?? 0}/{ar.progress?.total ?? analysis.ratsnest.unrouted}</span><span className="dim" title={ar.progress?.net || '准备中'} style={{ flex: '0 1 auto', width: '12ch', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ar.progress?.net || '准备中'}</span>
+          <span style={{ flex: '0 1 auto', width: 120, minWidth: 40, height: 3, borderRadius: 2, background: 'var(--border)', overflow: 'hidden', display: 'inline-block' }}><span style={{ display: 'block', width: `${ar.progress && ar.progress.total ? (100 * ar.progress.done) / ar.progress.total : 0}%`, height: '100%', background: 'var(--accent)' }} /></span>
+          <button className="btn sm" style={{ flexShrink: 0 }} onClick={cancelAutoroute}>取消</button>
+        </div>
       )}
       {ar.status === 'done' && ar.result && (
-        <div className="banner ai" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6, whiteSpace: 'normal', maxWidth: 640 }}>
+        <div className="banner ai" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6, whiteSpace: 'normal', width: 'min(640px, calc(100% - 24px))' }}>
           <div className="row" style={{ gap: 10 }}>
-            <span style={{ color: 'var(--ai)' }}>✨</span>自动布线完成 · <span className="mono">{ar.result.routed}/{ar.result.total}</span> 连接{ar.result.failed.length ? <span style={{ color: 'var(--warning)' }}>，{ar.result.failed.length} 条失败</span> : ''} · 紫色虚线为建议，接受后可 Undo
-            <button className="btn sm ai-solid" style={{ marginLeft: 'auto' }} onClick={acceptAutoroute} disabled={!ar.result.traces.length}>接受</button>
-            <button className="btn sm" onClick={() => app.patch({ autoroute: { status: 'idle', result: null } })}>放弃</button>
+            <span style={{ flex: 1, minWidth: 0, lineHeight: 1.6 }}>自动布线完成 · {ar.copperCount ?? board.copperCount} 层板 · <span className="mono">{ar.result.routed}/{ar.result.total}</span> 连接 · {(ar.result.ms / 1000).toFixed(1)}s{ar.result.failed.length ? <span style={{ color: 'var(--warning)' }}>，{ar.result.failed.length} 条失败</span> : ''}</span>
+            <button className="btn sm ai-solid" style={{ flexShrink: 0 }} onClick={acceptAutoroute} disabled={!ar.result.traces.length && !ar.result.moves?.length}>接受</button>
+            <button className="btn sm" style={{ flexShrink: 0 }} onClick={cancelAutoroute}>放弃</button>
           </div>
+          <div className="dim">紫色虚线为建议，接受后可 Undo{ar.result.moves?.length ? ` · 建议微调 ${ar.result.moves.length} 个器件（${ar.result.moves.map(m => m.ref).join('、')}）` : ''}</div>
           {ar.result.failed.length > 0 && (
             <div className="col" style={{ gap: 2, fontSize: 11.5 }}>
               {[...new Map(ar.result.failed.map((f) => [f.net + f.reason, f])).values()].slice(0, 6).map((f, i) => <div key={i} className="row" style={{ gap: 6 }}><span style={{ color: 'var(--warning)' }}>⚠</span><span className="mono">{f.net || '无网络'}</span><span className="muted">{f.reason}</span></div>)}

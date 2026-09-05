@@ -1,5 +1,5 @@
-import { pcb, sch, diffBoardFromSchematic, syncBoardDetailed } from '@tracelet/kernel';
-import { exportProjectFile, backupAllProjects, importProjectFiles } from '../store/backup.js';
+import { pcb, sch, diffBoardFromSchematic, syncBoardDetailed, exportSchematicPdf, exportAssemblyPdf } from '@tracelet/kernel';
+import { exportProjectFile, backupAllProjects, downloadFile, slug, importProjectFiles } from '../store/backup.js';
 import { useRef } from 'react';
 import { useApp, useEditor, useProject, type Screen } from '../store/app.js';
 import { Icon } from './Icon.js';
@@ -58,6 +58,8 @@ export function TopBar() {
             <div className="menu-item" onClick={() => { set('projMenuOpen', false); fileRef.current?.click(); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇪</span>{t('proj.import')}</div>
             <div className="menu-item" onClick={() => { set('projMenuOpen', false); exportProjectFile(project); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇩</span>{t('proj.export')}</div>
             <div className="menu-item" onClick={() => { set('projMenuOpen', false); void backupAllProjects().then((n) => toast(`已备份 ${n} 个项目`, 'success')); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⧉</span>{t('proj.backup')}</div>
+            <div className="menu-item" title="矢量 PDF，每页一张图纸；标准字体不含中文，中文以 ? 显示" onClick={() => { set('projMenuOpen', false); downloadFile(`${slug(project.name)}-schematic.pdf`, exportSchematicPdf(project), 'application/pdf'); toast('已导出原理图 PDF', 'success'); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇩</span>导出原理图 PDF</div>
+            <div className="menu-item" title="顶层 / 底层装配图（位号 + 外形）" onClick={() => { set('projMenuOpen', false); downloadFile(`${slug(project.name)}-assembly.pdf`, exportAssemblyPdf(project), 'application/pdf'); toast('已导出装配图 PDF', 'success'); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇩</span>导出装配图 PDF</div>
             <input ref={fileRef} type="file" accept=".json,.zip,.kicad_sch,.kicad_pcb,.kicad_pro" multiple hidden onChange={(e) => { const fs = e.target.files; if (fs?.length) void importProjectFiles(Array.from(fs)); e.target.value = ''; }} />
             <div className="menu-sep" />
             <div className="menu-item" onClick={() => { const n = prompt('项目名', project.name); if (n && n !== project.name) editor.dispatch(sch.renameProject(n)); set('projMenuOpen', false); }}><span style={{ width: 14 }} />重命名</div>

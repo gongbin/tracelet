@@ -95,6 +95,10 @@ export function setComponentFootprint(sheetId: string, id: string, footprint: st
   return command('修改封装', (proj) => updateSheet(proj, sheetId, (s) => ({ ...s, components: s.components.map((c) => (c.id === id ? { ...c, footprint } : c)) })));
 }
 
+/** 替换元件的自定义属性表（mpn / lcsc / datasheet / 任意键值）。 */
+export function setComponentProps(sheetId: string, id: string, props: Record<string, string>): Command {
+  return command('修改属性', (proj) => updateSheet(proj, sheetId, (s) => ({ ...s, components: s.components.map((c) => (c.id === id ? { ...c, props: { ...props } } : c)) })));
+}
 export function setComponentRef(sheetId: string, id: string, ref: string): Command {
   return command('修改位号', (proj) => updateSheet(proj, sheetId, (s) => ({ ...s, components: s.components.map((c) => (c.id === id ? { ...c, ref } : c)) })));
 }
@@ -174,6 +178,12 @@ export function deleteJunctions(sheetId: string, ids: string[]): Command {
 }
 export function addBus(sheetId: string, points: Vec[]): Command {
   return command('总线', (proj) => updateSheet(proj, sheetId, (s) => ({ ...s, buses: [...(s.buses ?? []), { id: newId('b'), points }] })));
+}
+export function setBusPoints(sheetId: string, id: string, points: Vec[]): Command {
+  return command('移动总线', (proj) => updateSheet(proj, sheetId, (s) => ({ ...s, buses: (s.buses ?? []).map((b) => (b.id === id ? { ...b, points } : b)) })));
+}
+export function moveJunction(sheetId: string, id: string, at: Vec): Command {
+  return command('移动结点', (proj) => updateSheet(proj, sheetId, (s) => ({ ...s, junctions: s.junctions.map((j) => (j.id === id ? { ...j, x: at.x, y: at.y } : j)) })));
 }
 export function deleteBuses(sheetId: string, ids: string[]): Command {
   const set = new Set(ids);

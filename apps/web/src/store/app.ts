@@ -10,6 +10,7 @@ export type PcbTool = 'select' | 'route' | 'via' | 'zone' | 'place' | 'edge' | '
 export type RightTab = 'props' | 'layers' | 'lib' | 'check' | 'ai' | '3d';
 
 export interface Placing { symbolId: string; value: string; footprint: string; props?: Record<string, string>; rotation: number; partLabel?: string }
+export interface PcbPlacing { footprintId: string; label: string; rotation: number }
 export interface Routing { points: Vec[]; net: string; layer: CopperLayer; width: number; startPad?: { footprintId: string; number: string } }
 export interface Toast { id: number; text: string; kind?: 'info' | 'error' | 'success' }
 
@@ -54,7 +55,15 @@ export interface AppState {
   zoneDraft: Vec[] | null;
   outlineDraft: Vec[] | null;
   measure: Vec[] | null;
-  autoroute: { status: 'idle' | 'running' | 'done'; result: AutorouteResult | null };
+  /** 仅板级封装放置（定位孔 / 基准点 / Logo） */
+  pcbPlacing: PcbPlacing | null;
+  /** 栅格与走线 / 过孔覆盖（null = 跟随网络类） */
+  pcbGrid: number;
+  schGrid: number;
+  traceWidthOverride: number | null;
+  viaOverride: { size: number; drill: number } | null;
+  favorites: string[];
+  autoroute: { status: 'idle' | 'running' | 'done'; result: AutorouteResult | null; copperCount?: 2 | 4; progress?: { done: number; total: number; net: string } };
   otherLayerOpacity: number;
   highlightNet: string | null;
   checkHighlight: string | null;
@@ -77,8 +86,10 @@ export interface AppState {
   stopPlacing(): void;
   setPcbTool(t: PcbTool): void;
   setLayerHidden(layer: Layer, hidden: boolean): void;
+  toggleFavorite(id: string): void;
 }
 
+function loadFavorites(): string[] { try { return JSON.parse(localStorage.getItem('tracelet:favorites') ?? '[]') as string[]; } catch { return []; } }
 let toastSeq = 0;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let unsubscribe: (() => void) | null = null;
@@ -122,6 +133,12 @@ export const useApp = create<AppState>((set, get) => ({
   zoneDraft: null,
   outlineDraft: null,
   measure: null,
+  pcbPlacing: null,
+  pcbGrid: 0.25,
+  schGrid: 100,
+  traceWidthOverride: null,
+  viaOverride: null,
+  favorites: loadFavorites(),
   autoroute: { status: 'idle', result: null },
   otherLayerOpacity: 0.4,
   highlightNet: null,
@@ -147,12 +164,12 @@ export const useApp = create<AppState>((set, get) => ({
         try { await get().store.save(editor.project); set({ lastSavedAt: Date.now(), saving: false }); } catch (e) { set({ saving: false }); get().toast(`保存失败：${(e as Error).message}`, 'error'); }
       }, 600);
     });
-    set({ editor, screen: 'sch', rightTab: null, selection: [], pcbSelection: [], placing: null, pendingPin: null, routing: null, schTool: 'select', pcbTool: 'select', lastSavedAt: Date.now(), projMenuOpen: false, wizardOpen: false, highlightNet: null, checkHighlight: null, sheetId: p.schematic.sheets[0].id, wireDraft: null, busDraft: null, drawDraft: null, pasting: null });
+    set({ editor, autoroute: { status: 'idle', result: null }, screen: 'sch', rightTab: null, selection: [], pcbSelection: [], placing: null, pendingPin: null, routing: null, schTool: 'select', pcbTool: 'select', lastSavedAt: Date.now(), projMenuOpen: false, wizardOpen: false, highlightNet: null, checkHighlight: null, sheetId: p.schematic.sheets[0].id, wireDraft: null, busDraft: null, drawDraft: null, pasting: null });
     void get().store.save(p).then(() => get().refreshProjects());
   },
   closeProject() {
     unsubscribe?.(); unsubscribe = null;
-    set({ editor: null, screen: 'home', projMenuOpen: false });
+    set({ editor: null, autoroute: { status: 'idle', result: null }, screen: 'home', projMenuOpen: false });
     void get().refreshProjects();
   },
   async deleteProject(id) {
@@ -160,7 +177,7 @@ export const useApp = create<AppState>((set, get) => ({
     await get().refreshProjects();
   },
   go(screen) {
-    set({ screen, rightTab: null, projMenuOpen: false, hoverTool: -1, pwrMenuOpen: false, placing: null, pendingPin: null, routing: null, zoneDraft: null, outlineDraft: null, measure: null, labelPrompt: null, wireDraft: null, busDraft: null, drawDraft: null, pasting: null, drawMenuOpen: false, cursorWorld: { x: 0, y: 0 } });
+    set({ screen, rightTab: null, projMenuOpen: false, hoverTool: -1, pwrMenuOpen: false, placing: null, pcbPlacing: null, pendingPin: null, routing: null, zoneDraft: null, outlineDraft: null, measure: null, labelPrompt: null, wireDraft: null, busDraft: null, drawDraft: null, pasting: null, drawMenuOpen: false, cursorWorld: { x: 0, y: 0 } });
   },
   set(key, value) { set({ [key]: value } as Partial<AppState>); },
   patch(p) { set(p); },
@@ -179,7 +196,12 @@ export const useApp = create<AppState>((set, get) => ({
   },
   startPlacing(p) { set({ placing: p, schTool: 'place', pendingPin: null, pwrMenuOpen: false, labelPrompt: null }); },
   stopPlacing() { set({ placing: null, schTool: 'select' }); },
-  setPcbTool(t) { set({ pcbTool: t, routing: null, zoneDraft: null, outlineDraft: null, measure: null }); },
+  setPcbTool(t) { set({ pcbTool: t, routing: null, zoneDraft: null, outlineDraft: null, measure: null, ...(t === 'place' ? { rightTab: 'lib' as RightTab } : { pcbPlacing: null }) }); },
+  toggleFavorite(id) {
+    const next = get().favorites.includes(id) ? get().favorites.filter((x) => x !== id) : [...get().favorites, id];
+    try { localStorage.setItem('tracelet:favorites', JSON.stringify(next)); } catch { /* ignore */ }
+    set({ favorites: next });
+  },
   setLayerHidden(layer, hidden) {
     const ed = get().editor; if (!ed) return;
     ed.dispatch(pcb.setLayerHidden(layer, hidden));

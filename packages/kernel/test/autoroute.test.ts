@@ -65,7 +65,8 @@ describe('自动布线：更密的板', () => {
     const r = autoroute(ed.project.board, rules);
     ed.dispatch(pcb.applyRoutes(r.traces, r.vias));
     const rep = runDrc(ed.project.board, rules);
-    expect(rep.items.filter((i) => i.rule === 'clearance').map((i) => i.message + ' ' + i.refs.join(','))).toEqual([]);
+    const cl = rep.items.filter((i) => i.rule === 'clearance').map((i) => i.message + ' ' + i.refs.join(','));
+    expect(cl, JSON.stringify(cl)).toEqual([]);
     expect(r.failed.length, JSON.stringify(r.failed)).toBeLessThanOrEqual(1);
     expect(computeRatsnest(ed.project.board, rules).unrouted).toBe(r.failed.length);
     for (const t of r.traces) for (let i = 0; i < t.points.length - 1; i++) { const a = t.points[i], b = t.points[i + 1]; const ang = Math.abs(Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI); const k = ang % 45; expect(Math.min(k, 45 - k), `${t.net} seg ${i} ${ang.toFixed(1)}°`).toBeLessThan(0.5); }

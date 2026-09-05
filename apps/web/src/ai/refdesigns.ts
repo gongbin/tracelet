@@ -31,13 +31,14 @@ export function searchCatalog(q: string): RefDesign[] {
 export async function searchReferenceDesigns(cfg: AiConfig, query: string): Promise<RefDesign[]> {
   const client = createClient(cfg);
   try {
-    const response = await client.messages.create({
+    // 流式：联网搜索 + 长输出时非流式请求可能被 SDK 以“可能超过 10 分钟”拒绝
+    const response = await client.messages.stream({
       model: cfg.model,
       max_tokens: 16000,
       thinking: { type: 'adaptive' },
       tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 5 }],
       messages: [{ role: 'user', content: `请搜索「${query}」的官方参考设计 / 开发板 / 模块原理图 PDF（优先芯片或模块厂商官网、其次知名开源硬件项目）。找到后只输出一个 JSON 数组，不要其他文字，每项：{"title":"","vendor":"","url":"直接指向 PDF 的链接","note":"可选说明"}。最多 8 条，url 必须是 http(s) 链接。` }]
-    });
+    }).finalMessage();
     const text = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('\n');
     const m = /\[[\s\S]*\]/.exec(text);
     if (!m) return [];
