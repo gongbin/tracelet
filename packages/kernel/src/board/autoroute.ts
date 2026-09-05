@@ -49,6 +49,8 @@ export interface AutorouteOptions {
   corridorDilate?: number;
   /** 推挤：0 关闭，1 单级，3 级联（默认 1） */
   shove?: 0 | 1 | 3;
+  /** 布通后的过孔 / 长度优化（默认开） */
+  optimize?: boolean;
 }
 
 export interface AutorouteResult {
@@ -113,7 +115,9 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   const bb = boardBounds(board);
   const W = Math.ceil(bb.w / g) + 1, H = Math.ceil(bb.h / g) + 1;
   const N = W * H;
-  const viaCost = opts.viaCost ?? Math.round(3 / g);
+  const viaCostBase = opts.viaCost ?? Math.round(3 / g);
+  let viaScale = 1; // 优化阶段临时调高过孔代价
+  const viaCost = () => viaCostBase * viaScale;
   const maxNodes = opts.maxNodes ?? Math.max(200000, Math.min(1500000, N * L));
   const maxRounds = opts.maxRounds ?? 10;
   const deadline = t0 + (opts.timeBudgetMs ?? 90000);
@@ -398,7 +402,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
         const vc = mode === 'strict' ? (layers.every((layer) => dyn.free(toWorld(x, y), viaSize / 2, layer, net, clearance)) ? 0 : -1) : mode === 'soft' ? layers.filter((layer) => !dyn.free(toWorld(x, y), viaSize / 2, layer, net, clearance)).length : viaConflict(x, y);
         if (vc >= 0 && !(mode === 'strict' && vc)) for (let nl = 0; nl < L; nl++) {
           if (nl === l) continue;
-          const ni = idx(x, y, nl); const ng = gi + viaCost + (vc ? (mode === 'soft' ? pf * vc * 3 : pf * vc * (1 + hist[ni])) : 0) + (corridor && !inCorridor(x, y, nl) ? viaCost : 0);
+          const ni = idx(x, y, nl); const ng = gi + viaCost() + (vc ? (mode === 'soft' ? pf * vc * 3 : pf * vc * (1 + hist[ni])) : 0) + (corridor && !inCorridor(x, y, nl) ? viaCost() : 0);
           if (ng < gScore[ni]) { gScore[ni] = ng; came[ni] = i; heap.push(ng + h(x, y), ni); }
         }
       }
@@ -667,6 +671,8 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     unmarkNet(nr); nr.routes.push(cand); nr.failures.delete(cand.key); markNet(nr); routedLines++;
     return true;
   };
+  /** 调试：全板新走线几何自检。 */
+  const auditAll = (label: string) => { if (!opts.debug || !(typeof process !== 'undefined' && process.env?.TRACELET_OPT_CHECK)) return; const bad: string[] = []; for (const y of nets.values()) { const sf = makeSafe(y.net, clearanceOf(y.net)); for (const rr of y.routes) for (const tr of rr.traces) for (let i = 1; i < tr.points.length; i++) if (!sf(tr.points[i - 1], tr.points[i], tr.width / 2, [tr.layer], [], [], true)) { const nd = dyn.nearest(tr.points[i - 1], tr.points[i], tr.layer, y.net); bad.push(`${y.net} vs ${nd?.net} d=${nd?.d.toFixed(3)}`); } } opts.debug({ audit: label, bad: bad.slice(0, 4), count: bad.length }); };
   // 第 0 阶段：全局路由——粗网格协商拥塞，得到每个网络的走廊（含层分配）；细节布线先在走廊内搜索
   let corridors: Map<string, Uint8Array> | undefined;
   // 目前实测（door 板）走廊约束不优于直接细节布线，默认关闭；保留为实验开关，供后续换成按轨道数计容量 + 走廊内协商细节布线
@@ -683,6 +689,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   // 第 1 阶段：全部网络严格布线（全局最短飞线优先）
   routeGroup([...nets.values()], 'strict', 0);
   const phase1Ms = Date.now() - t0;
+  auditAll('phase1');
   opts.debug?.({ phase1: true, t: phase1Ms });
   /** 挡在失败飞线附近的网络（端点 2.5mm 内或直连线走廊 1mm 内有其新走线）。 */
   const blockersOf = (failedNets: NetRoutes[], radius = 2.5): NetRoutes[] => {
@@ -712,19 +719,20 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     const blockers = (probe.crossed ?? []).map((n) => nets.get(n)).filter((x): x is NetRoutes => !!x && x !== nr);
     if (!blockers.length) { unmarkNet(nr); routeGroup([nr], 'strict', 0); continue; }
     // 先试推挤：把挡路走线的线段垂直平移一点点（≤0.6mm），比拆线重布温和；成功就直接采用探测路径
-    if (tryShove(nr, probe.route)) { rounds++; opts.debug?.({ shove: line.net, t: Date.now() - t0, blockers: blockers.map((b) => b.net) }); continue; }
+    if (tryShove(nr, probe.route)) { rounds++; opts.debug?.({ shove: line.net, t: Date.now() - t0, blockers: blockers.map((b) => b.net) }); auditAll(`shove ${line.net}`); continue; }
     if (blockers.length > 8) continue;
     rounds++;
     opts.debug?.({ pass: iter, t: Date.now() - t0, line: `${line.net} ${Math.hypot(line.a.x - line.b.x, line.a.y - line.b.y).toFixed(1)}mm`, blockers: blockers.map((b) => b.net) });
     const before = remainingLines().length;
     const subset = [nr, ...blockers];
-    const snapshot = new Map(subset.map((x) => [x, { routes: x.routes, failures: new Map(x.failures) }]));
+    const snapshot = new Map(subset.map((x) => [x, { routes: [...x.routes], failures: new Map(x.failures) }]));
     for (const x of blockers) ripNet(x);
     unmarkNet(nr);
     routeGroup(subset, 'strict', 0, new Set([nr.net]));
     const after = remainingLines().length;
     opts.debug?.({ result: line.net, before, after, stillFailing: subset.filter(retryable).map((x) => `${x.net}:${[...x.failures.values()][0]?.slice(0, 12)}`) });
     if (after >= before) for (const [x, snap] of snapshot) { ripNet(x); x.routes = snap.routes; x.failures = snap.failures; markNet(x); }
+    auditAll(`pass${iter} ${line.net}`);
   }
   void blockersOf;
   // 收尾：剩余飞线在最终布局上再各试一次（前面失败时的局面可能已经变了）
@@ -737,13 +745,44 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     opts.debug?.({ full: attempt, t: Date.now() - t0, failed: failedNets.map((n) => n.net) });
     const before = remainingLines().length;
     const all = [...nets.values()];
-    const snapshot = new Map(all.map((nr) => [nr, { routes: nr.routes, failures: new Map(nr.failures) }]));
+    const snapshot = new Map(all.map((nr) => [nr, { routes: [...nr.routes], failures: new Map(nr.failures) }]));
     for (const nr of all) ripNet(nr);
     routeGroup(all, 'strict', 0, new Set(failedNets.map((n) => n.net)));
     const after = remainingLines().length;
     if (after >= before) { for (const [nr, snap] of snapshot) { ripNet(nr); nr.routes = snap.routes; nr.failures = snap.failures; markNet(nr); } break; }
   }
   let stuck: NetRoutes[] = [];
+  // 优化阶段：逐条重布已布通的连接（其他一切为障碍），过孔代价 ×3 —— 过孔更少或明显更短才替换
+  const routeLen = (r: Route) => r.traces.reduce((n, t) => { for (let i = 1; i < t.points.length; i++) n += Math.hypot(t.points[i].x - t.points[i - 1].x, t.points[i].y - t.points[i - 1].y); return n; }, 0);
+  if (opts.optimize !== false) {
+    const optDeadline = Math.min(deadline, Date.now() + Math.max(2000, Math.min(8000, (opts.timeBudgetMs ?? 90000) / 10)));
+    let improvedVias = 0, improvedLen = 0;
+    const candidates: { x: NetRoutes; r: Route }[] = [];
+    for (const x of nets.values()) for (const r of x.routes) candidates.push({ x, r });
+    candidates.sort((a, b) => b.r.vias.length - a.r.vias.length || routeLen(b.r) - routeLen(a.r));
+    viaScale = 3;
+    for (const { x, r } of candidates) {
+      if (Date.now() > optDeadline) break;
+      if (!r.vias.length && routeLen(r) < 8) continue;
+      const before = remainingLines().length;
+      x.routes = x.routes.filter((q) => q !== r); markNet(x);
+      const conn = computeRatsnest(netBoard(x.net), rules, fillsOf(x.net));
+      const missing = conn.lines.filter((l) => l.net === x.net && netFilter(l));
+      let replaced = false;
+      if (missing.length === 1) {
+        const alt = routeLine(missing[0], 'strict', 0, conn);
+        if (alt.route) {
+          const better = alt.route.vias.length < r.vias.length ? routeLen(alt.route) <= routeLen(r) * 1.25 + 1 : alt.route.vias.length === r.vias.length && routeLen(alt.route) < routeLen(r) * 0.92;
+          if (better) { x.routes.push(alt.route); markNet(x); const after = remainingLines().length; opts.debug?.({ swap: x.net, line: missing[0].net, before, after, viasOld: r.vias.length, viasNew: alt.route.vias.length });
+            if (opts.debug && (typeof process !== 'undefined' && process.env?.TRACELET_OPT_CHECK)) { const bad: string[] = []; for (const y of nets.values()) { const sf = makeSafe(y.net, clearanceOf(y.net)); for (const rr of y.routes) for (const tr of rr.traces) for (let i = 1; i < tr.points.length; i++) if (!sf(tr.points[i - 1], tr.points[i], tr.width / 2, [tr.layer], [], [], true)) { const nd = dyn.nearest(tr.points[i - 1], tr.points[i], tr.layer, y.net); bad.push(`${y.net}${rr === alt.route ? '(alt)' : ''} vs ${nd?.net} d=${nd?.d.toFixed(3)}`); } } if (bad.length) opts.debug({ afterSwapInvalid: x.net, bad: bad.slice(0, 5) }); }
+            if (after <= before) { replaced = true; if (alt.route.vias.length < r.vias.length) improvedVias += r.vias.length - alt.route.vias.length; else improvedLen++; } else { x.routes = x.routes.filter((q) => q !== alt.route); } }
+        }
+      }
+      if (!replaced) { x.routes.push(r); markNet(x); }
+    }
+    viaScale = 1;
+    opts.debug?.({ optimize: true, t: Date.now() - t0, viasRemoved: improvedVias, shortened: improvedLen, remaining: remainingLines().length });
+  }
   // 最终几何校验（保守栅格标记之外的漏网之鱼）：不合格的网络严格重布一次
   for (let pass = 0; pass < 2; pass++) {
     const invalid: NetRoutes[] = [];
@@ -754,6 +793,12 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       const ok = nr.routes.every((r) => r.traces.every((tr) => tr.points.slice(1).every((b, i) => safe(tr.points[i], b, tr.width / 2, [tr.layer], extraT, extraV))) && r.vias.every((v) => safe(v, v, v.size / 2, layers, extraT, extraV)));
       if (!ok) invalid.push(nr);
     }
+    if (opts.debug) for (const nr of invalid.slice(0, 3)) {
+      const safe = makeSafe(nr.net, clearanceOf(nr.net));
+      for (const r of nr.routes) { for (const tr of r.traces) for (let i = 1; i < tr.points.length; i++) if (!safe(tr.points[i - 1], tr.points[i], tr.width / 2, [tr.layer], [], [], true)) { const nd = dyn.nearest(tr.points[i - 1], tr.points[i], tr.layer, nr.net), ns = space.nearest(tr.points[i - 1], tr.points[i], tr.layer, nr.net); opts.debug({ finalInvalid: nr.net, seg: `${tr.points[i - 1].x.toFixed(2)},${tr.points[i - 1].y.toFixed(2)}→${tr.points[i].x.toFixed(2)},${tr.points[i].y.toFixed(2)} w${tr.width} ${tr.layer}`, dyn: nd ? `${nd.net} d=${nd.d.toFixed(3)} ${nd.geom}` : '-', static: ns ? `${ns.net} d=${ns.d.toFixed(3)} ${ns.geom}` : '-' }); }
+        for (const v of r.vias) if (!safe(v, v, v.size / 2, layers, [], [], true)) opts.debug({ finalInvalidVia: nr.net, via: `${v.x.toFixed(2)},${v.y.toFixed(2)}`, dyn: layers.map((l) => { const nd = dyn.nearest(v, v, l, nr.net); return nd ? `${l}:${nd.net} d=${nd.d.toFixed(3)}` : '-'; }).join(' ') }); }
+    }
+    opts.debug?.({ finalValidation: pass, invalid: invalid.map((n) => n.net), remaining: remainingLines().length });
     if (!invalid.length) break;
     for (const nr of invalid) ripNet(nr);
     for (const nr of invalid) { routeNet(nr.net, 'strict', 0); markNet(nr); }
@@ -789,6 +834,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       tr.points = simplify(out);
     }
   }
+  opts.debug?.({ afterChamfer: true, remaining: remainingLines().length });
   // ---------- 汇总 ----------
   for (const nr of nets.values()) for (const r of nr.routes) { result.traces.push(...r.traces); result.vias.push(...r.vias); }
   const remaining = remainingLines();
