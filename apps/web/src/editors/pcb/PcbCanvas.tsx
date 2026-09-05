@@ -326,6 +326,37 @@ export function PcbCanvas() {
     stopAutoroute(); sourceBoardRef.current = null;
     useApp.getState().patch({ autoroute: { status: 'idle', result: null } });
   };
+  // ---- 布局优化（Worker）----
+  const placementWorker = useRef<Worker | null>(null);
+  const placementBoardRef = useRef<typeof board | null>(null);
+  const cancelPlacement = () => { placementWorker.current?.terminate(); placementWorker.current = null; placementBoardRef.current = null; useApp.getState().patch({ placement: { status: 'idle', result: null } }); };
+  const runPlacement = () => {
+    cancelPlacement();
+    const snapshot = editor.project; placementBoardRef.current = snapshot.board;
+    app.patch({ placement: { status: 'running', result: null, stage: '整理布局中…' } });
+    try {
+      const w = new Worker(new URL('./autoroute.worker.ts', import.meta.url), { type: 'module' });
+      placementWorker.current = w;
+      w.onmessage = (ev: MessageEvent<{ type: string; stage?: string; result?: import('@tracelet/kernel').PlacementResult; message?: string }>) => {
+        if (placementWorker.current !== w) return;
+        const m = ev.data;
+        if (m.type === 'stage') app.patch({ placement: { ...useApp.getState().placement, stage: m.stage } });
+        else if (m.type === 'placement' && m.result) { placementWorker.current = null; app.patch({ placement: { status: 'done', result: m.result } }); if (m.result.rejected) app.toast(m.result.rejected); else if (!m.result.moves.length) app.toast('当前布局已经不错，没有需要移动的器件'); }
+        else if (m.type === 'error') { app.toast(`布局优化失败：${m.message}`, 'error'); cancelPlacement(); }
+      };
+      w.onerror = () => { app.toast('布局优化失败（Worker）', 'error'); cancelPlacement(); };
+      w.postMessage({ kind: 'placement', board: snapshot.board, rules: analysis.rules, library: snapshot.library, placementOpts: { timeBudgetMs: 3000, routeBudgetMs: 20000 } });
+    } catch { app.toast('浏览器不支持 Worker，无法运行布局优化', 'error'); cancelPlacement(); }
+  };
+  const acceptPlacement = () => {
+    const r = app.placement.result; if (!r || !r.moves.length) return;
+    if (placementBoardRef.current !== editor.project.board) { cancelPlacement(); app.toast('板子已修改，请重新优化布局'); return; }
+    editor.dispatch(pcb.applyPlacementMoves(r.moves));
+    app.patch({ placement: { status: 'idle', result: null } });
+    app.toast(`已应用布局优化：移动 ${r.moves.length} 个器件（可 Undo）· 接下来可以自动布线`, 'success');
+  };
+  useEffect(() => { if (app.placementSeq > 0) runPlacement(); return () => { placementWorker.current?.terminate(); }; // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app.placementSeq]);
   // Board edits (including layer changes and Undo) invalidate the proposed geometry.
   useEffect(() => {
     if (sourceBoardRef.current && sourceBoardRef.current !== board) cancelAutoroute();
@@ -510,6 +541,17 @@ export function PcbCanvas() {
               <circle cx={a.x} cy={a.y} r={0.2} fill="#FFD84D" /><circle cx={b.x} cy={b.y} r={0.2} fill="#FFD84D" />
               <g transform={`translate(${(a.x + b.x) / 2 + 0.5} ${(a.y + b.y) / 2 - 0.5})`}><rect x={0} y={-1.4} width={11} height={1.8} rx={0.2} fill="#16181D" opacity={0.9} /><text x={0.4} y={0} fontSize={1.1} fill="#FFD84D">{`${fmt(d)}mm ΔX ${fmt(Math.abs(b.x - a.x))} ΔY ${fmt(Math.abs(b.y - a.y))}`}</text></g>
             </g>); })()}
+          {/* 布局优化建议 */}
+          {app.placement.status === 'done' && app.placement.result && app.placement.result.moves.map((m) => {
+            const original = board.footprints.find((fp) => fp.id === m.id); if (!original) return null;
+            const proposed = { ...original, x: m.x, y: m.y, rotation: m.rotation ?? original.rotation }, b = footprintBody(proposed);
+            return <g key={m.id} stroke="#F0A040" fill="none" pointerEvents="none">
+              <path d={`M${m.from.x} ${m.from.y}L${m.x} ${m.y}`} strokeWidth={0.12} strokeDasharray=".3 .2" />
+              <rect x={b.x} y={b.y} width={b.w} height={b.h} strokeWidth={0.15} strokeDasharray=".4 .2" fill="rgba(240,160,64,.08)" />
+              {footprintPads(proposed, board).map((p, i) => <rect key={i} x={p.rect.x} y={p.rect.y} width={p.rect.w} height={p.rect.h} strokeWidth={0.1} />)}
+              <text x={m.x} y={b.y - 0.3} fontSize={0.9} fill="#F0A040" stroke="none" textAnchor="middle">{m.ref}</text>
+            </g>;
+          })}
           {/* 自动布线建议 */}
           {ar.status === 'done' && ar.result && (
             <g pointerEvents="none" opacity={0.95}>
@@ -579,6 +621,18 @@ export function PcbCanvas() {
           <span className="dim">{app.outlineDraft?.length ? `新板框已 ${app.outlineDraft.length} 点 · 双击闭合 · Esc 取消` : '拖板内 = 移动 · 拖顶点 = 调整 · 点板外 = 画新板框'}</span>
         </div>
       )}
+      {app.placement.status === 'running' && (
+        <div className="banner" style={{ width: 'max-content', gap: 8 }}><span className="spinner" /><span>布局优化 · {app.placement.stage ?? '整理中…'}</span><button className="btn sm" onClick={cancelPlacement}>取消</button></div>
+      )}
+      {app.placement.status === 'done' && app.placement.result && (() => { const r = app.placement.result!; return (
+        <div className="banner" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6, whiteSpace: 'normal', width: 'min(620px, calc(100% - 24px))', borderColor: '#F0A040' }}>
+          <div className="row" style={{ gap: 10 }}>
+            <span style={{ flex: 1, minWidth: 0, lineHeight: 1.6 }}>{r.rejected ? '布局优化：新布局没有让布线变好，已放弃' : `布局优化建议：移动 ${r.moves.length} 个器件 · 飞线 ${r.before.hpwl} → ${r.after.hpwl} mm · 去耦距离 ${r.before.decouplingAvg} → ${r.after.decouplingAvg} mm${r.routing ? ` · 试布线 ${r.routing.before.routed}/${r.routing.before.total} → ${r.routing.after.routed}/${r.routing.after.total}，过孔 ${r.routing.before.vias} → ${r.routing.after.vias}` : ''}`}</span>
+            {!r.rejected && r.moves.length > 0 && <button className="btn sm primary" style={{ flexShrink: 0 }} onClick={acceptPlacement}>接受</button>}
+            <button className="btn sm" style={{ flexShrink: 0 }} onClick={cancelPlacement}>{r.rejected || !r.moves.length ? '关闭' : '放弃'}</button>
+          </div>
+          <div className="dim">橙色虚线为建议位置；不动锁定件、连接器、安装孔和已布线的器件。接受后可 Undo。</div>
+        </div>); })()}
       {ar.status === 'running' && (
         <div className="banner" style={{ width: 'max-content', maxWidth: 'calc(100% - 24px)', flexWrap: 'nowrap', gap: 8 }}><span className="spinner" /><span>自动布线中 · {ar.copperCount ?? board.copperCount} 层板</span><span className="mono" style={{ flex: '0 0 auto', width: '9ch', fontVariantNumeric: 'tabular-nums' }}>{ar.progress?.done ?? 0}/{ar.progress?.total ?? analysis.ratsnest.unrouted}</span><span className="dim" title={ar.progress?.net || '准备中'} style={{ flex: '0 1 auto', width: '12ch', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ar.progress?.net || '准备中'}</span>
           <span style={{ flex: '0 1 auto', width: 120, minWidth: 40, height: 3, borderRadius: 2, background: 'var(--border)', overflow: 'hidden', display: 'inline-block' }}><span style={{ display: 'block', width: `${ar.progress && ar.progress.total ? (100 * ar.progress.done) / ar.progress.total : 0}%`, height: '100%', background: 'var(--accent)' }} /></span>

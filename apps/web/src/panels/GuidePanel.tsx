@@ -1,4 +1,4 @@
-import { pcb, getSymbol, boardBounds, DEFAULT_STACKUP } from '@tracelet/kernel';
+import { pcb, getSymbol, boardBounds, DEFAULT_STACKUP, checkPlacement } from '@tracelet/kernel';
 import { useApp, useEditor, useProject, useSheet } from '../store/app.js';
 import { getAnalysis } from '../store/analysis.js';
 import { locateItem } from './CheckPanel.js';
@@ -23,6 +23,8 @@ export function GuidePanel() {
   const hasVersion = b.texts.some((t) => /v\d/i.test(t.text));
   const holes = b.footprints.filter((f) => !f.componentId && /^H\d/.test(f.ref)).length;
   const pendingSync = comps.length !== b.footprints.filter((f) => f.componentId).length;
+  const placementIssues = b.footprints.length ? checkPlacement(b, a.rules) : [];
+  const placementErrors = placementIssues.filter((i) => i.severity === 'error'), placementWarns = placementIssues.filter((i) => i.severity !== 'error');
   const st = { ...DEFAULT_STACKUP, ...(b.stackup ?? {}) };
   const go = (screen: 'sch' | 'pcb' | '3d' | 'fab') => { if (app.screen !== screen) app.go(screen); };
 
@@ -46,7 +48,7 @@ export function GuidePanel() {
   ];
   const pcbSteps: Step[] = [
     { title: '板框与尺寸', status: b.outline.length >= 3 ? 'done' : 'todo', detail: `${bb.w.toFixed(1)} × ${bb.h.toFixed(1)} mm · ${b.copperCount} 层 · ${b.thickness} mm`, actions: [{ label: 'E 板框工具', run: () => { go('pcb'); app.setPcbTool('edge'); } }, { label: '层叠', run: () => { go('pcb'); app.set('rightTab', 'layers'); } }], tip: '先定板框和安装孔位置，再布局；「适配内容」可让板框自动包住元件。' },
-    { title: '元件布局', status: !b.footprints.length ? 'skip' : drcBy('outside-board').length || drcBy('courtyard-overlap').length ? 'todo' : 'done', detail: drcBy('outside-board').length ? `${drcBy('outside-board').length} 个元件在板外` : drcBy('courtyard-overlap').length ? `${drcBy('courtyard-overlap').length} 处元件重叠` : '没有重叠，全部在板内', actions: (drcBy('outside-board')[0] ?? drcBy('courtyard-overlap')[0]) ? [{ label: '定位', run: () => locateItem((drcBy('outside-board')[0] ?? drcBy('courtyard-overlap')[0])!, 'pcb') }] : undefined, tip: '连接器放板边、去耦电容贴近芯片电源脚、晶振靠近 MCU；R 旋转、F 翻面、L 对齐。' },
+    { title: '元件布局', status: !b.footprints.length ? 'skip' : placementErrors.length ? 'todo' : placementWarns.length ? 'warn' : 'done', detail: placementErrors.length ? `${placementErrors.length} 处重叠 / 出板` : placementWarns.length ? `${placementWarns.length} 条建议（去耦 / 间距 / 干扰 / 对齐）` : '布局检查通过', actions: [{ label: '优化布局（预览）', primary: placementErrors.length > 0 || placementWarns.length > 2, run: () => { go('pcb'); app.set('placementSeq', app.placementSeq + 1); } }, ...(placementIssues[0]?.location ? [{ label: '定位第一条', run: () => { go('pcb'); app.patch({ flyTo: { x: placementIssues[0].location!.x, y: placementIssues[0].location!.y, space: 'pcb', seq: Date.now() } }); } }] : [])], tip: placementIssues.slice(0, 3).map((i) => `${i.severity === 'error' ? '●' : '·'} ${i.message}${i.suggestion ? '，' + i.suggestion : ''}`).join('\n') || '连接器放板边、去耦电容贴近芯片电源脚、晶振靠近 MCU；R 旋转、F 翻面、L 对齐。' },
     { title: '安装孔', status: holes ? 'done' : 'warn', detail: holes ? `${holes} 个` : '还没有螺丝孔（如果板子要固定）', actions: [{ label: 'H 开孔', run: () => { go('pcb'); app.setPcbTool('hole'); } }] },
     { title: '布线', status: !b.footprints.length ? 'skip' : a.ratsnest.unrouted ? 'todo' : 'done', detail: a.ratsnest.unrouted ? `还有 ${a.ratsnest.unrouted} / ${a.ratsnest.total} 条连接未布线` : `${a.ratsnest.total} 条连接已全部布通`, actions: a.ratsnest.unrouted ? [{ label: '自动布线', primary: true, run: () => { go('pcb'); app.patch({ pcbTool: 'autoroute', routing: null }); } }, { label: 'X 手动走线', run: () => { go('pcb'); app.setPcbTool('route'); } }] : undefined, tip: '自动布线剩下的几条常常是电源 / 地：先铺地铜，再手动补几根粗线。' },
     { title: '铺铜（地平面）', status: !gndNet ? 'skip' : gndZones.length ? 'done' : 'todo', detail: !gndNet ? '没有 GND 网络' : gndZones.length ? `${gndNet} 已在 ${gndZones.map((z) => z.layer).join(' / ')} 铺铜` : `建议整板铺 ${gndNet}：减少走线、改善 EMI 与散热`, actions: gndNet && !gndZones.length ? [{ label: `一键铺 ${gndNet}`, primary: true, run: pourGround }] : gndNet ? [{ label: '重新铺铜（选中区域可调热焊盘）', run: () => { go('pcb'); app.set('rightTab', 'props'); } }] : undefined, tip: '铺铜后过孔 / 焊盘用热焊盘连接便于焊接；地铜会自动避让其他网络并移除孤岛。' },
@@ -72,7 +74,7 @@ export function GuidePanel() {
         {steps.map((s, i) => (
           <div key={s.title} className="col" style={{ gap: 4, padding: '8px 10px', borderRadius: 6, background: s === next ? 'var(--bg-raised)' : 'transparent', border: `1px solid ${s === next ? 'var(--accent)' : 'var(--border)'}`, opacity: s.status === 'skip' ? 0.55 : 1 }}>
             <div className="row" style={{ gap: 8 }}><span style={{ width: 18, height: 18, borderRadius: '50%', border: `1.5px solid ${color[s.status]}`, color: color[s.status], display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flex: 'none' }}>{mark[s.status]}</span><span style={{ fontWeight: 500 }}>{i + 1}. {s.title}</span><span className="ml-auto muted xs">{s.detail}</span></div>
-            {(s.actions?.length || s.tip) && <div className="row" style={{ gap: 6, paddingLeft: 26, flexWrap: 'wrap' }}>{s.actions?.map((ac) => <button key={ac.label} className={`btn sm${ac.primary ? ' primary' : ''}`} onClick={ac.run}>{ac.label}</button>)}{s.tip && <span className="dim xs" style={{ flexBasis: '100%' }}>{s.tip}</span>}</div>}
+            {(s.actions?.length || s.tip) && <div className="row" style={{ gap: 6, paddingLeft: 26, flexWrap: 'wrap' }}>{s.actions?.map((ac) => <button key={ac.label} className={`btn sm${ac.primary ? ' primary' : ''}`} onClick={ac.run}>{ac.label}</button>)}{s.tip && <span className="dim xs" style={{ flexBasis: '100%', whiteSpace: 'pre-line' }}>{s.tip}</span>}</div>}
           </div>
         ))}
         <div className="dim xs" style={{ padding: '8px 2px' }}>每一步都可撤销（⌘Z）。遇到具体问题可到「AI」标签让助手直接修改。</div>

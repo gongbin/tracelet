@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ProjectEditor, pcb, type sch, type Project, type CopperLayer, type Layer, type Vec, type AutorouteResult, type Sheet } from '@tracelet/kernel';
+import { ProjectEditor, pcb, type sch, type Project, type CopperLayer, type Layer, type Vec, type AutorouteResult, type PlacementResult, type Sheet } from '@tracelet/kernel';
 type Clipboard = sch.Clipboard;
 import { createProjectStore, type ProjectMeta, type ProjectStore } from './projectStore.js';
 
@@ -68,6 +68,10 @@ export interface AppState {
   viaOverride: { size: number; drill: number } | null;
   favorites: string[];
   autoroute: { status: 'idle' | 'running' | 'done'; result: AutorouteResult | null; copperCount?: 2 | 4; progress?: { done: number; total: number; net: string } };
+  /** 布局优化建议（预览 / 接受） */
+  placement: { status: 'idle' | 'running' | 'done'; result: PlacementResult | null; stage?: string };
+  /** 请求运行布局优化（递增触发） */
+  placementSeq: number;
   otherLayerOpacity: number;
   highlightNet: string | null;
   checkHighlight: string | null;
@@ -146,6 +150,8 @@ export const useApp = create<AppState>((set, get) => ({
   viaOverride: null,
   favorites: loadFavorites(),
   autoroute: { status: 'idle', result: null },
+  placement: { status: 'idle', result: null },
+  placementSeq: 0,
   otherLayerOpacity: 0.4,
   highlightNet: null,
   checkHighlight: null,
@@ -170,7 +176,7 @@ export const useApp = create<AppState>((set, get) => ({
         try { await get().store.save(editor.project); set({ lastSavedAt: Date.now(), saving: false }); } catch (e) { set({ saving: false }); get().toast(`保存失败：${(e as Error).message}`, 'error'); }
       }, 600);
     });
-    set({ editor, autoroute: { status: 'idle', result: null }, screen: 'sch', rightTab: null, selection: [], pcbSelection: [], placing: null, pendingPin: null, routing: null, schTool: 'select', pcbTool: 'select', lastSavedAt: Date.now(), projMenuOpen: false, wizardOpen: false, highlightNet: null, checkHighlight: null, sheetId: p.schematic.sheets[0].id, wireDraft: null, busDraft: null, drawDraft: null, pasting: null });
+    set({ editor, autoroute: { status: 'idle', result: null }, placement: { status: 'idle', result: null }, screen: 'sch', rightTab: null, selection: [], pcbSelection: [], placing: null, pendingPin: null, routing: null, schTool: 'select', pcbTool: 'select', lastSavedAt: Date.now(), projMenuOpen: false, wizardOpen: false, highlightNet: null, checkHighlight: null, sheetId: p.schematic.sheets[0].id, wireDraft: null, busDraft: null, drawDraft: null, pasting: null });
     void get().store.save(p).then(() => get().refreshProjects());
   },
   closeProject() {

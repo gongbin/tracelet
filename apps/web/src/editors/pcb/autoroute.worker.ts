@@ -1,16 +1,22 @@
 /// <reference lib="webworker" />
-import { autoroute, registerProjectLibrary, type Board, type RuleSet, type AutorouteOptions, type Project } from '@tracelet/kernel';
+import { autoroute, optimizePlacement, registerProjectLibrary, type Board, type RuleSet, type AutorouteOptions, type PlacementOptions, type PlacementResult, type Project } from '@tracelet/kernel';
 
-export interface AutorouteRequest { board: Board; rules: RuleSet; library?: Project['library']; opts?: Omit<AutorouteOptions, 'onProgress'> }
-export type AutorouteMessage = { type: 'progress'; done: number; total: number; net: string } | { type: 'done'; result: ReturnType<typeof autoroute> } | { type: 'error'; message: string };
+export interface AutorouteRequest { kind?: 'autoroute' | 'placement'; board: Board; rules: RuleSet; library?: Project['library']; opts?: Omit<AutorouteOptions, 'onProgress'>; placementOpts?: Omit<PlacementOptions, 'onProgress'> }
+export type AutorouteMessage = { type: 'progress'; done: number; total: number; net: string } | { type: 'stage'; stage: string } | { type: 'done'; result: ReturnType<typeof autoroute> } | { type: 'placement'; result: PlacementResult } | { type: 'error'; message: string };
 
 self.onmessage = (e: MessageEvent<AutorouteRequest>) => {
-  const { board, rules, library, opts } = e.data;
+  const { kind, board, rules, library, opts, placementOpts } = e.data;
+  const post = (m: AutorouteMessage) => (self as unknown as Worker).postMessage(m);
   try {
     registerProjectLibrary(library);
-    const result = autoroute(board, rules, { ...(opts ?? {}), onProgress: (done, total, net) => (self as unknown as Worker).postMessage({ type: 'progress', done, total, net } satisfies AutorouteMessage) });
-    (self as unknown as Worker).postMessage({ type: 'done', result } satisfies AutorouteMessage);
+    if (kind === 'placement') {
+      const result = optimizePlacement(board, rules, { ...(placementOpts ?? {}), onProgress: (stage) => post({ type: 'stage', stage }) });
+      post({ type: 'placement', result });
+      return;
+    }
+    const result = autoroute(board, rules, { ...(opts ?? {}), onProgress: (done, total, net) => post({ type: 'progress', done, total, net }) });
+    post({ type: 'done', result });
   } catch (err) {
-    (self as unknown as Worker).postMessage({ type: 'error', message: (err as Error).message } satisfies AutorouteMessage);
+    post({ type: 'error', message: (err as Error).message });
   }
 };

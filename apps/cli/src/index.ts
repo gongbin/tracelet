@@ -9,7 +9,7 @@ import { Command } from 'commander';
 import {
   parseProject, serializeProject, createProject, createDemoProject, buildNetlist, runErc, runDrc, computeRatsnest, reviewSchematic, ruleSetOf, RULE_SETS,
   exportBomCsv, exportNetlistJson, exportPickAndPlaceCsv, exportFabFiles, exportFabZip, importKicadProject, ProjectEditor, pcb, sch, lib, diffBoardFromSchematic, getSymbol, type Project, type CheckReport,
-  PROJECT_TEMPLATES, createFromTemplate, exportSchematicPdf, exportAssemblyPdf, importLibraryFile, footprintFromName, generateFootprint, importEasyEdaProject, type FootprintSpec
+  PROJECT_TEMPLATES, createFromTemplate, exportSchematicPdf, exportAssemblyPdf, importLibraryFile, footprintFromName, generateFootprint, importEasyEdaProject, checkPlacement, optimizePlacement, type FootprintSpec
 } from '@tracelet/kernel';
 import { basename } from 'node:path';
 
@@ -126,6 +126,15 @@ imp.command('lib <project> <files...>').description('把 KiCad 库文件（.kica
   for (const f of files) { const r = importLibraryFile(basename(f), readFileSync(resolve(f), 'utf8')); symbols.push(...r.symbols); footprints.push(...r.footprints); for (const w of r.warnings) console.warn(w); }
   ed.dispatch(lib.addLibraryItems({ symbols, footprints })); save(project, ed.project);
   console.log(`已导入 ${symbols.length} 符号 · ${footprints.length} 封装 → ${project}`);
+});
+const plc = program.command('placement').description('布局检查与优化');
+plc.command('check <file>').description('布局问题清单（重叠 / 出板 / 间距 / 去耦 / 晶振 / 连接器 / 干扰 / 长飞线 / 对齐）').option('--json').action((file, o) => { const p = load(file); const issues = checkPlacement(p.board, ruleSetOf(p)); out(issues, o.json, () => issues.length ? issues.map((i) => `  ${i.severity === 'error' ? '●' : i.severity === 'warning' ? '⚠' : '·'} [${i.rule}] ${i.message}${i.suggestion ? '  → ' + i.suggestion : ''}`).join('\n') : '布局没有发现问题'); if (issues.some((i) => i.severity === 'error')) process.exitCode = 1; });
+plc.command('optimize <file>').description('模拟退火整理布局并用自动布线验证，变好才写回').option('-t, --time <ms>', '优化时间预算', '3000').option('--no-verify', '不做布线验证').option('--dry-run', '只显示建议').action((file, o) => {
+  const p = load(file); const r = optimizePlacement(p.board, ruleSetOf(p), { timeBudgetMs: Number(o.time), verifyRouting: o.verify !== false, onProgress: (st) => console.error(st) });
+  console.log(`飞线 HPWL ${r.before.hpwl} → ${r.after.hpwl} · 去耦平均 ${r.before.decouplingAvg} → ${r.after.decouplingAvg} mm · 问题 ${r.before.issues} → ${r.after.issues}${r.routing ? ` · 布线 ${r.routing.before.routed}/${r.routing.before.total} → ${r.routing.after.routed}/${r.routing.after.total}` : ''}`);
+  if (r.rejected) { console.log(r.rejected); return; }
+  for (const m of r.moves) console.log(`  ${m.ref}: (${m.from.x}, ${m.from.y}) → (${m.x}, ${m.y})${m.rotation !== undefined ? ` 旋转 ${m.rotation}°` : ''}`);
+  if (!o.dryRun && r.moves.length) { const ed = new ProjectEditor(p); ed.dispatch(pcb.applyPlacementMoves(r.moves)); save(file, ed.project); console.log(`已应用 ${r.moves.length} 个移动 → ${file}`); }
 });
 const fpc = program.command('footprint').description('参数化封装');
 fpc.command('gen <project> <spec>').description('按 KiCad 风格名（如 LQFP-48_7x7mm_P0.5mm）或 JSON spec 生成并加入项目库').action((project: string, spec: string) => {

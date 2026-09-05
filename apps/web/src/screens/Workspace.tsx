@@ -120,7 +120,7 @@ export function Workspace() {
         else return;
         e.preventDefault();
       } else if (S.screen === 'pcb') {
-        if (e.key === 'Escape') { if (S.autoroute.status !== 'idle') S.patch({ autoroute: { status: 'idle', result: null } }); else if (S.pcbPlacing) S.patch({ pcbPlacing: null }); else if (S.routing || S.zoneDraft || S.outlineDraft || S.measure) S.patch({ routing: null, zoneDraft: null, outlineDraft: null, measure: null }); else if (S.pcbTool !== 'select') S.setPcbTool('select'); else S.patch({ pcbSelection: [], highlightNet: null, checkHighlight: null }); }
+        if (e.key === 'Escape') { if (S.autoroute.status !== 'idle') S.patch({ autoroute: { status: 'idle', result: null } }); else if (S.placement.status !== 'idle') S.patch({ placement: { status: 'idle', result: null } }); else if (S.pcbPlacing) S.patch({ pcbPlacing: null }); else if (S.routing || S.zoneDraft || S.outlineDraft || S.measure) S.patch({ routing: null, zoneDraft: null, outlineDraft: null, measure: null }); else if (S.pcbTool !== 'select') S.setPcbTool('select'); else S.patch({ pcbSelection: [], highlightNet: null, checkHighlight: null }); }
         else if (k === 'v') {
           if (S.routing) {
             const r = S.routing; const last = r.points[r.points.length - 1];

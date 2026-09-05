@@ -155,6 +155,8 @@ claude mcp list          # 查看
 | `sync_to_pcb` | 原理图 → PCB（新增 / 删除封装、更新焊盘网络） | — |
 | `set_board_outline` | 矩形板框 | `width`, `height` |
 | `move_footprint` | 移动 / 旋转封装 | `ref`, `x`, `y`, `rotation?` |
+| `check_placement` | 布线前布局检查：重叠 / 出板 / 间距 / 去耦距离 / 晶振距离 / 连接器位置 / 干扰 / 长飞线 / 对齐 | — |
+| `optimize_placement` | 模拟退火整理布局（不动锁定件、连接器、已布线器件），用试布线验证不变差才应用（可 undo） | `timeMs?`, `apply?` |
 | `autoroute` | A* 自动布线并应用（可 undo） | `nets?[]` |
 | `export_fab` | Gerber + Excellon + BOM + 坐标写入目录 | `dir` |
 | `export_pdf` | 原理图 / 装配图 PDF | `schematic?`, `assembly?` |
@@ -165,7 +167,7 @@ claude mcp list          # 查看
 
 1. **从零到制造文件（文件模式）**
    “用 esp32 模板新建 /tmp/demo.eda.json，跑 ERC，同步到 PCB，板框 50×40，自动布线，导出制造文件到 /tmp/demo-fab”
-   → `new_from_template` → `run_erc` → `sync_to_pcb` → `set_board_outline` → `autoroute` → `export_fab`
+   → `new_from_template` → `run_erc` → `sync_to_pcb` → `set_board_outline` → `check_placement` / `optimize_placement` → `autoroute` → `export_fab`
 
 2. **改我正在画的板子（实时桥）**
    “R3 改成 4.7k，再给 U1 的 IO0 加下拉”

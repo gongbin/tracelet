@@ -234,3 +234,8 @@ export function deleteFootprints(ids: string[]): Command {
   const set = new Set(ids);
   return command('删除封装', (proj) => updateBoard(proj, (b) => ({ ...b, footprints: b.footprints.filter((f) => !set.has(f.id)) })));
 }
+
+/** 应用布局优化建议（可撤销）。 */
+export function applyPlacementMoves(moves: { id: string; x: number; y: number; rotation?: number }[]): Command {
+  return command(`布局优化（${moves.length} 个器件）`, (proj) => updateBoard(proj, (b) => ({ ...b, footprints: b.footprints.map((f) => { const m = moves.find((x) => x.id === f.id); return m && !f.locked ? { ...f, x: m.x, y: m.y, rotation: m.rotation ?? f.rotation } : f; }) })));
+}

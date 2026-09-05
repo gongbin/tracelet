@@ -30,6 +30,7 @@ export * from './board/zones.js';
 export * from './board/align.js';
 export * from './board/autoroute.js';
 export * from './board/routingModel.js';
+export * from './board/placement.js';
 export * from './board/globalRoute.js';
 export * from './commands/types.js';
 export * as sch from './commands/schematic.js';
