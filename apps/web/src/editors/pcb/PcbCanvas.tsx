@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from 'react';
+import React, { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from 'react';
 import { pcb, LAYER_COLORS, copperLayers, footprintPads, footprintBody, boardBounds, netClassFor, snapTo, PCB_GRID, dist, segRectDist, segSegDist, pointSegDist, rectsOverlap, alignFootprints, autoroute, type Vec, type Rect, type CopperLayer, type Layer, type WorldPad, type AlignMode } from '@tracelet/kernel';
 import { useApp, useEditor, useProject } from '../../store/app.js';
 import { getAnalysis } from '../../store/analysis.js';
@@ -248,6 +248,16 @@ export function PcbCanvas() {
     return snap45(last, { x: sg(raw.x), y: sg(raw.y) });
   };
 
+  /** 右键 / 双指轻触：结束当前走线 / 草稿 / 工具。 */
+  const onContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (app.routing) { if (app.routing.points.length >= 2) finishRoute(); else app.patch({ routing: null }); }
+    else if (app.zoneDraft || app.outlineDraft || app.measure) app.patch({ zoneDraft: null, outlineDraft: null, measure: null });
+    else if (app.autoroute.status === 'done') app.patch({ autoroute: { status: 'idle', result: null } });
+    else if (tool !== 'select') app.setPcbTool('select');
+    else app.patch({ pcbSelection: [], highlightNet: null });
+  };
+
   // ---- 自动布线 ----
   const runAutoroute = () => {
     app.patch({ autoroute: { status: 'running', result: null }, routing: null });
@@ -285,7 +295,7 @@ export function PcbCanvas() {
 
   return (
     <div className="canvas-wrap pcb">
-      <svg ref={svgRef} className="stage" style={{ cursor }} onPointerDown={onBackgroundDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp} onContextMenu={(e) => e.preventDefault()} fontFamily="'JetBrains Mono',monospace">
+      <svg ref={svgRef} className="stage" style={{ cursor }} onPointerDown={onBackgroundDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp} onContextMenu={onContextMenu} fontFamily="'JetBrains Mono',monospace">
         <defs>
           <pattern id="pcb-grid" width={gs} height={gs} patternUnits="userSpaceOnUse" x={vp.x % gs} y={vp.y % gs}><circle cx={0.5} cy={0.5} r={1} fill="#2A2F38" /></pattern>
         </defs>

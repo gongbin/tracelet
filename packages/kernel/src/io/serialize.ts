@@ -1,4 +1,5 @@
 import { ProjectSchema, FORMAT_VERSION, type Project } from '../model/project.js';
+import { registerProjectLibrary } from '../library/registry.js';
 
 export function serializeProject(p: Project, pretty = true): string {
   return JSON.stringify(p, null, pretty ? 2 : 0);
@@ -15,5 +16,6 @@ export function parseProject(text: string | unknown): Project {
     const first = result.error.issues[0];
     throw new Error(`项目文件格式错误：${first.path.join('.')} ${first.message}`);
   }
+  registerProjectLibrary(result.data.library);
   return result.data;
 }

@@ -8,8 +8,9 @@ import { resolve, dirname } from 'node:path';
 import { Command } from 'commander';
 import {
   parseProject, serializeProject, createProject, createDemoProject, buildNetlist, runErc, runDrc, computeRatsnest, reviewSchematic, ruleSetOf, RULE_SETS,
-  exportBomCsv, exportNetlistJson, exportPickAndPlaceCsv, exportFabFiles, exportFabZip, ProjectEditor, pcb, sch, diffBoardFromSchematic, getSymbol, type Project, type CheckReport
+  exportBomCsv, exportNetlistJson, exportPickAndPlaceCsv, exportFabFiles, exportFabZip, importKicadProject, ProjectEditor, pcb, sch, diffBoardFromSchematic, getSymbol, type Project, type CheckReport
 } from '@tracelet/kernel';
+import { basename } from 'node:path';
 
 const program = new Command();
 program.name('tracelet').description('Tracelet —— 开源在线 PCB 设计工具的命令行').version('0.1.0');
@@ -92,6 +93,19 @@ exp.command('zip <file>').description('打包全部制造文件为 zip').option(
   const out = o.out ?? z.name;
   writeFileSync(resolve(out), z.data);
   console.log(`已写入 ${out}（${(z.data.length / 1024).toFixed(1)} KB）`);
+});
+
+const imp = program.command('import').description('导入其他格式');
+imp.command('kicad <files...>').description('导入 KiCad 工程（.kicad_sch 可多个 = 多页，.kicad_pcb 一个）').option('-o, --out <file>', '输出 .eda.json').option('-n, --name <name>').action((files: string[], o) => {
+  const schs = files.filter((f) => f.endsWith('.kicad_sch')).map((f) => ({ name: basename(f, '.kicad_sch'), text: readFileSync(resolve(f), 'utf8') }));
+  const pcbFile = files.find((f) => f.endsWith('.kicad_pcb'));
+  const name = o.name ?? basename(pcbFile ?? files[0]).replace(/\.kicad_(sch|pcb)$/, '');
+  const r = importKicadProject({ name, schematics: schs, pcb: pcbFile ? readFileSync(resolve(pcbFile), 'utf8') : undefined });
+  for (const w of r.warnings) console.error(`提示 · ${w.where}: ${w.message}`);
+  const out = o.out ?? `${name}.eda.json`;
+  save(out, r.project);
+  const comps = r.project.schematic.sheets.reduce((n, s) => n + s.components.length, 0);
+  console.log(`已导入 ${schs.length} 页原理图（${comps} 元件）${pcbFile ? `、PCB（${r.project.board.footprints.length} 封装 / ${r.project.board.traces.length} 走线）` : ''} → ${out}`);
 });
 
 program.command('serve').description('以 MCP server 模式启动').option('--mcp').action(() => { console.error('MCP server 在 P3 里程碑接入；内核命令已就绪，届时逐一映射为工具。'); process.exitCode = 2; });

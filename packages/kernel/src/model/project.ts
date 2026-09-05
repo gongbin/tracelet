@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { SchematicSchema, emptySchematic } from './schematic.js';
-import { BoardSchema, emptyBoard } from './board.js';
+import { SchematicSchema, SymbolDefSchema, emptySchematic } from './schematic.js';
+import { BoardSchema, FootprintDefSchema, emptyBoard } from './board.js';
 import { newId } from '../ids.js';
 
 export const FORMAT_VERSION = 1;
@@ -29,6 +29,13 @@ export const ProjectSettingsSchema = z.object({
   fab: z.string().default('嘉立创')
 });
 
+/** 项目内库：导入的符号 / 封装随项目文件一起保存。 */
+export const ProjectLibrarySchema = z.object({
+  symbols: z.array(SymbolDefSchema).default([]),
+  footprints: z.array(FootprintDefSchema).default([])
+});
+export type ProjectLibrary = z.infer<typeof ProjectLibrarySchema>;
+
 export const ProjectSchema = z.object({
   format: z.literal('eda-project'),
   version: z.number(),
@@ -38,7 +45,8 @@ export const ProjectSchema = z.object({
   updatedAt: z.string(),
   settings: ProjectSettingsSchema,
   schematic: SchematicSchema,
-  board: BoardSchema
+  board: BoardSchema,
+  library: ProjectLibrarySchema.default({ symbols: [], footprints: [] })
 });
 export type Project = z.infer<typeof ProjectSchema>;
 export type ProjectSettings = z.infer<typeof ProjectSettingsSchema>;
@@ -56,7 +64,8 @@ export function createProject(opts: { name: string; copperCount?: 2 | 4; unit?: 
     updatedAt: now,
     settings: { unit: opts.unit ?? 'mm', ruleSetId: opts.ruleSetId ?? 'jlc', fab: opts.fab ?? '嘉立创' },
     schematic: emptySchematic(),
-    board
+    board,
+    library: { symbols: [], footprints: [] }
   };
 }
 

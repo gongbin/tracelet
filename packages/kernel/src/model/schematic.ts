@@ -16,12 +16,27 @@ export const PinDefSchema = z.object({
   side: PinSideSchema,
   offset: z.number(),
   length: z.number().default(200),
-  type: PinTypeSchema.default('passive')
+  type: PinTypeSchema.default('passive'),
+  /** 通用符号：引脚连接端点（相对符号外接框左上角，mil）；有 at 时忽略 side/offset 的几何含义 */
+  at: VecSchema.optional(),
+  /** 通用符号：从端点指向本体的方向（0 右 / 90 上 / 180 左 / 270 下，屏幕坐标） */
+  dir: z.number().optional(),
+  hidden: z.boolean().optional()
 });
 export type PinDef = z.infer<typeof PinDefSchema>;
 
-export const SymbolGraphicSchema = z.enum(['box', 'resistor', 'capacitor', 'led', 'gnd', 'power']);
+export const SymbolGraphicSchema = z.enum(['box', 'resistor', 'capacitor', 'led', 'gnd', 'power', 'shapes']);
 export type SymbolGraphic = z.infer<typeof SymbolGraphicSchema>;
+
+/** 通用符号图形（相对外接框左上角，mil，y 向下）。 */
+export const SymbolShapeSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('polyline'), points: z.array(VecSchema).min(2), fill: z.enum(['none', 'background', 'outline']).default('none'), width: z.number().default(10) }),
+  z.object({ kind: z.literal('rect'), a: VecSchema, b: VecSchema, fill: z.enum(['none', 'background', 'outline']).default('none'), width: z.number().default(10) }),
+  z.object({ kind: z.literal('circle'), c: VecSchema, r: z.number(), fill: z.enum(['none', 'background', 'outline']).default('none'), width: z.number().default(10) }),
+  z.object({ kind: z.literal('arc'), start: VecSchema, mid: VecSchema, end: VecSchema, width: z.number().default(10) }),
+  z.object({ kind: z.literal('text'), x: z.number(), y: z.number(), text: z.string(), size: z.number().default(50) })
+]);
+export type SymbolShape = z.infer<typeof SymbolShapeSchema>;
 
 /** 符号定义。 */
 export const SymbolDefSchema = z.object({
@@ -39,7 +54,11 @@ export const SymbolDefSchema = z.object({
   color: z.string().optional(),
   defaultValue: z.string().default(''),
   defaultFootprint: z.string().default(''),
-  description: z.string().default('')
+  description: z.string().default(''),
+  /** 通用图形（graphic === 'shapes' 时使用） */
+  shapes: z.array(SymbolShapeSchema).optional(),
+  /** 来源（如 KiCad 库名） */
+  source: z.string().optional()
 });
 export type SymbolDef = z.infer<typeof SymbolDefSchema>;
 

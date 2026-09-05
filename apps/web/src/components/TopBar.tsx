@@ -56,7 +56,7 @@ export function TopBar() {
             <div className="menu-item" onClick={() => { set('projMenuOpen', false); fileRef.current?.click(); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇪</span>{t('proj.import')}</div>
             <div className="menu-item" onClick={() => { set('projMenuOpen', false); exportProjectFile(project); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇩</span>{t('proj.export')}</div>
             <div className="menu-item" onClick={() => { set('projMenuOpen', false); void backupAllProjects().then((n) => toast(`已备份 ${n} 个项目`, 'success')); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⧉</span>{t('proj.backup')}</div>
-            <input ref={fileRef} type="file" accept=".json,.zip" multiple hidden onChange={(e) => { const fs = e.target.files; if (fs?.length) void importProjectFiles(Array.from(fs)); e.target.value = ''; }} />
+            <input ref={fileRef} type="file" accept=".json,.zip,.kicad_sch,.kicad_pcb,.kicad_pro" multiple hidden onChange={(e) => { const fs = e.target.files; if (fs?.length) void importProjectFiles(Array.from(fs)); e.target.value = ''; }} />
             <div className="menu-sep" />
             <div className="menu-item" onClick={() => { const n = prompt('项目名', project.name); if (n && n !== project.name) editor.dispatch(sch.renameProject(n)); set('projMenuOpen', false); }}><span style={{ width: 14 }} />重命名</div>
             <div className="menu-item" onClick={() => { set('projMenuOpen', false); go('fab'); }}><span style={{ width: 14 }} />项目设置<span className="ml-auto dim">层数 · 板厂规则 · 单位</span></div>

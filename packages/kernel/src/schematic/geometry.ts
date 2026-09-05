@@ -23,6 +23,12 @@ function localToWorld(c: SchComponent, sym: SymbolDef, p: Vec): Vec {
 
 export function pinLocal(sym: SymbolDef, pin: PinDef): { base: Vec; end: Vec } {
   const L = pin.length;
+  if (pin.at) {
+    const d = ((pin.dir ?? 0) % 360 + 360) % 360;
+    const rad = (d * Math.PI) / 180;
+    // dir 为屏幕方向（90 = 向上），y 向下取负
+    return { base: { x: pin.at.x + L * Math.cos(rad), y: pin.at.y - L * Math.sin(rad) }, end: { ...pin.at } };
+  }
   switch (pin.side) {
     case 'L': return { base: { x: 0, y: pin.offset }, end: { x: -L, y: pin.offset } };
     case 'R': return { base: { x: sym.width, y: pin.offset }, end: { x: sym.width + L, y: pin.offset } };

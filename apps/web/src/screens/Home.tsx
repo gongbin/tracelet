@@ -53,8 +53,8 @@ export function Home() {
           </div>
           <div className="action-card" onClick={() => fileRef.current?.click()}>
             <div className="row" style={{ fontWeight: 600, fontSize: 14 }}><Icon d={I.upload} size={16} stroke={2} color="var(--text-2)" />{t('home.import')}</div>
-            <div className="small muted">.eda.json 或备份 zip · 拖入即可（KiCad 导入开发中）</div>
-            <input ref={fileRef} type="file" accept=".json,.eda.json,.zip" multiple hidden onChange={(e) => { const fs = e.target.files ? Array.from(e.target.files) : []; if (fs.length) void onImport(fs); e.target.value = ''; }} />
+            <div className="small muted">KiCad（.kicad_sch / .kicad_pcb）· .eda.json · 备份 zip · 拖入即可</div>
+            <input ref={fileRef} type="file" accept=".json,.eda.json,.zip,.kicad_sch,.kicad_pcb,.kicad_pro" multiple hidden onChange={(e) => { const fs = e.target.files ? Array.from(e.target.files) : []; if (fs.length) void onImport(fs); e.target.value = ''; }} />
           </div>
           <div className="action-card" onClick={() => set('wizardOpen', true)}>
             <div className="row" style={{ fontWeight: 600, fontSize: 14 }}><Icon d={I.file} size={16} stroke={2} color="var(--text-2)" />{t('home.template')}</div>

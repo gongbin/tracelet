@@ -23,6 +23,7 @@ pnpm typecheck
 pnpm cli --help          # tracelet CLI
 pnpm cli new demo.eda.json --demo && pnpm cli drc demo.eda.json
 pnpm cli export zip demo.eda.json     # 全套制造文件
+pnpm cli import kicad board.kicad_sch board.kicad_pcb -o board.eda.json
 ```
 
 ## 当前能力（v0.1）
@@ -31,6 +32,10 @@ pnpm cli export zip demo.eda.json     # 全套制造文件
 - PCB：45° 走线、过孔换层、铺铜（自动避让异网络铜、移除孤岛）、飞线、实时 DRC、图层与透明度
 - 制造：Gerber RS-274X（铜 / 阻焊 / 锡膏 / 丝印 / 板框）+ Excellon（PTH / NPTH）+ BOM + 坐标文件，一键 zip；Gerber 预览由第三方解析器（tracespace）读取导出文件后渲染
 - 库：内置零件目录，按型号 / 参数搜索，42 类元器件分类图标筛选
+- 导入：KiCad 6/7/8 工程（多个 `.kicad_sch` = 多页，`.kicad_pcb`），符号 / 封装随项目保存；项目备份 zip 导入导出
+- 原理图：多页与图纸模板（A4/A3/A2 边框 + 标题栏）、总线、结点、图形注释、测量、复制粘贴、⌥拖动复制
+- PCB：框选、板框编辑、走线顶点/线段拖动、走线中实时间距检查、对齐分布、内置 A* 自动布线（建议预览后接受）
+- 手势：触控板双指平移 / 捏合缩放（可切回滚轮缩放）、右键或双指轻触结束当前操作
 - 界面：深色 / 浅色 / 跟随系统；简体中文 / English（`t()` 词典，`apps/web/src/i18n`）
 - CLI：`tracelet erc | drc | review | sync | export gerber | export zip`，退出码可用于 CI
 

@@ -1,4 +1,4 @@
-import { parseProject, serializeProject, zipFiles, unzipFiles, type Project } from '@tracelet/kernel';
+import { parseProject, serializeProject, zipFiles, unzipFiles, importKicadProject, type Project } from '@tracelet/kernel';
 import { useApp } from './app.js';
 
 function download(name: string, content: string | Uint8Array, type: string) {
@@ -30,13 +30,33 @@ export async function importProjectFiles(files: File[]): Promise<void> {
   const app = useApp.getState();
   const projects: Project[] = [];
   const errors: string[] = [];
+  const kicad: { name: string; text: string }[] = [];
   for (const f of files) {
     try {
-      if (f.name.toLowerCase().endsWith('.zip')) {
+      const lower = f.name.toLowerCase();
+      if (lower.endsWith('.zip')) {
         const entries = unzipFiles(new Uint8Array(await f.arrayBuffer()));
-        for (const e of entries) if (e.name.toLowerCase().endsWith('.json')) { try { projects.push(parseProject(e.content)); } catch (err) { errors.push(`${e.name}: ${(err as Error).message}`); } }
-      } else projects.push(parseProject(await f.text()));
+        for (const e of entries) {
+          const el = e.name.toLowerCase();
+          if (el.endsWith('.json')) { try { projects.push(parseProject(e.content)); } catch (err) { errors.push(`${e.name}: ${(err as Error).message}`); } }
+          else if (el.endsWith('.kicad_sch') || el.endsWith('.kicad_pcb')) kicad.push({ name: e.name.split('/').pop()!, text: e.content });
+        }
+      } else if (lower.endsWith('.kicad_sch') || lower.endsWith('.kicad_pcb')) kicad.push({ name: f.name, text: await f.text() });
+      else if (lower.endsWith('.kicad_pro') || lower.endsWith('.kicad_prl')) { /* 项目设置文件暂不使用 */ }
+      else projects.push(parseProject(await f.text()));
     } catch (err) { errors.push(`${f.name}: ${(err as Error).message}`); }
+  }
+  if (kicad.length) {
+    const schs = kicad.filter((k) => k.name.toLowerCase().endsWith('.kicad_sch'));
+    const pcbFile = kicad.find((k) => k.name.toLowerCase().endsWith('.kicad_pcb'));
+    const base = (pcbFile ?? schs[0]).name.replace(/\.kicad_(sch|pcb)$/i, '');
+    // 根图纸优先（与 pcb 同名的）
+    schs.sort((a, b) => (a.name.startsWith(base) ? -1 : 0) - (b.name.startsWith(base) ? -1 : 0));
+    try {
+      const r = importKicadProject({ name: base, schematics: schs.map((s) => ({ name: s.name.replace(/\.kicad_sch$/i, ''), text: s.text })), pcb: pcbFile?.text });
+      projects.push(r.project);
+      for (const w of r.warnings.slice(0, 3)) app.toast(`KiCad 导入提示 · ${w.where}: ${w.message}`);
+    } catch (err) { errors.push(`KiCad: ${(err as Error).message}`); }
   }
   for (const p of projects) await app.store.save(p);
   await app.refreshProjects();

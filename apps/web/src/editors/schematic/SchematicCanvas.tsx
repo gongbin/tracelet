@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from 'react';
+import React, { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from 'react';
 import { sch, getSymbol, findPin, previewRoute, snapComponentOrigin, componentBounds, SCH_GRID, snapTo, pointOnSeg, pointSegDist, rectsOverlap, milToMm, PAPER_SIZES, type Vec, type Rect, type Wire } from '@tracelet/kernel';
 import { useApp, useEditor, useProject, useSheet } from '../../store/app.js';
 import { getAnalysis } from '../../store/analysis.js';
@@ -270,8 +270,34 @@ export function SchematicCanvas() {
     if (e.button !== 0 || view.spaceDown || !editable) return;
     const c = sheet.components.find((x) => x.id === id)!;
     const p = view.toWorld(e.clientX, e.clientY);
+    if (e.altKey) {
+      // Option + 拖动：复制选中元件并拖动副本（macOS 习惯）
+      e.stopPropagation();
+      const ids = app.selection.includes(id) ? app.selection : [id];
+      const clip = sch.copySelection(sheet, ids);
+      editor.begin('复制并移动');
+      const r = sch.pasteClipboard(editor.project, sheet.id, clip, clip.anchor);
+      editor.dispatch(r.command);
+      const idx = clip.components.findIndex((x) => x.id === id);
+      const newId = r.ids[idx >= 0 ? idx : 0];
+      const nc = editor.project.schematic.sheets.find((x) => x.id === sheet.id)!.components.find((x) => x.id === newId)!;
+      app.patch({ selection: r.ids.filter((x) => editor.project.schematic.sheets.find((sh) => sh.id === sheet.id)!.components.some((cc) => cc.id === x)), rightTab: app.rightTab === 'lib' || app.rightTab === 'ai' ? app.rightTab : 'props' });
+      drag.current = { kind: 'comp', id: newId, dx: p.x - nc.x, dy: p.y - nc.y };
+      return;
+    }
     selectId(id, e);
     beginDrag('移动元件', { kind: 'comp', id, dx: p.x - c.x, dy: p.y - c.y }, e);
+  };
+  /** 右键 / 触控板双指轻触：结束当前放置 / 粘贴 / 画线等，单手可完成。 */
+  const onContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (app.pasting) app.patch({ pasting: null });
+    else if (app.placing) app.stopPlacing();
+    else if (app.wireDraft || app.busDraft || app.drawDraft || app.measure) app.patch({ wireDraft: null, busDraft: null, drawDraft: null, measure: null });
+    else if (app.pendingPin) app.patch({ pendingPin: null });
+    else if (app.labelPrompt) app.patch({ labelPrompt: null });
+    else if (tool !== 'select') app.setSchTool('select');
+    else app.patch({ selection: [], highlightNet: null });
   };
   const onWireDown = (w: Wire) => (e: RPE<SVGElement>) => {
     if (e.button !== 0 || view.spaceDown) return;
@@ -332,7 +358,7 @@ export function SchematicCanvas() {
 
   return (
     <div className="canvas-wrap sch">
-      <svg ref={svgRef} className="stage" style={{ cursor }} onPointerDown={onBackgroundDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp} onContextMenu={(e) => e.preventDefault()} fontFamily="Inter,'Noto Sans SC',sans-serif">
+      <svg ref={svgRef} className="stage" style={{ cursor }} onPointerDown={onBackgroundDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp} onContextMenu={onContextMenu} fontFamily="Inter,'Noto Sans SC',sans-serif">
         <defs>
           <pattern id="sch-grid" width={gs} height={gs} patternUnits="userSpaceOnUse" x={vp.x % gs} y={vp.y % gs}>
             <circle cx={0.5} cy={0.5} r={step >= SCH_GRID * 5 ? 1.2 : 0.9} fill="#C9C6BE" />
@@ -431,7 +457,7 @@ export function SchematicCanvas() {
           <div style={{ color: '#6B6B6B' }}>空白图纸 · 从这里开始</div>
           <div className="row" style={{ gap: 12 }}>
             <button className="btn xl primary" style={{ boxShadow: '0 4px 14px rgba(61,139,255,.35)' }} onClick={() => app.setSchTool('place')}>放置第一个元件 <span className="mono" style={{ opacity: .8 }}>A</span></button>
-            <button className="btn xl light" onClick={() => app.toast('KiCad 导入开发中')}>导入 KiCad</button>
+            <button className="btn xl light" onClick={() => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.kicad_sch,.kicad_pcb,.kicad_pro,.zip,.json'; i.multiple = true; i.onchange = () => { if (i.files?.length) void import('../../store/backup.js').then((m) => m.importProjectFiles(Array.from(i.files!))); }; i.click(); }}>导入 KiCad</button>
             <button className="btn xl light" onClick={() => app.set('rightTab', 'ai')}><span style={{ color: 'var(--ai)' }}>✨</span>用 AI 生成起点</button>
           </div>
           <div style={{ color: '#8A8A8A', fontSize: 12 }}>小技巧：按 <b className="mono">R</b> / <b className="mono">C</b> / <b className="mono">D</b> 直接放电阻 / 电容 / LED</div>

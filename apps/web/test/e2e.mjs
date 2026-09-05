@@ -124,6 +124,18 @@ await page.click('.ws-tab:has-text("PCB")');
 await page.waitForTimeout(400);
 await page.screenshot({ path: `${outDir}/14-light-en-pcb.png` });
 await page.evaluate(() => { localStorage.removeItem('tracelet:theme'); localStorage.removeItem('tracelet:locale'); });
+// KiCad 导入：通过首页隐藏的文件输入
+await page.evaluate(() => { localStorage.setItem('tracelet:locale', 'zh-CN'); });
+await page.goto(base, { waitUntil: 'networkidle' });
+await page.waitForSelector('text=ESP32 传感器板');
+const fixtures = new URL('../../../packages/kernel/test/fixtures/', import.meta.url).pathname;
+await page.setInputFiles('input[type=file]', [fixtures + 'demo.kicad_sch', fixtures + 'demo.kicad_pcb']);
+await page.waitForSelector('text=同步到 PCB');
+await page.waitForTimeout(500);
+await page.screenshot({ path: `${outDir}/15-kicad-import-schematic.png` });
+await page.click('.ws-tab:has-text("PCB")');
+await page.waitForTimeout(500);
+await page.screenshot({ path: `${outDir}/16-kicad-import-pcb.png` });
 
 await browser.close();
 if (errors.length) { console.error('控制台错误：\n' + errors.join('\n')); process.exit(1); }

@@ -1,4 +1,5 @@
 import type { FootprintDef, PadDef } from '../model/board.js';
+import { registeredFootprint } from './registry.js';
 
 function twoPad(id: string, name: string, pitch: number, pw: number, ph: number, bw: number, bh: number, height: number, desc: string): FootprintDef {
   return {
@@ -70,8 +71,8 @@ export const BUILTIN_FOOTPRINTS: FootprintDef[] = [
 
 const byId = new Map(BUILTIN_FOOTPRINTS.map((f) => [f.id, f]));
 export function getFootprint(id: string): FootprintDef {
-  const f = byId.get(id);
+  const f = byId.get(id) ?? registeredFootprint(id);
   if (!f) throw new Error(`未知封装: ${id}`);
   return f;
 }
-export function findFootprint(id: string): FootprintDef | undefined { return byId.get(id); }
+export function findFootprint(id: string): FootprintDef | undefined { return byId.get(id) ?? registeredFootprint(id); }

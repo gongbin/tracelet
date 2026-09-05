@@ -1,12 +1,42 @@
 import type { PointerEvent as RPE } from 'react';
-import { type SchComponent, type SymbolDef, componentBody, pinGeoms } from '@tracelet/kernel';
+import { type SchComponent, type SymbolDef, type SymbolShape, componentBody, pinGeoms } from '@tracelet/kernel';
 
 const INK = '#7A1F1F';
 const SW = 16; // 线宽 mil
 
+function arcPath(a: SymbolShape & { kind: 'arc' }): string {
+  const { start: s, mid: m, end: e } = a;
+  const d = 2 * (s.x * (m.y - e.y) + m.x * (e.y - s.y) + e.x * (s.y - m.y));
+  if (Math.abs(d) < 1e-9) return `M${s.x} ${s.y}L${e.x} ${e.y}`;
+  const ux = ((s.x ** 2 + s.y ** 2) * (m.y - e.y) + (m.x ** 2 + m.y ** 2) * (e.y - s.y) + (e.x ** 2 + e.y ** 2) * (s.y - m.y)) / d;
+  const uy = ((s.x ** 2 + s.y ** 2) * (e.x - m.x) + (m.x ** 2 + m.y ** 2) * (s.x - e.x) + (e.x ** 2 + e.y ** 2) * (m.x - s.x)) / d;
+  const r = Math.hypot(s.x - ux, s.y - uy);
+  const cross = (m.x - s.x) * (e.y - s.y) - (m.y - s.y) * (e.x - s.x);
+  const sweep = cross > 0 ? 1 : 0;
+  const a0 = Math.atan2(s.y - uy, s.x - ux), a1 = Math.atan2(e.y - uy, e.x - ux);
+  let delta = a1 - a0; if (sweep) { while (delta < 0) delta += 2 * Math.PI; } else { while (delta > 0) delta -= 2 * Math.PI; }
+  const large = Math.abs(delta) > Math.PI ? 1 : 0;
+  return `M${s.x} ${s.y}A${r} ${r} 0 ${large} ${sweep} ${e.x} ${e.y}`;
+}
+
+function shapes(sym: SymbolDef, color: string, ghost: boolean) {
+  const bg = ghost ? 'rgba(61,139,255,.08)' : '#FFFBE8';
+  const fillOf = (f: 'none' | 'background' | 'outline') => (f === 'background' ? bg : f === 'outline' ? color : 'none');
+  return <g stroke={color} strokeLinecap="round" strokeLinejoin="round" fill="none">
+    {(sym.shapes ?? []).map((sh, i) => {
+      if (sh.kind === 'polyline') return <path key={i} d={sh.points.map((p, j) => `${j ? 'L' : 'M'}${p.x} ${p.y}`).join('') + (sh.fill !== 'none' ? 'Z' : '')} strokeWidth={Math.max(sh.width, 10)} fill={fillOf(sh.fill)} />;
+      if (sh.kind === 'rect') return <rect key={i} x={Math.min(sh.a.x, sh.b.x)} y={Math.min(sh.a.y, sh.b.y)} width={Math.abs(sh.b.x - sh.a.x)} height={Math.abs(sh.b.y - sh.a.y)} strokeWidth={Math.max(sh.width, 10)} fill={fillOf(sh.fill)} />;
+      if (sh.kind === 'circle') return <circle key={i} cx={sh.c.x} cy={sh.c.y} r={sh.r} strokeWidth={Math.max(sh.width, 10)} fill={fillOf(sh.fill)} />;
+      if (sh.kind === 'arc') return <path key={i} d={arcPath(sh)} strokeWidth={Math.max(sh.width, 10)} />;
+      return <text key={i} x={sh.x} y={sh.y} fontSize={sh.size} fill="#4A4A4A" stroke="none" textAnchor="middle">{sh.text}</text>;
+    })}
+  </g>;
+}
+
 function body(sym: SymbolDef, color: string, ghost: boolean) {
   const w = sym.width, h = sym.height;
   const fill = ghost ? 'rgba(61,139,255,.08)' : '#FFFFFF';
+  if (sym.graphic === 'shapes') return shapes(sym, color, ghost);
   switch (sym.graphic) {
     case 'box':
     case 'resistor':
@@ -53,7 +83,7 @@ export function SymbolGlyph({ comp, sym, selected, ghost, wireMode, openPins, pi
   return (
     <g opacity={ghost ? 0.85 : 1} className={ghost ? 'ghost' : undefined}>
       {selected && !ghost && <rect x={b.x - 160} y={b.y - 160} width={b.w + 320} height={b.h + 320} rx={40} fill="rgba(255,216,77,.12)" stroke="#E5B800" strokeWidth={20} />}
-      <g transform={`translate(${comp.x} ${comp.y}) rotate(${comp.rotation} ${sym.width / 2} ${sym.height / 2})`}>
+      <g transform={`translate(${comp.x + sym.width / 2} ${comp.y + sym.height / 2}) rotate(${comp.rotation}) scale(${comp.mirror ? -1 : 1} 1) translate(${-sym.width / 2} ${-sym.height / 2})`}>
         <g onPointerDown={onBodyDown} style={{ cursor: ghost ? 'copy' : 'move' }} strokeDasharray={ghost ? '50 40' : undefined}>
           {body(sym, color, !!ghost)}
           {/* 透明命中区 */}
@@ -66,10 +96,14 @@ export function SymbolGlyph({ comp, sym, selected, ghost, wireMode, openPins, pi
         const hl = highlightNet && net === highlightNet;
         return (
           <g key={g.def.number}>
-            <path d={`M${g.base.x} ${g.base.y}L${g.end.x} ${g.end.y}`} stroke={color} strokeWidth={SW} />
-            {sym.showPinNames && (
-              <text x={g.def.side === 'L' ? g.base.x + 60 : g.def.side === 'R' ? g.base.x - 60 : g.base.x} y={g.def.side === 'T' ? g.base.y + 110 : g.def.side === 'B' ? g.base.y - 50 : g.base.y + 40} fontSize={100} fill="#4A4A4A" textAnchor={g.def.side === 'L' ? 'start' : g.def.side === 'R' ? 'end' : 'middle'} pointerEvents="none">{g.def.name}</text>
-            )}
+            {!g.def.hidden && <path d={`M${g.base.x} ${g.base.y}L${g.end.x} ${g.end.y}`} stroke={color} strokeWidth={SW} />}
+            {sym.showPinNames && !g.def.hidden && g.def.name !== g.def.number && (() => {
+              const dx = g.base.x - g.end.x, dy = g.base.y - g.end.y;
+              const horiz = Math.abs(dx) >= Math.abs(dy);
+              const tx = horiz ? g.base.x + Math.sign(dx || 1) * 50 : g.base.x, ty = horiz ? g.base.y + 35 : g.base.y + Math.sign(dy || 1) * 60 + (dy > 0 ? 60 : 0);
+              return <text x={tx} y={ty} fontSize={sym.graphic === 'shapes' ? 90 : 100} fill="#4A4A4A" textAnchor={horiz ? (dx >= 0 ? 'start' : 'end') : 'middle'} pointerEvents="none">{g.def.name}</text>;
+            })()}
+            {sym.graphic === 'shapes' && !g.def.hidden && <text x={(g.base.x + g.end.x) / 2} y={(g.base.y + g.end.y) / 2 - 25} fontSize={70} fill="#7A1F1F" textAnchor="middle" pointerEvents="none">{g.def.number}</text>}
             {open && !sym.power && !ghost && <rect x={g.end.x - 30} y={g.end.y - 30} width={60} height={60} fill="#FF3B30" pointerEvents="none" />}
             {hl && <circle cx={g.end.x} cy={g.end.y} r={90} fill="rgba(255,216,77,.35)" stroke="#E5B800" strokeWidth={14} pointerEvents="none" />}
             {!ghost && (
