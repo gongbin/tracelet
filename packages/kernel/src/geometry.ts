@@ -67,7 +67,13 @@ export function segSegDist(a: Vec, b: Vec, c: Vec, d: Vec): number {
 }
 
 /** 线段到轴对齐矩形的距离；线段穿过矩形则为 0。 */
+/** 点到矩形的距离（矩形内为 0）。 */
+export function pointRectDist(p: Vec, r: Rect): number {
+  const dx = Math.max(r.x - p.x, 0, p.x - (r.x + r.w)), dy = Math.max(r.y - p.y, 0, p.y - (r.y + r.h));
+  return Math.hypot(dx, dy);
+}
 export function segRectDist(a: Vec, b: Vec, r: Rect): number {
+  if (a.x === b.x && a.y === b.y) return pointRectDist(a, r);
   if (pointInRect(a, r) || pointInRect(b, r)) return 0;
   const p1 = { x: r.x, y: r.y }, p2 = { x: r.x + r.w, y: r.y }, p3 = { x: r.x + r.w, y: r.y + r.h }, p4 = { x: r.x, y: r.y + r.h };
   return Math.min(segSegDist(a, b, p1, p2), segSegDist(a, b, p2, p3), segSegDist(a, b, p3, p4), segSegDist(a, b, p4, p1));

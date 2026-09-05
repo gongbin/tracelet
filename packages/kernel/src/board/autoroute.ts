@@ -60,12 +60,32 @@ interface NetRoutes { net: string; nid: number; routes: Route[]; cells: Int32Arr
 
 const DIRS: [number, number, number][] = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, Math.SQRT2], [1, -1, Math.SQRT2], [-1, 1, Math.SQRT2], [-1, -1, Math.SQRT2]];
 
+/** 二叉堆（TypedArray 存储，避免对象分配）。 */
 class MinHeap {
-  private a: { f: number; i: number }[] = [];
-  push(f: number, i: number) { const a = this.a; a.push({ f, i }); let k = a.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (a[p].f <= a[k].f) break; [a[p], a[k]] = [a[k], a[p]]; k = p; } }
-  pop() { const a = this.a; const top = a[0]; const last = a.pop()!; if (a.length) { a[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < a.length && a[l].f < a[m].f) m = l; if (r < a.length && a[r].f < a[m].f) m = r; if (m === k) break; [a[m], a[k]] = [a[k], a[m]]; k = m; } } return top; }
-  get size() { return this.a.length; }
-  clear() { this.a.length = 0; }
+  private f = new Float64Array(1 << 14);
+  private i = new Int32Array(1 << 14);
+  private n = 0;
+  push(f: number, i: number) {
+    if (this.n === this.f.length) { const nf = new Float64Array(this.n * 2); nf.set(this.f); this.f = nf; const ni = new Int32Array(this.n * 2); ni.set(this.i); this.i = ni; }
+    let k = this.n++;
+    const F = this.f, I = this.i;
+    while (k > 0) { const p = (k - 1) >> 1; if (F[p] <= f) break; F[k] = F[p]; I[k] = I[p]; k = p; }
+    F[k] = f; I[k] = i;
+  }
+  pop(): { f: number; i: number } {
+    const F = this.f, I = this.i;
+    const top = { f: F[0], i: I[0] };
+    const n = --this.n;
+    if (n > 0) {
+      const lf = F[n], li = I[n];
+      let k = 0;
+      for (;;) { const l = 2 * k + 1; if (l >= n) break; const r = l + 1; const m = r < n && F[r] < F[l] ? r : l; if (F[m] >= lf) break; F[k] = F[m]; I[k] = I[m]; k = m; }
+      F[k] = lf; I[k] = li;
+    }
+    return top;
+  }
+  get size() { return this.n; }
+  clear() { this.n = 0; }
 }
 
 export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: AutorouteOptions = {}): AutorouteResult {
@@ -233,12 +253,15 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   const makeSafe = (net: string, clearance: number) => {
     const gapFor = (other: string) => Math.max(clearance, netClassFor(board, other)?.clearance ?? 0);
     const foreign = (other: string) => !other || other !== net;
-    return (a: Vec, b: Vec, radius: number, ls: CopperLayer[], extraTraces: TraceOut[], extraVias: ViaOut[]) => {
+    // 静态铜（焊盘 / 已有走线 / 过孔 / 预留出线通道）与新走线都走空间索引，避免每段线扫全板
+    return (a: Vec, b: Vec, radius: number, ls: CopperLayer[], _extraTraces: TraceOut[], _extraVias: ViaOut[], useDyn = true) => {
       if (!pointInPolygon(a, board.outline) || !pointInPolygon(b, board.outline)) return false;
       for (let i = 0; i < board.outline.length; i++) if (segSegDist(a, b, board.outline[i], board.outline[(i + 1) % board.outline.length]) < edge + radius - 1e-6) return false;
-      for (const p of pads) if ((p.def.npth || foreign(p.net)) && p.layers.some((l) => ls.includes(l)) && segRectDist(a, b, p.rect) < radius + gapFor(p.net) - 1e-6) return false;
-      for (const list of [board.traces, extraTraces]) for (const tr of list) if (foreign(tr.net) && ls.includes(tr.layer)) for (let i = 1; i < tr.points.length; i++) if (segSegDist(a, b, tr.points[i - 1], tr.points[i]) < radius + tr.width / 2 + gapFor(tr.net) - 1e-6) return false;
-      for (const list of [board.vias, extraVias]) for (const v of list) if (foreign(v.net) && pointSegDist(v, a, b) < radius + v.size / 2 + gapFor(v.net) - 1e-6) return false;
+      for (const l of ls) {
+        if (!space.segmentFree(a, b, radius, l, net, clearance)) return false;
+        if (useDyn && !dyn.segmentFree(a, b, radius, l, net, clearance)) return false;
+      }
+      for (const p of pads) if (p.def.npth && p.layers.some((l) => ls.includes(l)) && segRectDist(a, b, p.rect) < radius + clearance - 1e-6) return false;
       for (const fill of fills) if (foreign(fill.zone.net) && ls.includes(fill.zone.layer)) {
         const expanded = { points: [a, b], width: 2 * (radius + Math.max(gapFor(fill.zone.net), fill.zone.clearance ?? 0)) };
         if (fill.polygons.some((poly) => traceTouchesPolygon(expanded, poly))) return false;
@@ -401,7 +424,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     }
     // 几何校验对象：协商模式只看静态铜，严格模式连其他网络的新走线一起看
     const safe = makeSafe(net, clearance);
-    const extraT = mode === 'strict' ? allTraces(net) : [], extraV = mode === 'strict' ? allVias(net) : [];
+    const extraT: TraceOut[] = [], extraV: ViaOut[] = []; const useDyn = mode === 'strict';
     let candidate = traces;
     // 收窄只保留在焊盘附近的短出线，其余恢复网络类线宽
     if (width < preferredWidth) {
@@ -412,7 +435,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
         for (let k = 0; k < count; k++) {
           const at = (u: number) => ({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u });
           const aa = at(k / count), bb2 = at((k + 1) / count);
-          const w = safe(aa, bb2, preferredWidth / 2, [tr.layer], extraT, extraV) ? preferredWidth : width;
+          const w = safe(aa, bb2, preferredWidth / 2, [tr.layer], extraT, extraV, useDyn) ? preferredWidth : width;
           const prev = widened[widened.length - 1];
           if (prev && prev.layer === tr.layer && prev.width === w && Math.hypot(prev.points[prev.points.length - 1].x - aa.x, prev.points[prev.points.length - 1].y - aa.y) < 1e-8) prev.points.push(bb2);
           else widened.push({ ...tr, width: w, points: [aa, bb2] });
@@ -420,7 +443,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       }
       candidate = widened.map((tr) => ({ ...tr, points: simplify(tr.points) }));
     }
-    const ok = candidate.every((tr) => tr.points.slice(1).every((b, i) => safe(tr.points[i], b, tr.width / 2, [tr.layer], extraT, extraV))) && vias.every((v) => safe(v, v, v.size / 2, layers, extraT, extraV));
+    const ok = candidate.every((tr) => tr.points.slice(1).every((b, i) => safe(tr.points[i], b, tr.width / 2, [tr.layer], extraT, extraV, useDyn))) && vias.every((v) => safe(v, v, v.size / 2, layers, extraT, extraV, useDyn));
     if (!ok) return { reason: '焊盘出线或过孔不满足实际铜间距，已跳过' };
     void nr;
     return { route: { key: keyOf(line), traces: candidate, vias } };
@@ -534,7 +557,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     for (const nr of nets.values()) {
       if (!nr.routes.length) continue;
       const safe = makeSafe(nr.net, clearanceOf(nr.net));
-      const extraT = allTraces(nr.net), extraV = allVias(nr.net);
+      const extraT: TraceOut[] = [], extraV: ViaOut[] = [];
       const ok = nr.routes.every((r) => r.traces.every((tr) => tr.points.slice(1).every((b, i) => safe(tr.points[i], b, tr.width / 2, [tr.layer], extraT, extraV))) && r.vias.every((v) => safe(v, v, v.size / 2, layers, extraT, extraV)));
       if (!ok) invalid.push(nr);
     }
@@ -542,7 +565,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     for (const nr of invalid) ripNet(nr);
     for (const nr of invalid) { routeNet(nr.net, 'strict', 0); markNet(nr); }
     if (pass === 1) for (const nr of invalid) { // 仍不合格：放弃，避免交付违规走线
-      const safe = makeSafe(nr.net, clearanceOf(nr.net)); const extraT = allTraces(nr.net), extraV = allVias(nr.net);
+      const safe = makeSafe(nr.net, clearanceOf(nr.net)); const extraT: TraceOut[] = [], extraV: ViaOut[] = [];
       const ok = nr.routes.every((r) => r.traces.every((tr) => tr.points.slice(1).every((b, i) => safe(tr.points[i], b, tr.width / 2, [tr.layer], extraT, extraV))) && r.vias.every((v) => safe(v, v, v.size / 2, layers, extraT, extraV)));
       if (!ok) { ripNet(nr); nr.failures.set('*', '与其他新走线的实际铜间距不足，已放弃'); }
     }
@@ -551,7 +574,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   // 45° 倒角：直角拐点改成斜切（校验通过才替换）
   for (const nr of nets.values()) {
     const safe = makeSafe(nr.net, clearanceOf(nr.net));
-    const extraT = allTraces(nr.net), extraV = allVias(nr.net);
+    const extraT: TraceOut[] = [], extraV: ViaOut[] = [];
     for (const r of nr.routes) for (const tr of r.traces) {
       const pts = tr.points; if (pts.length < 3) continue;
       const out: Vec[] = [pts[0]];

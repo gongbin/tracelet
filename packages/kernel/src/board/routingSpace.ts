@@ -1,7 +1,7 @@
 import type { Board, CopperLayer } from '../model/board.js';
 import { copperLayers } from '../model/board.js';
 import type { RuleSet } from '../model/project.js';
-import { segRectDist, pointSegDist, type Vec, type Rect } from '../geometry.js';
+import { segRectDist, pointSegDist, segSegDist, pointRectDist, type Vec, type Rect } from '../geometry.js';
 import { allPads, netClassFor } from './geometry.js';
 
 type Obstacle = { net: string; layers: CopperLayer[]; clearance: number } & ({ rect: Rect } | { a: Vec; b: Vec; radius: number });
@@ -49,11 +49,27 @@ export class RoutingSpace {
   segment(a: Vec, b: Vec, radius: number, layers: CopperLayer[], net: string) { this.add({ a, b, radius, layers, net, clearance: this.gap(net) }); }
   /** 移除某网络的全部障碍（拆线重布用）。 */
   removeNet(net: string) { for (const [k, list] of this.buckets) { const kept = list.filter((o) => o.net !== net); if (kept.length !== list.length) { if (kept.length) this.buckets.set(k, kept); else this.buckets.delete(k); } } }
+  /** 线段 a→b（半径 radius）在 layer 上是否与所有异网络障碍保持间距：只查线段包围盒覆盖的桶。 */
+  segmentFree(a: Vec, b: Vec, radius: number, layer: CopperLayer, net: string, clearance: number): boolean {
+    const s = this.bucketSize, m = radius + clearance + this.margin;
+    const x1 = Math.floor((Math.min(a.x, b.x) - m) / s), x2 = Math.floor((Math.max(a.x, b.x) + m) / s), y1 = Math.floor((Math.min(a.y, b.y) - m) / s), y2 = Math.floor((Math.max(a.y, b.y) + m) / s);
+    const seen = new Set<Obstacle>();
+    for (let y = y1; y <= y2; y++) for (let x = x1; x <= x2; x++) {
+      const list = this.buckets.get(`${x},${y}`); if (!list) continue;
+      for (const o of list) {
+        if (seen.has(o) || (o.net && o.net === net) || !o.layers.includes(layer)) continue;
+        seen.add(o);
+        const d = 'rect' in o ? segRectDist(a, b, o.rect) : segSegDist(a, b, o.a, o.b) - o.radius;
+        if (d < radius + Math.max(clearance, o.clearance) - 1e-7) return false;
+      }
+    }
+    return true;
+  }
   free(p: Vec, radius: number, layer: CopperLayer, net: string, clearance: number): boolean {
     const list = this.buckets.get(`${Math.floor(p.x / this.bucketSize)},${Math.floor(p.y / this.bucketSize)}`) ?? [];
     for (const o of list) {
       if ((o.net && o.net === net) || !o.layers.includes(layer)) continue;
-      const d = 'rect' in o ? segRectDist(p, p, o.rect) : pointSegDist(p, o.a, o.b) - o.radius;
+      const d = 'rect' in o ? pointRectDist(p, o.rect) : pointSegDist(p, o.a, o.b) - o.radius;
       if (d < radius + Math.max(clearance, o.clearance) - 1e-7) return false;
     }
     return true;
