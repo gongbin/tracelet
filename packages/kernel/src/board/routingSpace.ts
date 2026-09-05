@@ -75,6 +75,17 @@ export class RoutingSpace {
     }
     return null;
   }
+  /** 调试：离线段 a→b 最近的异网络障碍及其几何。 */
+  nearest(a: Vec, b: Vec, layer: CopperLayer, net: string): { net: string; d: number; geom: string } | null {
+    let best: { net: string; d: number; geom: string } | null = null;
+    const seen = new Set<Obstacle>();
+    for (const list of this.buckets.values()) for (const o of list) {
+      if (seen.has(o) || (o.net && o.net === net) || !o.layers.includes(layer)) continue; seen.add(o);
+      const d = 'rect' in o ? segRectDist(a, b, o.rect) : segSegDist(a, b, o.a, o.b) - o.radius;
+      if (!best || d < best.d) best = { net: o.net, d, geom: 'rect' in o ? `rect ${o.rect.x.toFixed(2)},${o.rect.y.toFixed(2)} ${o.rect.w}x${o.rect.h}` : `seg ${o.a.x.toFixed(2)},${o.a.y.toFixed(2)}→${o.b.x.toFixed(2)},${o.b.y.toFixed(2)} r${o.radius}` };
+    }
+    return best;
+  }
   free(p: Vec, radius: number, layer: CopperLayer, net: string, clearance: number): boolean {
     const list = this.buckets.get(`${Math.floor(p.x / this.bucketSize)},${Math.floor(p.y / this.bucketSize)}`) ?? [];
     for (const o of list) {

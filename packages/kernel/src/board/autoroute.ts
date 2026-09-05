@@ -290,7 +290,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
 
   /** 布一条飞线。mode=negotiate：与其他新走线冲突只加代价；strict：视为硬障碍。 */
   let corridorInfo: { CW: number; CH: number; f: number } | null = null;
-  const routeLine = (line: RatsnestLine, mode: 'negotiate' | 'strict' | 'soft', pf: number, connectivity: ReturnType<typeof computeRatsnest>, corridor?: Uint8Array): { route?: Route; reason?: string; crossed?: string[] } => {
+  const routeLine = (line: RatsnestLine, mode: 'negotiate' | 'strict' | 'soft', pf: number, connectivity: ReturnType<typeof computeRatsnest>, corridor?: Uint8Array, banned?: Set<number>): { route?: Route; reason?: string; crossed?: string[]; badCells?: number[] } => {
     generation++;
     const net = line.net, nid = netId(net), nr = netOf(net);
     const preferredWidth = widthOf(net), clearance = clearanceOf(net);
@@ -317,6 +317,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       const i = idx(x, y, l);
       if (freeStamp[i] === generation) return freeVal[i] === 1;
       freeStamp[i] = generation; freeVal[i] = -1;
+      if (banned?.has(i)) return false;
       const p = toWorld(x, y);
       const nearPad = [pa, pb].some((pd) => pd && segRectDist(p, p, pd.rect) < 1.25);
       const localWidth = nearPad ? width : preferredWidth;
@@ -466,8 +467,30 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       }
       candidate = widened.map((tr) => ({ ...tr, points: simplify(tr.points) }));
     }
-    const ok = candidate.every((tr) => tr.points.slice(1).every((b, i) => safe(tr.points[i], b, tr.width / 2, [tr.layer], extraT, extraV, useDyn))) && vias.every((v) => safe(v, v, v.size / 2, layers, extraT, extraV, useDyn));
-    if (!ok) return { reason: '焊盘出线或过孔不满足实际铜间距，已跳过' };
+    // 端点缝合段（最后一格 → 焊盘中心）常因贴着别的走线而差一点点：试着去掉倒数第二个点直连，或首段同理
+    const segOk = (tr: TraceOut, i: number) => safe(tr.points[i - 1], tr.points[i], tr.width / 2, [tr.layer], extraT, extraV, useDyn);
+    const failing = (list: TraceOut[]) => list.flatMap((tr, ti) => tr.points.slice(1).map((_, k) => (segOk(tr, k + 1) ? -1 : ti * 1000 + k + 1)).filter((v) => v >= 0));
+    let fails = failing(candidate);
+    if (fails.length) {
+      const lastT = candidate[candidate.length - 1], firstT = candidate[0];
+      const variants: TraceOut[][] = [];
+      if (lastT.points.length >= 3) variants.push([...candidate.slice(0, -1), { ...lastT, points: simplify([...lastT.points.slice(0, -2), lastT.points[lastT.points.length - 1]]) }]);
+      if (firstT.points.length >= 3) variants.push([{ ...firstT, points: simplify([firstT.points[0], ...firstT.points.slice(2)]) }, ...candidate.slice(1)]);
+      if (lastT.points.length >= 3 && firstT.points.length >= 3 && candidate.length >= 2) variants.push([{ ...firstT, points: simplify([firstT.points[0], ...firstT.points.slice(2)]) }, ...candidate.slice(1, -1), { ...lastT, points: simplify([...lastT.points.slice(0, -2), lastT.points[lastT.points.length - 1]]) }]);
+      for (const v of variants) { if (!failing(v).length) { candidate = v; fails = []; break; } }
+    }
+    const badCells: number[] = [];
+    for (const tr of candidate) for (let i = 1; i < tr.points.length; i++) if (!segOk(tr, i)) forSegCells(tr.points[i - 1], tr.points[i], 0, [layerIdx(tr.layer)], (c) => badCells.push(c));
+    for (const v of vias) if (!safe(v, v, v.size / 2, layers, extraT, extraV, useDyn)) forSegCells(v, v, 0, layers.map((_, i) => i), (c) => badCells.push(c));
+    if (badCells.length) {
+      if (opts.debug) {
+        const why: string[] = [];
+        for (const tr of candidate) for (let i = 1; i < tr.points.length; i++) if (!safe(tr.points[i - 1], tr.points[i], tr.width / 2, [tr.layer], extraT, extraV, useDyn)) { const a = tr.points[i - 1], b = tr.points[i]; const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; const nd = dyn.nearest(a, b, tr.layer, net); why.push(`nearestDyn=${nd ? `${nd.net} d=${nd.d.toFixed(3)} ${nd.geom}` : '-'} padA=${pa ? `${pa.rect.x.toFixed(2)},${pa.rect.y.toFixed(2)} ${pa.rect.w}x${pa.rect.h} ${pa.layers}` : '-'} padB=${pb ? `${pb.rect.x.toFixed(2)},${pb.rect.y.toFixed(2)} ${pb.rect.w}x${pb.rect.h} ${pb.layers}` : '-'} vias=${vias.map((v) => `${v.x.toFixed(2)},${v.y.toFixed(2)}`).join(';')}`); why.push(`seg ${a.x.toFixed(2)},${a.y.toFixed(2)}→${b.x.toFixed(2)},${b.y.toFixed(2)} w${tr.width} ${tr.layer} static=${space.conflictNet(mid, tr.width / 2, tr.layer, net, clearance) ?? space.conflictNet(a, tr.width / 2, tr.layer, net, clearance) ?? space.conflictNet(b, tr.width / 2, tr.layer, net, clearance)} dyn=${dyn.conflictNet(mid, tr.width / 2, tr.layer, net, clearance) ?? dyn.conflictNet(a, tr.width / 2, tr.layer, net, clearance) ?? dyn.conflictNet(b, tr.width / 2, tr.layer, net, clearance)} edge=${board.outline.length ? Math.min(...board.outline.map((q, k) => segSegDist(a, b, q, board.outline[(k + 1) % board.outline.length]))).toFixed(2) : '-'}`); }
+        for (const v of vias) if (!safe(v, v, v.size / 2, layers, extraT, extraV, useDyn)) why.push(`via ${v.x.toFixed(2)},${v.y.toFixed(2)} static=${layers.map((l) => space.conflictNet(v, v.size / 2, l, net, clearance)).join('/')} dyn=${layers.map((l) => dyn.conflictNet(v, v.size / 2, l, net, clearance)).join('/')}`);
+        opts.debug({ invalid: net, from: `${pa?.ref}.${pa?.number}`, to: `${pb?.ref}.${pb?.number}`, why: why.slice(0, 3) });
+      }
+      return { reason: '焊盘出线或过孔不满足实际铜间距，已跳过', badCells: [...new Set(badCells)].filter((c) => !goal.has(c) && !startPoints.has(c)) };
+    }
     void nr;
     return { route: { key: keyOf(line), traces: candidate, vias } };
   };
@@ -522,7 +545,11 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       const net = best.net, nr = netOf(net), key = keyOf(best); tried.add(key);
       unmarkNet(nr);
       const cor = corridors?.get(net);
-      const r = routeLine(best, mode, pf, conn.get(net)!, cor);
+      // 几何校验失败（焊盘出线 / 过孔擦边）时，把出问题的格子禁掉再搜，最多 3 次
+      let r = routeLine(best, mode, pf, conn.get(net)!, cor);
+      const banned = new Set<number>();
+      // 禁格重搜：实测对结果无提升但费时，只在严格模式下做 1 次
+      for (let attempt = 0; attempt < (mode === 'strict' ? 1 : 0) && !r.route && r.badCells?.length; attempt++) { for (const c of r.badCells) banned.add(c); r = routeLine(best, mode, pf, conn.get(net)!, cor, banned); }
       if (r.route) { nr.routes.push(r.route); nr.failures.delete(key); routedLines++; } else nr.failures.set(key, r.reason!);
       markNet(nr);
       refresh(net);
@@ -584,6 +611,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     unmarkNet(nr);
     routeGroup(subset, 'strict', 0, new Set([nr.net]));
     const after = remainingLines().length;
+    opts.debug?.({ result: line.net, before, after, stillFailing: subset.filter(retryable).map((x) => `${x.net}:${[...x.failures.values()][0]?.slice(0, 12)}`) });
     if (after >= before) for (const [x, snap] of snapshot) { ripNet(x); x.routes = snap.routes; x.failures = snap.failures; markNet(x); }
   }
   void blockersOf;
