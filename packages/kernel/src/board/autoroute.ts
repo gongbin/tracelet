@@ -6,7 +6,7 @@ import type { Board, CopperLayer, Trace, Via } from '../model/board.js';
 import { copperLayers } from '../model/board.js';
 import type { RuleSet } from '../model/project.js';
 import { RULE_SETS } from '../model/project.js';
-import { pointSegDist, type Vec } from '../geometry.js';
+import { pointSegDist, pointInPolygon, type Vec } from '../geometry.js';
 import { allPads, boardBounds, netClassFor, type WorldPad } from './geometry.js';
 import { computeRatsnest, type RatsnestLine } from './ratsnest.js';
 
@@ -106,6 +106,10 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     const startLayers = pa ? pa.layers.map((l) => layers.indexOf(l)).filter((i) => i >= 0) : layers.map((_, i) => i);
     const goalLayers = new Set(pb ? pb.layers.map((l) => layers.indexOf(l)).filter((i) => i >= 0) : layers.map((_, i) => i));
     const s = toCell(line.a), t = toCell(line.b);
+    // 预检查：焊盘在板框外 / 起点周围没有可走空间，给出明确原因
+    const key = `${net}|${line.a.x},${line.a.y}|${line.b.x},${line.b.y}`;
+    const outside = [line.a, line.b].filter((q) => !pointInPolygon(q, board.outline));
+    if (outside.length) { skipped.add(key); result.failed.push({ net, reason: `${pa?.ref ?? ''}${pb ? (pa ? '/' : '') + pb.ref : ''} 焊盘在板框外，请先把元件拖进板框` }); continue; }
     // 目标格集合：终点焊盘覆盖的格子
     const goal = new Set<number>();
     if (pb) { const cx1 = Math.floor((pb.rect.x - bb.x) / g), cx2 = Math.ceil((pb.rect.x + pb.rect.w - bb.x) / g), cy1 = Math.floor((pb.rect.y - bb.y) / g), cy2 = Math.ceil((pb.rect.y + pb.rect.h - bb.y) / g); for (let y = cy1; y <= cy2; y++) for (let x = cx1; x <= cx2; x++) for (const l of goalLayers) goal.add(idx(x, y, l)); }
@@ -167,7 +171,13 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
         if (ng < gScore[ni]) { gScore[ni] = ng; came[ni] = i; heap.push(ng + h(x, y), ni); }
       }
     }
-    if (found < 0) { skipped.add(`${net}|${line.a.x},${line.a.y}|${line.b.x},${line.b.y}`); result.failed.push({ net, reason: expanded > maxNodes ? '搜索空间过大' : '没有可用路径' }); continue; }
+    if (found < 0) {
+      skipped.add(key);
+      const startBlocked = !startLayers.some((l) => DIRS.some(([dx, dy]) => free(s.x + dx, s.y + dy, l)));
+      const goalBlocked = ![...goalLayers].some((l) => DIRS.some(([dx, dy]) => free(t.x + dx, t.y + dy, l)));
+      result.failed.push({ net, reason: expanded > maxNodes ? '搜索空间过大（板子太大或栅格太细）' : startBlocked ? `${pa?.ref ?? '起点'} 焊盘周围没有走线空间（与其他焊盘/走线太近，或板边留白不够）` : goalBlocked ? `${pb?.ref ?? '终点'} 焊盘周围没有走线空间` : '没有找到不违反间距的路径（可尝试移动元件、改 4 层或减小线宽）' });
+      continue;
+    }
 
     // 回溯路径
     const path: { x: number; y: number; l: number }[] = [];

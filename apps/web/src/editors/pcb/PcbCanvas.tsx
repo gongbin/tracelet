@@ -442,10 +442,18 @@ export function PcbCanvas() {
         <div className="banner"><span className="spinner" />自动布线中 · {analysis.ratsnest.unrouted} 条连接</div>
       )}
       {ar.status === 'done' && ar.result && (
-        <div className="banner ai">
-          <span style={{ color: 'var(--ai)' }}>✨</span>自动布线完成 · <span className="mono">{ar.result.routed}/{ar.result.total}</span> 连接{ar.result.failed.length ? <span style={{ color: 'var(--warning)' }}>（{ar.result.failed.length} 条失败：{ar.result.failed.map((f) => f.net).join('、')}）</span> : ''} · 紫色虚线为建议，接受后可 Undo
-          <button className="btn sm ai-solid" onClick={acceptAutoroute}>接受</button>
-          <button className="btn sm" onClick={() => app.patch({ autoroute: { status: 'idle', result: null } })}>放弃</button>
+        <div className="banner ai" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6, whiteSpace: 'normal', maxWidth: 640 }}>
+          <div className="row" style={{ gap: 10 }}>
+            <span style={{ color: 'var(--ai)' }}>✨</span>自动布线完成 · <span className="mono">{ar.result.routed}/{ar.result.total}</span> 连接{ar.result.failed.length ? <span style={{ color: 'var(--warning)' }}>，{ar.result.failed.length} 条失败</span> : ''} · 紫色虚线为建议，接受后可 Undo
+            <button className="btn sm ai-solid" style={{ marginLeft: 'auto' }} onClick={acceptAutoroute} disabled={!ar.result.traces.length}>接受</button>
+            <button className="btn sm" onClick={() => app.patch({ autoroute: { status: 'idle', result: null } })}>放弃</button>
+          </div>
+          {ar.result.failed.length > 0 && (
+            <div className="col" style={{ gap: 2, fontSize: 11.5 }}>
+              {[...new Map(ar.result.failed.map((f) => [f.net + f.reason, f])).values()].slice(0, 6).map((f, i) => <div key={i} className="row" style={{ gap: 6 }}><span style={{ color: 'var(--warning)' }}>⚠</span><span className="mono">{f.net || '无网络'}</span><span className="muted">{f.reason}</span></div>)}
+              {ar.result.failed.length > 6 && <div className="dim">…还有 {ar.result.failed.length - 6} 条</div>}
+            </div>
+          )}
         </div>
       )}
       {(tool === 'align' || (isSelectLike && alignSel.length >= 2)) && ar.status === 'idle' && !app.routing && (

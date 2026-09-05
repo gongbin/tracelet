@@ -71,3 +71,16 @@ describe('自动布线：更密的板', () => {
     for (const t of r.traces) for (let i = 0; i < t.points.length - 1; i++) { const a = t.points[i], b = t.points[i + 1]; const ang = Math.abs(Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI); const k = ang % 45; expect(Math.min(k, 45 - k), `${t.net} seg ${i} ${ang.toFixed(1)}°`).toBeLessThan(0.5); }
   });
 });
+
+describe('自动布线失败原因', () => {
+  it('元件在板框外时给出明确原因而不是静默失败', async () => {
+    const { createDemoProject, ProjectEditor, pcb, autoroute, ruleSetOf } = await import('../src/index.js');
+    const ed = new ProjectEditor(createDemoProject());
+    const c1 = ed.project.board.footprints.find((f) => f.ref === 'C1')!;
+    ed.dispatch(pcb.moveFootprint(c1.id, { x: 70, y: 10 })); // 板框右侧暂存区
+    const r = autoroute(ed.project.board, ruleSetOf(ed.project));
+    const f = r.failed.find((x) => x.reason.includes('板框外'));
+    expect(f).toBeTruthy();
+    expect(f!.reason).toContain('C1');
+  });
+});
