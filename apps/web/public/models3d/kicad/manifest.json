@@ -62,5 +62,917 @@
   "SOT-583-8": {
     "file": "SOT-583-8.glb",
     "source": "Package_TO_SOT_SMD.3dshapes/SOT-583-8.step"
+  },
+  "R_0201_0603Metric": {
+    "file": "R_0201_0603Metric.glb",
+    "source": "Resistor_SMD.3dshapes/R_0201_0603Metric.step"
+  },
+  "R_0201": {
+    "file": "R_0201.glb",
+    "source": "Resistor_SMD.3dshapes/R_0201_0603Metric.step"
+  },
+  "C_0201_0603Metric": {
+    "file": "C_0201_0603Metric.glb",
+    "source": "Capacitor_SMD.3dshapes/C_0201_0603Metric.step"
+  },
+  "C_0201": {
+    "file": "C_0201.glb",
+    "source": "Capacitor_SMD.3dshapes/C_0201_0603Metric.step"
+  },
+  "L_0201_0603Metric": {
+    "file": "L_0201_0603Metric.glb",
+    "source": "Inductor_SMD.3dshapes/L_0201_0603Metric.step"
+  },
+  "L_0201": {
+    "file": "L_0201.glb",
+    "source": "Inductor_SMD.3dshapes/L_0201_0603Metric.step"
+  },
+  "LED_0201_0603Metric": {
+    "file": "LED_0201_0603Metric.glb",
+    "source": "LED_SMD.3dshapes/LED_0201_0603Metric.step"
+  },
+  "LED_0201": {
+    "file": "LED_0201.glb",
+    "source": "LED_SMD.3dshapes/LED_0201_0603Metric.step"
+  },
+  "R_0402_1005Metric": {
+    "file": "R_0402_1005Metric.glb",
+    "source": "Resistor_SMD.3dshapes/R_0402_1005Metric.step"
+  },
+  "R_0402": {
+    "file": "R_0402.glb",
+    "source": "Resistor_SMD.3dshapes/R_0402_1005Metric.step"
+  },
+  "C_0402_1005Metric": {
+    "file": "C_0402_1005Metric.glb",
+    "source": "Capacitor_SMD.3dshapes/C_0402_1005Metric.step"
+  },
+  "C_0402": {
+    "file": "C_0402.glb",
+    "source": "Capacitor_SMD.3dshapes/C_0402_1005Metric.step"
+  },
+  "L_0402_1005Metric": {
+    "file": "L_0402_1005Metric.glb",
+    "source": "Inductor_SMD.3dshapes/L_0402_1005Metric.step"
+  },
+  "L_0402": {
+    "file": "L_0402.glb",
+    "source": "Inductor_SMD.3dshapes/L_0402_1005Metric.step"
+  },
+  "LED_0402_1005Metric": {
+    "file": "LED_0402_1005Metric.glb",
+    "source": "LED_SMD.3dshapes/LED_0402_1005Metric.step"
+  },
+  "LED_0402": {
+    "file": "LED_0402.glb",
+    "source": "LED_SMD.3dshapes/LED_0402_1005Metric.step"
+  },
+  "R_0603_1608Metric": {
+    "file": "R_0603_1608Metric.glb",
+    "source": "Resistor_SMD.3dshapes/R_0603_1608Metric.step"
+  },
+  "R_0603": {
+    "file": "R_0603.glb",
+    "source": "Resistor_SMD.3dshapes/R_0603_1608Metric.step"
+  },
+  "C_0603_1608Metric": {
+    "file": "C_0603_1608Metric.glb",
+    "source": "Capacitor_SMD.3dshapes/C_0603_1608Metric.step"
+  },
+  "C_0603": {
+    "file": "C_0603.glb",
+    "source": "Capacitor_SMD.3dshapes/C_0603_1608Metric.step"
+  },
+  "L_0603_1608Metric": {
+    "file": "L_0603_1608Metric.glb",
+    "source": "Inductor_SMD.3dshapes/L_0603_1608Metric.step"
+  },
+  "L_0603": {
+    "file": "L_0603.glb",
+    "source": "Inductor_SMD.3dshapes/L_0603_1608Metric.step"
+  },
+  "LED_0603_1608Metric": {
+    "file": "LED_0603_1608Metric.glb",
+    "source": "LED_SMD.3dshapes/LED_0603_1608Metric.step"
+  },
+  "LED_0603": {
+    "file": "LED_0603.glb",
+    "source": "LED_SMD.3dshapes/LED_0603_1608Metric.step"
+  },
+  "D_0603_1608Metric": {
+    "file": "D_0603_1608Metric.glb",
+    "source": "Diode_SMD.3dshapes/D_0603_1608Metric.step"
+  },
+  "D_0603": {
+    "file": "D_0603.glb",
+    "source": "Diode_SMD.3dshapes/D_0603_1608Metric.step"
+  },
+  "R_0805": {
+    "file": "R_0805.glb",
+    "source": "Resistor_SMD.3dshapes/R_0805_2012Metric.step"
+  },
+  "C_0805": {
+    "file": "C_0805.glb",
+    "source": "Capacitor_SMD.3dshapes/C_0805_2012Metric.step"
+  },
+  "L_0805_2012Metric": {
+    "file": "L_0805_2012Metric.glb",
+    "source": "Inductor_SMD.3dshapes/L_0805_2012Metric.step"
+  },
+  "L_0805": {
+    "file": "L_0805.glb",
+    "source": "Inductor_SMD.3dshapes/L_0805_2012Metric.step"
+  },
+  "LED_0805": {
+    "file": "LED_0805.glb",
+    "source": "LED_SMD.3dshapes/LED_0805_2012Metric.step"
+  },
+  "D_0805_2012Metric": {
+    "file": "D_0805_2012Metric.glb",
+    "source": "Diode_SMD.3dshapes/D_0805_2012Metric.step"
+  },
+  "D_0805": {
+    "file": "D_0805.glb",
+    "source": "Diode_SMD.3dshapes/D_0805_2012Metric.step"
+  },
+  "R_1206_3216Metric": {
+    "file": "R_1206_3216Metric.glb",
+    "source": "Resistor_SMD.3dshapes/R_1206_3216Metric.step"
+  },
+  "R_1206": {
+    "file": "R_1206.glb",
+    "source": "Resistor_SMD.3dshapes/R_1206_3216Metric.step"
+  },
+  "C_1206": {
+    "file": "C_1206.glb",
+    "source": "Capacitor_SMD.3dshapes/C_1206_3216Metric.step"
+  },
+  "L_1206_3216Metric": {
+    "file": "L_1206_3216Metric.glb",
+    "source": "Inductor_SMD.3dshapes/L_1206_3216Metric.step"
+  },
+  "L_1206": {
+    "file": "L_1206.glb",
+    "source": "Inductor_SMD.3dshapes/L_1206_3216Metric.step"
+  },
+  "LED_1206_3216Metric": {
+    "file": "LED_1206_3216Metric.glb",
+    "source": "LED_SMD.3dshapes/LED_1206_3216Metric.step"
+  },
+  "LED_1206": {
+    "file": "LED_1206.glb",
+    "source": "LED_SMD.3dshapes/LED_1206_3216Metric.step"
+  },
+  "D_1206_3216Metric": {
+    "file": "D_1206_3216Metric.glb",
+    "source": "Diode_SMD.3dshapes/D_1206_3216Metric.step"
+  },
+  "D_1206": {
+    "file": "D_1206.glb",
+    "source": "Diode_SMD.3dshapes/D_1206_3216Metric.step"
+  },
+  "R_1210_3225Metric": {
+    "file": "R_1210_3225Metric.glb",
+    "source": "Resistor_SMD.3dshapes/R_1210_3225Metric.step"
+  },
+  "R_1210": {
+    "file": "R_1210.glb",
+    "source": "Resistor_SMD.3dshapes/R_1210_3225Metric.step"
+  },
+  "C_1210_3225Metric": {
+    "file": "C_1210_3225Metric.glb",
+    "source": "Capacitor_SMD.3dshapes/C_1210_3225Metric.step"
+  },
+  "C_1210": {
+    "file": "C_1210.glb",
+    "source": "Capacitor_SMD.3dshapes/C_1210_3225Metric.step"
+  },
+  "L_1210_3225Metric": {
+    "file": "L_1210_3225Metric.glb",
+    "source": "Inductor_SMD.3dshapes/L_1210_3225Metric.step"
+  },
+  "L_1210": {
+    "file": "L_1210.glb",
+    "source": "Inductor_SMD.3dshapes/L_1210_3225Metric.step"
+  },
+  "LED_1210_3225Metric": {
+    "file": "LED_1210_3225Metric.glb",
+    "source": "LED_SMD.3dshapes/LED_1210_3225Metric.step"
+  },
+  "LED_1210": {
+    "file": "LED_1210.glb",
+    "source": "LED_SMD.3dshapes/LED_1210_3225Metric.step"
+  },
+  "R_2010_5025Metric": {
+    "file": "R_2010_5025Metric.glb",
+    "source": "Resistor_SMD.3dshapes/R_2010_5025Metric.step"
+  },
+  "R_2010": {
+    "file": "R_2010.glb",
+    "source": "Resistor_SMD.3dshapes/R_2010_5025Metric.step"
+  },
+  "C_2010_5025Metric": {
+    "file": "C_2010_5025Metric.glb",
+    "source": "Capacitor_SMD.3dshapes/C_2010_5025Metric.step"
+  },
+  "C_2010": {
+    "file": "C_2010.glb",
+    "source": "Capacitor_SMD.3dshapes/C_2010_5025Metric.step"
+  },
+  "L_2010_5025Metric": {
+    "file": "L_2010_5025Metric.glb",
+    "source": "Inductor_SMD.3dshapes/L_2010_5025Metric.step"
+  },
+  "L_2010": {
+    "file": "L_2010.glb",
+    "source": "Inductor_SMD.3dshapes/L_2010_5025Metric.step"
+  },
+  "LED_2010_5025Metric": {
+    "file": "LED_2010_5025Metric.glb",
+    "source": "LED_SMD.3dshapes/LED_2010_5025Metric.step"
+  },
+  "LED_2010": {
+    "file": "LED_2010.glb",
+    "source": "LED_SMD.3dshapes/LED_2010_5025Metric.step"
+  },
+  "D_2010_5025Metric": {
+    "file": "D_2010_5025Metric.glb",
+    "source": "Diode_SMD.3dshapes/D_2010_5025Metric.step"
+  },
+  "D_2010": {
+    "file": "D_2010.glb",
+    "source": "Diode_SMD.3dshapes/D_2010_5025Metric.step"
+  },
+  "R_2512_6332Metric": {
+    "file": "R_2512_6332Metric.glb",
+    "source": "Resistor_SMD.3dshapes/R_2512_6332Metric.step"
+  },
+  "R_2512": {
+    "file": "R_2512.glb",
+    "source": "Resistor_SMD.3dshapes/R_2512_6332Metric.step"
+  },
+  "C_2512_6332Metric": {
+    "file": "C_2512_6332Metric.glb",
+    "source": "Capacitor_SMD.3dshapes/C_2512_6332Metric.step"
+  },
+  "C_2512": {
+    "file": "C_2512.glb",
+    "source": "Capacitor_SMD.3dshapes/C_2512_6332Metric.step"
+  },
+  "L_2512_6332Metric": {
+    "file": "L_2512_6332Metric.glb",
+    "source": "Inductor_SMD.3dshapes/L_2512_6332Metric.step"
+  },
+  "L_2512": {
+    "file": "L_2512.glb",
+    "source": "Inductor_SMD.3dshapes/L_2512_6332Metric.step"
+  },
+  "LED_2512_6332Metric": {
+    "file": "LED_2512_6332Metric.glb",
+    "source": "LED_SMD.3dshapes/LED_2512_6332Metric.step"
+  },
+  "LED_2512": {
+    "file": "LED_2512.glb",
+    "source": "LED_SMD.3dshapes/LED_2512_6332Metric.step"
+  },
+  "SOT-23-3": {
+    "file": "SOT-23-3.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/SOT-23-3.step"
+  },
+  "SOT-23-5": {
+    "file": "SOT-23-5.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/SOT-23-5.step"
+  },
+  "SOT-23-8": {
+    "file": "SOT-23-8.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/SOT-23-8.step"
+  },
+  "SOT-23W": {
+    "file": "SOT-23W.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/SOT-23W.step"
+  },
+  "SOT-23W_Handsoldering": {
+    "file": "SOT-23W_Handsoldering.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/SOT-23W_Handsoldering.step"
+  },
+  "SOT-223-8": {
+    "file": "SOT-223-8.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/SOT-223-8.step"
+  },
+  "SOT-223": {
+    "file": "SOT-223.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/SOT-223.step"
+  },
+  "SOT-89-3": {
+    "file": "SOT-89-3.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/SOT-89-3.step"
+  },
+  "TSOT-23-5": {
+    "file": "TSOT-23-5.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/TSOT-23-5.step"
+  },
+  "TSOT-23-8": {
+    "file": "TSOT-23-8.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/TSOT-23-8.step"
+  },
+  "TSOT-23": {
+    "file": "TSOT-23.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/TSOT-23.step"
+  },
+  "SOT-563": {
+    "file": "SOT-563.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/SOT-563.step"
+  },
+  "SOT-363_SC-70-6": {
+    "file": "SOT-363_SC-70-6.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/SOT-363_SC-70-6.step"
+  },
+  "SOT-353_SC-70-5": {
+    "file": "SOT-353_SC-70-5.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/SOT-353_SC-70-5.step"
+  },
+  "TO-252-2": {
+    "file": "TO-252-2.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/TO-252-2.step"
+  },
+  "TO-263-2": {
+    "file": "TO-263-2.glb",
+    "source": "Package_TO_SOT_SMD.3dshapes/TO-263-2.step"
+  },
+  "TO-92_Inline": {
+    "file": "TO-92_Inline.glb",
+    "source": "Package_TO_SOT_THT.3dshapes/TO-92_Inline.step"
+  },
+  "TO-220-3_Vertical": {
+    "file": "TO-220-3_Vertical.glb",
+    "source": "Package_TO_SOT_THT.3dshapes/TO-220-3_Vertical.step"
+  },
+  "TO-220-3_Horizontal_TabDown": {
+    "file": "TO-220-3_Horizontal_TabDown.glb",
+    "source": "Package_TO_SOT_THT.3dshapes/TO-220-3_Horizontal_TabDown.step"
+  },
+  "SOIC-8_3.9x4.9mm_P1.27mm": {
+    "file": "SOIC-8_3.9x4.9mm_P1.27mm.glb",
+    "source": "Package_SO.3dshapes/SOIC-8_3.9x4.9mm_P1.27mm.step"
+  },
+  "SOIC-14_3.9x8.7mm_P1.27mm": {
+    "file": "SOIC-14_3.9x8.7mm_P1.27mm.glb",
+    "source": "Package_SO.3dshapes/SOIC-14_3.9x8.7mm_P1.27mm.step"
+  },
+  "SOIC-16W_7.5x10.3mm_P1.27mm": {
+    "file": "SOIC-16W_7.5x10.3mm_P1.27mm.glb",
+    "source": "Package_SO.3dshapes/SOIC-16W_7.5x10.3mm_P1.27mm.step"
+  },
+  "TSSOP-8_4.4x3mm_P0.65mm": {
+    "file": "TSSOP-8_4.4x3mm_P0.65mm.glb",
+    "source": "Package_SO.3dshapes/TSSOP-8_4.4x3mm_P0.65mm.step"
+  },
+  "TSSOP-14_4.4x5mm_P0.65mm": {
+    "file": "TSSOP-14_4.4x5mm_P0.65mm.glb",
+    "source": "Package_SO.3dshapes/TSSOP-14_4.4x5mm_P0.65mm.step"
+  },
+  "TSSOP-16_4.4x5mm_P0.65mm": {
+    "file": "TSSOP-16_4.4x5mm_P0.65mm.glb",
+    "source": "Package_SO.3dshapes/TSSOP-16_4.4x5mm_P0.65mm.step"
+  },
+  "TSSOP-20_4.4x6.5mm_P0.65mm": {
+    "file": "TSSOP-20_4.4x6.5mm_P0.65mm.glb",
+    "source": "Package_SO.3dshapes/TSSOP-20_4.4x6.5mm_P0.65mm.step"
+  },
+  "TSSOP-24_4.4x7.8mm_P0.65mm": {
+    "file": "TSSOP-24_4.4x7.8mm_P0.65mm.glb",
+    "source": "Package_SO.3dshapes/TSSOP-24_4.4x7.8mm_P0.65mm.step"
+  },
+  "TSSOP-28_4.4x9.7mm_P0.65mm": {
+    "file": "TSSOP-28_4.4x9.7mm_P0.65mm.glb",
+    "source": "Package_SO.3dshapes/TSSOP-28_4.4x9.7mm_P0.65mm.step"
+  },
+  "MSOP-8_3x3mm_P0.65mm": {
+    "file": "MSOP-8_3x3mm_P0.65mm.glb",
+    "source": "Package_SO.3dshapes/MSOP-8_3x3mm_P0.65mm.step"
+  },
+  "MSOP-10_3x3mm_P0.5mm": {
+    "file": "MSOP-10_3x3mm_P0.5mm.glb",
+    "source": "Package_SO.3dshapes/MSOP-10_3x3mm_P0.5mm.step"
+  },
+  "SSOP-20_5.3x7.2mm_P0.65mm": {
+    "file": "SSOP-20_5.3x7.2mm_P0.65mm.glb",
+    "source": "Package_SO.3dshapes/SSOP-20_5.3x7.2mm_P0.65mm.step"
+  },
+  "SSOP-28_5.3x10.2mm_P0.65mm": {
+    "file": "SSOP-28_5.3x10.2mm_P0.65mm.glb",
+    "source": "Package_SO.3dshapes/SSOP-28_5.3x10.2mm_P0.65mm.step"
+  },
+  "LQFP-32_7x7mm_P0.8mm": {
+    "file": "LQFP-32_7x7mm_P0.8mm.glb",
+    "source": "Package_QFP.3dshapes/LQFP-32_7x7mm_P0.8mm.step"
+  },
+  "LQFP-44_10x10mm_P0.8mm": {
+    "file": "LQFP-44_10x10mm_P0.8mm.glb",
+    "source": "Package_QFP.3dshapes/LQFP-44_10x10mm_P0.8mm.step"
+  },
+  "LQFP-48_7x7mm_P0.5mm": {
+    "file": "LQFP-48_7x7mm_P0.5mm.glb",
+    "source": "Package_QFP.3dshapes/LQFP-48_7x7mm_P0.5mm.step"
+  },
+  "LQFP-100_14x14mm_P0.5mm": {
+    "file": "LQFP-100_14x14mm_P0.5mm.glb",
+    "source": "Package_QFP.3dshapes/LQFP-100_14x14mm_P0.5mm.step"
+  },
+  "TQFP-32_7x7mm_P0.8mm": {
+    "file": "TQFP-32_7x7mm_P0.8mm.glb",
+    "source": "Package_QFP.3dshapes/TQFP-32_7x7mm_P0.8mm.step"
+  },
+  "TQFP-64_10x10mm_P0.5mm": {
+    "file": "TQFP-64_10x10mm_P0.5mm.glb",
+    "source": "Package_QFP.3dshapes/TQFP-64_10x10mm_P0.5mm.step"
+  },
+  "QFN-16-1EP_3x3mm_P0.5mm_EP1.7x1.7mm": {
+    "file": "QFN-16-1EP_3x3mm_P0.5mm_EP1.7x1.7mm.glb",
+    "source": "Package_DFN_QFN.3dshapes/QFN-16-1EP_3x3mm_P0.5mm_EP1.7x1.7mm.step"
+  },
+  "QFN-20-1EP_4x4mm_P0.5mm_EP2.5x2.5mm": {
+    "file": "QFN-20-1EP_4x4mm_P0.5mm_EP2.5x2.5mm.glb",
+    "source": "Package_DFN_QFN.3dshapes/QFN-20-1EP_4x4mm_P0.5mm_EP2.5x2.5mm.step"
+  },
+  "QFN-24-1EP_4x4mm_P0.5mm_EP2.6x2.6mm": {
+    "file": "QFN-24-1EP_4x4mm_P0.5mm_EP2.6x2.6mm.glb",
+    "source": "Package_DFN_QFN.3dshapes/QFN-24-1EP_4x4mm_P0.5mm_EP2.6x2.6mm.step"
+  },
+  "QFN-28-1EP_5x5mm_P0.5mm_EP3.35x3.35mm": {
+    "file": "QFN-28-1EP_5x5mm_P0.5mm_EP3.35x3.35mm.glb",
+    "source": "Package_DFN_QFN.3dshapes/QFN-28-1EP_5x5mm_P0.5mm_EP3.35x3.35mm.step"
+  },
+  "QFN-32-1EP_5x5mm_P0.5mm_EP3.45x3.45mm": {
+    "file": "QFN-32-1EP_5x5mm_P0.5mm_EP3.45x3.45mm.glb",
+    "source": "Package_DFN_QFN.3dshapes/QFN-32-1EP_5x5mm_P0.5mm_EP3.45x3.45mm.step"
+  },
+  "DFN-8-1EP_3x3mm_P0.65mm_EP1.55x2.4mm": {
+    "file": "DFN-8-1EP_3x3mm_P0.65mm_EP1.55x2.4mm.glb",
+    "source": "Package_DFN_QFN.3dshapes/DFN-8-1EP_3x3mm_P0.65mm_EP1.55x2.4mm.step"
+  },
+  "DIP-6_W7.62mm": {
+    "file": "DIP-6_W7.62mm.glb",
+    "source": "Package_DIP.3dshapes/DIP-6_W7.62mm.step"
+  },
+  "DIP-8_W7.62mm": {
+    "file": "DIP-8_W7.62mm.glb",
+    "source": "Package_DIP.3dshapes/DIP-8_W7.62mm.step"
+  },
+  "DIP-14_W7.62mm": {
+    "file": "DIP-14_W7.62mm.glb",
+    "source": "Package_DIP.3dshapes/DIP-14_W7.62mm.step"
+  },
+  "DIP-16_W7.62mm": {
+    "file": "DIP-16_W7.62mm.glb",
+    "source": "Package_DIP.3dshapes/DIP-16_W7.62mm.step"
+  },
+  "DIP-18_W7.62mm": {
+    "file": "DIP-18_W7.62mm.glb",
+    "source": "Package_DIP.3dshapes/DIP-18_W7.62mm.step"
+  },
+  "DIP-20_W7.62mm": {
+    "file": "DIP-20_W7.62mm.glb",
+    "source": "Package_DIP.3dshapes/DIP-20_W7.62mm.step"
+  },
+  "DIP-28_W7.62mm": {
+    "file": "DIP-28_W7.62mm.glb",
+    "source": "Package_DIP.3dshapes/DIP-28_W7.62mm.step"
+  },
+  "DIP-28_W15.24mm": {
+    "file": "DIP-28_W15.24mm.glb",
+    "source": "Package_DIP.3dshapes/DIP-28_W15.24mm.step"
+  },
+  "DIP-40_W15.24mm": {
+    "file": "DIP-40_W15.24mm.glb",
+    "source": "Package_DIP.3dshapes/DIP-40_W15.24mm.step"
+  },
+  "PinHeader_1x01_P2.54mm_Vertical": {
+    "file": "PinHeader_1x01_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x01_P2.54mm_Vertical.step"
+  },
+  "PinHeader_1x03_P2.54mm_Vertical": {
+    "file": "PinHeader_1x03_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x03_P2.54mm_Vertical.step"
+  },
+  "PinHeader_1x05_P2.54mm_Vertical": {
+    "file": "PinHeader_1x05_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x05_P2.54mm_Vertical.step"
+  },
+  "PinHeader_1x06_P2.54mm_Vertical": {
+    "file": "PinHeader_1x06_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x06_P2.54mm_Vertical.step"
+  },
+  "PinHeader_1x07_P2.54mm_Vertical": {
+    "file": "PinHeader_1x07_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x07_P2.54mm_Vertical.step"
+  },
+  "PinHeader_1x08_P2.54mm_Vertical": {
+    "file": "PinHeader_1x08_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x08_P2.54mm_Vertical.step"
+  },
+  "PinHeader_1x09_P2.54mm_Vertical": {
+    "file": "PinHeader_1x09_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x09_P2.54mm_Vertical.step"
+  },
+  "PinHeader_1x10_P2.54mm_Vertical": {
+    "file": "PinHeader_1x10_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x10_P2.54mm_Vertical.step"
+  },
+  "PinHeader_2x01_P2.54mm_Vertical": {
+    "file": "PinHeader_2x01_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x01_P2.54mm_Vertical.step"
+  },
+  "PinHeader_2x02_P2.54mm_Vertical": {
+    "file": "PinHeader_2x02_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x02_P2.54mm_Vertical.step"
+  },
+  "PinHeader_2x03_P2.54mm_Vertical": {
+    "file": "PinHeader_2x03_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x03_P2.54mm_Vertical.step"
+  },
+  "PinHeader_2x04_P2.54mm_Vertical": {
+    "file": "PinHeader_2x04_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x04_P2.54mm_Vertical.step"
+  },
+  "PinHeader_2x05_P2.54mm_Vertical": {
+    "file": "PinHeader_2x05_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x05_P2.54mm_Vertical.step"
+  },
+  "PinHeader_2x06_P2.54mm_Vertical": {
+    "file": "PinHeader_2x06_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x06_P2.54mm_Vertical.step"
+  },
+  "PinHeader_2x07_P2.54mm_Vertical": {
+    "file": "PinHeader_2x07_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x07_P2.54mm_Vertical.step"
+  },
+  "PinHeader_2x08_P2.54mm_Vertical": {
+    "file": "PinHeader_2x08_P2.54mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x08_P2.54mm_Vertical.step"
+  },
+  "PinSocket_1x01_P2.54mm_Vertical": {
+    "file": "PinSocket_1x01_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x01_P2.54mm_Vertical.step"
+  },
+  "PinSocket_1x02_P2.54mm_Vertical": {
+    "file": "PinSocket_1x02_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x02_P2.54mm_Vertical.step"
+  },
+  "PinSocket_1x03_P2.54mm_Vertical": {
+    "file": "PinSocket_1x03_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x03_P2.54mm_Vertical.step"
+  },
+  "PinSocket_1x04_P2.54mm_Vertical": {
+    "file": "PinSocket_1x04_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x04_P2.54mm_Vertical.step"
+  },
+  "PinSocket_1x05_P2.54mm_Vertical": {
+    "file": "PinSocket_1x05_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x05_P2.54mm_Vertical.step"
+  },
+  "PinSocket_1x06_P2.54mm_Vertical": {
+    "file": "PinSocket_1x06_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x06_P2.54mm_Vertical.step"
+  },
+  "PinSocket_1x07_P2.54mm_Vertical": {
+    "file": "PinSocket_1x07_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x07_P2.54mm_Vertical.step"
+  },
+  "PinSocket_1x08_P2.54mm_Vertical": {
+    "file": "PinSocket_1x08_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x08_P2.54mm_Vertical.step"
+  },
+  "PinSocket_1x09_P2.54mm_Vertical": {
+    "file": "PinSocket_1x09_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x09_P2.54mm_Vertical.step"
+  },
+  "PinSocket_1x10_P2.54mm_Vertical": {
+    "file": "PinSocket_1x10_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x10_P2.54mm_Vertical.step"
+  },
+  "PinSocket_2x01_P2.54mm_Vertical": {
+    "file": "PinSocket_2x01_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x01_P2.54mm_Vertical.step"
+  },
+  "PinSocket_2x02_P2.54mm_Vertical": {
+    "file": "PinSocket_2x02_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x02_P2.54mm_Vertical.step"
+  },
+  "PinSocket_2x03_P2.54mm_Vertical": {
+    "file": "PinSocket_2x03_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x03_P2.54mm_Vertical.step"
+  },
+  "PinSocket_2x04_P2.54mm_Vertical": {
+    "file": "PinSocket_2x04_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x04_P2.54mm_Vertical.step"
+  },
+  "PinSocket_2x05_P2.54mm_Vertical": {
+    "file": "PinSocket_2x05_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x05_P2.54mm_Vertical.step"
+  },
+  "PinSocket_2x06_P2.54mm_Vertical": {
+    "file": "PinSocket_2x06_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x06_P2.54mm_Vertical.step"
+  },
+  "PinSocket_2x07_P2.54mm_Vertical": {
+    "file": "PinSocket_2x07_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x07_P2.54mm_Vertical.step"
+  },
+  "PinSocket_2x08_P2.54mm_Vertical": {
+    "file": "PinSocket_2x08_P2.54mm_Vertical.glb",
+    "source": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x08_P2.54mm_Vertical.step"
+  },
+  "PinHeader_1x02_P1.27mm_Vertical": {
+    "file": "PinHeader_1x02_P1.27mm_Vertical.glb",
+    "source": "Connector_PinHeader_1.27mm.3dshapes/PinHeader_1x02_P1.27mm_Vertical.step"
+  },
+  "PinHeader_1x03_P1.27mm_Vertical": {
+    "file": "PinHeader_1x03_P1.27mm_Vertical.glb",
+    "source": "Connector_PinHeader_1.27mm.3dshapes/PinHeader_1x03_P1.27mm_Vertical.step"
+  },
+  "PinHeader_1x04_P1.27mm_Vertical": {
+    "file": "PinHeader_1x04_P1.27mm_Vertical.glb",
+    "source": "Connector_PinHeader_1.27mm.3dshapes/PinHeader_1x04_P1.27mm_Vertical.step"
+  },
+  "PinHeader_1x05_P1.27mm_Vertical": {
+    "file": "PinHeader_1x05_P1.27mm_Vertical.glb",
+    "source": "Connector_PinHeader_1.27mm.3dshapes/PinHeader_1x05_P1.27mm_Vertical.step"
+  },
+  "PinHeader_1x06_P1.27mm_Vertical": {
+    "file": "PinHeader_1x06_P1.27mm_Vertical.glb",
+    "source": "Connector_PinHeader_1.27mm.3dshapes/PinHeader_1x06_P1.27mm_Vertical.step"
+  },
+  "PinHeader_1x07_P1.27mm_Vertical": {
+    "file": "PinHeader_1x07_P1.27mm_Vertical.glb",
+    "source": "Connector_PinHeader_1.27mm.3dshapes/PinHeader_1x07_P1.27mm_Vertical.step"
+  },
+  "PinHeader_1x08_P1.27mm_Vertical": {
+    "file": "PinHeader_1x08_P1.27mm_Vertical.glb",
+    "source": "Connector_PinHeader_1.27mm.3dshapes/PinHeader_1x08_P1.27mm_Vertical.step"
+  },
+  "PinHeader_1x02_P2.00mm_Vertical": {
+    "file": "PinHeader_1x02_P2.00mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.00mm.3dshapes/PinHeader_1x02_P2.00mm_Vertical.step"
+  },
+  "PinHeader_1x03_P2.00mm_Vertical": {
+    "file": "PinHeader_1x03_P2.00mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.00mm.3dshapes/PinHeader_1x03_P2.00mm_Vertical.step"
+  },
+  "PinHeader_1x04_P2.00mm_Vertical": {
+    "file": "PinHeader_1x04_P2.00mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.00mm.3dshapes/PinHeader_1x04_P2.00mm_Vertical.step"
+  },
+  "PinHeader_1x05_P2.00mm_Vertical": {
+    "file": "PinHeader_1x05_P2.00mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.00mm.3dshapes/PinHeader_1x05_P2.00mm_Vertical.step"
+  },
+  "PinHeader_1x06_P2.00mm_Vertical": {
+    "file": "PinHeader_1x06_P2.00mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.00mm.3dshapes/PinHeader_1x06_P2.00mm_Vertical.step"
+  },
+  "PinHeader_1x07_P2.00mm_Vertical": {
+    "file": "PinHeader_1x07_P2.00mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.00mm.3dshapes/PinHeader_1x07_P2.00mm_Vertical.step"
+  },
+  "PinHeader_1x08_P2.00mm_Vertical": {
+    "file": "PinHeader_1x08_P2.00mm_Vertical.glb",
+    "source": "Connector_PinHeader_2.00mm.3dshapes/PinHeader_1x08_P2.00mm_Vertical.step"
+  },
+  "USB_C_Receptacle_GCT_USB4085": {
+    "file": "USB_C_Receptacle_GCT_USB4085.glb",
+    "source": "Connector_USB.3dshapes/USB_C_Receptacle_GCT_USB4085.step"
+  },
+  "USB_A_Molex_67643_Horizontal": {
+    "file": "USB_A_Molex_67643_Horizontal.glb",
+    "source": "Connector_USB.3dshapes/USB_A_Molex_67643_Horizontal.step"
+  },
+  "USB_Mini-B_Lumberg_2486_01_Horizontal": {
+    "file": "USB_Mini-B_Lumberg_2486_01_Horizontal.glb",
+    "source": "Connector_USB.3dshapes/USB_Mini-B_Lumberg_2486_01_Horizontal.step"
+  },
+  "ESP32-WROOM-32": {
+    "file": "ESP32-WROOM-32.glb",
+    "source": "RF_Module.3dshapes/ESP32-WROOM-32.step"
+  },
+  "ESP32-WROOM-32E": {
+    "file": "ESP32-WROOM-32E.glb",
+    "source": "RF_Module.3dshapes/ESP32-WROOM-32E.step"
+  },
+  "ESP-12E": {
+    "file": "ESP-12E.glb",
+    "source": "RF_Module.3dshapes/ESP-12E.step"
+  },
+  "Crystal_SMD_3225-4Pin_3.2x2.5mm": {
+    "file": "Crystal_SMD_3225-4Pin_3.2x2.5mm.glb",
+    "source": "Crystal.3dshapes/Crystal_SMD_3225-4Pin_3.2x2.5mm.step"
+  },
+  "Crystal_SMD_5032-2Pin_5.0x3.2mm": {
+    "file": "Crystal_SMD_5032-2Pin_5.0x3.2mm.glb",
+    "source": "Crystal.3dshapes/Crystal_SMD_5032-2Pin_5.0x3.2mm.step"
+  },
+  "Crystal_SMD_2016-4Pin_2.0x1.6mm": {
+    "file": "Crystal_SMD_2016-4Pin_2.0x1.6mm.glb",
+    "source": "Crystal.3dshapes/Crystal_SMD_2016-4Pin_2.0x1.6mm.step"
+  },
+  "Crystal_HC49-4H_Vertical": {
+    "file": "Crystal_HC49-4H_Vertical.glb",
+    "source": "Crystal.3dshapes/Crystal_HC49-4H_Vertical.step"
+  },
+  "Crystal_SMD_HC49-SD": {
+    "file": "Crystal_SMD_HC49-SD.glb",
+    "source": "Crystal.3dshapes/Crystal_SMD_HC49-SD.step"
+  },
+  "Resonator_SMD_muRata_CSTxExxV-3Pin_3.0x1.1mm": {
+    "file": "Resonator_SMD_muRata_CSTxExxV-3Pin_3.0x1.1mm.glb",
+    "source": "Crystal.3dshapes/Resonator_SMD_muRata_CSTxExxV-3Pin_3.0x1.1mm.step"
+  },
+  "SW_SPST_TL3342": {
+    "file": "SW_SPST_TL3342.glb",
+    "source": "Button_Switch_SMD.3dshapes/SW_SPST_TL3342.step"
+  },
+  "SW_PUSH_6mm": {
+    "file": "SW_PUSH_6mm.glb",
+    "source": "Button_Switch_THT.3dshapes/SW_PUSH_6mm.step"
+  },
+  "SW_PUSH_6mm_H5mm": {
+    "file": "SW_PUSH_6mm_H5mm.glb",
+    "source": "Button_Switch_THT.3dshapes/SW_PUSH_6mm_H5mm.step"
+  },
+  "SW_SPDT_PCM12": {
+    "file": "SW_SPDT_PCM12.glb",
+    "source": "Button_Switch_SMD.3dshapes/SW_SPDT_PCM12.step"
+  },
+  "LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm": {
+    "file": "LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.glb",
+    "source": "LED_SMD.3dshapes/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.step"
+  },
+  "LED_D3.0mm": {
+    "file": "LED_D3.0mm.glb",
+    "source": "LED_THT.3dshapes/LED_D3.0mm.step"
+  },
+  "LED_D5.0mm": {
+    "file": "LED_D5.0mm.glb",
+    "source": "LED_THT.3dshapes/LED_D5.0mm.step"
+  },
+  "CP_Elec_6.3x5.4": {
+    "file": "CP_Elec_6.3x5.4.glb",
+    "source": "Capacitor_SMD.3dshapes/CP_Elec_6.3x5.4.step"
+  },
+  "CP_Elec_5x5.4": {
+    "file": "CP_Elec_5x5.4.glb",
+    "source": "Capacitor_SMD.3dshapes/CP_Elec_5x5.4.step"
+  },
+  "CP_Elec_8x10": {
+    "file": "CP_Elec_8x10.glb",
+    "source": "Capacitor_SMD.3dshapes/CP_Elec_8x10.step"
+  },
+  "CP_Radial_D5.0mm_P2.50mm": {
+    "file": "CP_Radial_D5.0mm_P2.50mm.glb",
+    "source": "Capacitor_THT.3dshapes/CP_Radial_D5.0mm_P2.50mm.step"
+  },
+  "CP_Radial_D6.3mm_P2.50mm": {
+    "file": "CP_Radial_D6.3mm_P2.50mm.glb",
+    "source": "Capacitor_THT.3dshapes/CP_Radial_D6.3mm_P2.50mm.step"
+  },
+  "CP_Radial_D8.0mm_P3.50mm": {
+    "file": "CP_Radial_D8.0mm_P3.50mm.glb",
+    "source": "Capacitor_THT.3dshapes/CP_Radial_D8.0mm_P3.50mm.step"
+  },
+  "CP_EIA-3216-18_Kemet-A": {
+    "file": "CP_EIA-3216-18_Kemet-A.glb",
+    "source": "Capacitor_Tantalum_SMD.3dshapes/CP_EIA-3216-18_Kemet-A.step"
+  },
+  "CP_EIA-3528-21_Kemet-B": {
+    "file": "CP_EIA-3528-21_Kemet-B.glb",
+    "source": "Capacitor_Tantalum_SMD.3dshapes/CP_EIA-3528-21_Kemet-B.step"
+  },
+  "R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal": {
+    "file": "R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal.glb",
+    "source": "Resistor_THT.3dshapes/R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal.step"
+  },
+  "R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal": {
+    "file": "R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal.glb",
+    "source": "Resistor_THT.3dshapes/R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal.step"
+  },
+  "L_Bourns_SRR1260": {
+    "file": "L_Bourns_SRR1260.glb",
+    "source": "Inductor_SMD.3dshapes/L_Bourns_SRR1260.step"
+  },
+  "L_Sunlord_SWPA3012S": {
+    "file": "L_Sunlord_SWPA3012S.glb",
+    "source": "Inductor_SMD.3dshapes/L_Sunlord_SWPA3012S.step"
+  },
+  "D_SOD-123": {
+    "file": "D_SOD-123.glb",
+    "source": "Diode_SMD.3dshapes/D_SOD-123.step"
+  },
+  "D_SOD-123F": {
+    "file": "D_SOD-123F.glb",
+    "source": "Diode_SMD.3dshapes/D_SOD-123F.step"
+  },
+  "D_SOD-323": {
+    "file": "D_SOD-323.glb",
+    "source": "Diode_SMD.3dshapes/D_SOD-323.step"
+  },
+  "D_SMA": {
+    "file": "D_SMA.glb",
+    "source": "Diode_SMD.3dshapes/D_SMA.step"
+  },
+  "D_SMB": {
+    "file": "D_SMB.glb",
+    "source": "Diode_SMD.3dshapes/D_SMB.step"
+  },
+  "D_SMC": {
+    "file": "D_SMC.glb",
+    "source": "Diode_SMD.3dshapes/D_SMC.step"
+  },
+  "D_SOD-523": {
+    "file": "D_SOD-523.glb",
+    "source": "Diode_SMD.3dshapes/D_SOD-523.step"
+  },
+  "D_DO-41_SOD81_P10.16mm_Horizontal": {
+    "file": "D_DO-41_SOD81_P10.16mm_Horizontal.glb",
+    "source": "Diode_THT.3dshapes/D_DO-41_SOD81_P10.16mm_Horizontal.step"
+  },
+  "TerminalBlock_Phoenix_MKDS-1,5-2_1x02_P5.00mm_Horizontal": {
+    "file": "TerminalBlock_Phoenix_MKDS-1,5-2_1x02_P5.00mm_Horizontal.glb",
+    "source": "TerminalBlock_Phoenix.3dshapes/TerminalBlock_Phoenix_MKDS-1,5-2_1x02_P5.00mm_Horizontal.step"
+  },
+  "TerminalBlock_Phoenix_MKDS-1,5-3_1x03_P5.00mm_Horizontal": {
+    "file": "TerminalBlock_Phoenix_MKDS-1,5-3_1x03_P5.00mm_Horizontal.glb",
+    "source": "TerminalBlock_Phoenix.3dshapes/TerminalBlock_Phoenix_MKDS-1,5-3_1x03_P5.00mm_Horizontal.step"
+  },
+  "BarrelJack_Horizontal": {
+    "file": "BarrelJack_Horizontal.glb",
+    "source": "Connector_BarrelJack.3dshapes/BarrelJack_Horizontal.step"
+  },
+  "SMA_Amphenol_132289_EdgeMount": {
+    "file": "SMA_Amphenol_132289_EdgeMount.glb",
+    "source": "Connector_Coaxial.3dshapes/SMA_Amphenol_132289_EdgeMount.step"
+  },
+  "JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical": {
+    "file": "JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical.glb",
+    "source": "Connector_JST.3dshapes/JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical.step"
+  },
+  "JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical": {
+    "file": "JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical.glb",
+    "source": "Connector_JST.3dshapes/JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical.step"
+  },
+  "JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical": {
+    "file": "JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical.glb",
+    "source": "Connector_JST.3dshapes/JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical.step"
+  },
+  "JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical": {
+    "file": "JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical.glb",
+    "source": "Connector_JST.3dshapes/JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical.step"
+  },
+  "JST_PH_B4B-PH-K_1x04_P2.00mm_Vertical": {
+    "file": "JST_PH_B4B-PH-K_1x04_P2.00mm_Vertical.glb",
+    "source": "Connector_JST.3dshapes/JST_PH_B4B-PH-K_1x04_P2.00mm_Vertical.step"
+  },
+  "JST_SH_BM04B-SRSS-TB_1x04-1MP_P1.00mm_Vertical": {
+    "file": "JST_SH_BM04B-SRSS-TB_1x04-1MP_P1.00mm_Vertical.glb",
+    "source": "Connector_JST.3dshapes/JST_SH_BM04B-SRSS-TB_1x04-1MP_P1.00mm_Vertical.step"
+  },
+  "microSD_HC_Hirose_DM3AT-SF-PEJM5": {
+    "file": "microSD_HC_Hirose_DM3AT-SF-PEJM5.glb",
+    "source": "Connector_Card.3dshapes/microSD_HC_Hirose_DM3AT-SF-PEJM5.step"
+  },
+  "Relay_SPDT_SANYOU_SRD_Series_Form_C": {
+    "file": "Relay_SPDT_SANYOU_SRD_Series_Form_C.glb",
+    "source": "Relay_THT.3dshapes/Relay_SPDT_SANYOU_SRD_Series_Form_C.step"
+  },
+  "Buzzer_12x9.5RM7.6": {
+    "file": "Buzzer_12x9.5RM7.6.glb",
+    "source": "Buzzer_Beeper.3dshapes/Buzzer_12x9.5RM7.6.step"
+  },
+  "R_LDR_5.1x4.3mm_P3.4mm_Vertical": {
+    "file": "R_LDR_5.1x4.3mm_P3.4mm_Vertical.glb",
+    "source": "OptoDevice.3dshapes/R_LDR_5.1x4.3mm_P3.4mm_Vertical.step"
+  },
+  "Potentiometer_Bourns_3296W_Vertical": {
+    "file": "Potentiometer_Bourns_3296W_Vertical.glb",
+    "source": "Potentiometer_THT.3dshapes/Potentiometer_Bourns_3296W_Vertical.step"
+  },
+  "Potentiometer_Bourns_3314J_Vertical": {
+    "file": "Potentiometer_Bourns_3314J_Vertical.glb",
+    "source": "Potentiometer_SMD.3dshapes/Potentiometer_Bourns_3314J_Vertical.step"
+  },
+  "Fuse_0805_2012Metric": {
+    "file": "Fuse_0805_2012Metric.glb",
+    "source": "Fuse.3dshapes/Fuse_0805_2012Metric.step"
+  },
+  "WSON-6-1EP_2x2mm_P0.65mm_EP1x1.6mm": {
+    "file": "WSON-6-1EP_2x2mm_P0.65mm_EP1x1.6mm.glb",
+    "source": "Package_SON.3dshapes/WSON-6-1EP_2x2mm_P0.65mm_EP1x1.6mm.step"
+  },
+  "BatteryHolder_Keystone_3034_1x20mm": {
+    "file": "BatteryHolder_Keystone_3034_1x20mm.glb",
+    "source": "Battery.3dshapes/BatteryHolder_Keystone_3034_1x20mm.step"
+  },
+  "BatteryHolder_Keystone_1060_1x2032": {
+    "file": "BatteryHolder_Keystone_1060_1x2032.glb",
+    "source": "Battery.3dshapes/BatteryHolder_Keystone_1060_1x2032.step"
   }
 }

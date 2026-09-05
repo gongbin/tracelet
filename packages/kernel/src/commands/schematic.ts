@@ -87,6 +87,41 @@ export function rotateComponent(sheetId: string, id: string, delta = 90): Comman
   }));
 }
 
+/** 水平镜像（翻转），连线端点跟随。 */
+export function mirrorComponent(sheetId: string, id: string): Command {
+  return command('镜像元件', (proj) => updateSheet(proj, sheetId, (s) => {
+    const old = s.components.find((c) => c.id === id);
+    if (!old) return s;
+    const nc = { ...old, mirror: !old.mirror };
+    return { ...s, components: s.components.map((c) => (c.id === id ? nc : c)), wires: rerouteWiresFor(s, old, nc) };
+  }));
+}
+/** 对齐 / 分布多个元件（按本体外框），端点仍落在栅格上。 */
+export function alignComponents(sheetId: string, ids: string[], mode: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom' | 'hdist' | 'vdist'): Command {
+  return command('对齐元件', (proj) => updateSheet(proj, sheetId, (s) => {
+    const items = ids.map((id) => s.components.find((c) => c.id === id)).filter((c): c is SchComponent => !!c);
+    if (items.length < 2) return s;
+    const boxes = items.map((c) => { const sym = getSymbol(c.symbolId); return { c, x: c.x, y: c.y, w: sym.width, h: sym.height }; });
+    const minX = Math.min(...boxes.map((b) => b.x)), maxX = Math.max(...boxes.map((b) => b.x + b.w)), minY = Math.min(...boxes.map((b) => b.y)), maxY = Math.max(...boxes.map((b) => b.y + b.h));
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    const targets = new Map<string, Vec>();
+    const snap = (v: number) => snapTo(v, SCH_GRID);
+    if (mode === 'hdist' || mode === 'vdist') {
+      const sorted = [...boxes].sort((a, b) => (mode === 'hdist' ? a.x - b.x : a.y - b.y));
+      const span = mode === 'hdist' ? maxX - minX - sorted.reduce((n, b) => n + b.w, 0) : maxY - minY - sorted.reduce((n, b) => n + b.h, 0);
+      const gap = span / (sorted.length - 1);
+      let cur = mode === 'hdist' ? minX : minY;
+      for (const b of sorted) { targets.set(b.c.id, mode === 'hdist' ? { x: snap(cur), y: b.y } : { x: b.x, y: snap(cur) }); cur += (mode === 'hdist' ? b.w : b.h) + gap; }
+    } else for (const b of boxes) {
+      const x = mode === 'left' ? minX : mode === 'right' ? maxX - b.w : mode === 'hcenter' ? cx - b.w / 2 : b.x;
+      const y = mode === 'top' ? minY : mode === 'bottom' ? maxY - b.h : mode === 'vcenter' ? cy - b.h / 2 : b.y;
+      targets.set(b.c.id, { x: snap(x), y: snap(y) });
+    }
+    let sheet = s;
+    for (const b of boxes) { const t = targets.get(b.c.id)!; if (t.x === b.c.x && t.y === b.c.y) continue; const old = sheet.components.find((c) => c.id === b.c.id)!; const nc = { ...old, x: t.x, y: t.y }; sheet = { ...sheet, components: sheet.components.map((c) => (c.id === nc.id ? nc : c)), wires: rerouteWiresFor(sheet, old, nc) }; }
+    return sheet;
+  }));
+}
 export function setComponentValue(sheetId: string, id: string, value: string): Command {
   return command('修改值', (proj) => updateSheet(proj, sheetId, (s) => ({ ...s, components: s.components.map((c) => (c.id === id ? { ...c, value } : c)) })));
 }

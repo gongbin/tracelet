@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from 'react';
-import { sch, getSymbol, findPin, previewRoute, snapComponentOrigin, componentBounds, SCH_GRID, snapTo, pointOnSeg, pointSegDist, rectsOverlap, milToMm, paperSize, type SheetFrame as SheetFrameDef, type Vec, type Rect, type Wire } from '@tracelet/kernel';
+import { sch, getSymbol, findPin, previewRoute, snapComponentOrigin, componentBounds, SCH_GRID, snapTo, pointOnSeg, pointSegDist, rectsOverlap, milToMm, paperSize, titleBlockSize, type SheetFrame as SheetFrameDef, type Vec, type Rect, type Wire } from '@tracelet/kernel';
 import { useApp, useEditor, useProject, useSheet } from '../../store/app.js';
 import { getAnalysis } from '../../store/analysis.js';
 import { useViewport, gridStep } from '../../hooks/useViewport.js';
@@ -40,7 +40,9 @@ function SheetFrame({ project, sheetName, index, total, frame }: { project: { na
   const W = paper.w, H = paper.h;
   const m = 200, ink = '#8E8B84', text = '#6B6862';
   const cols = Math.max(1, Math.round(W / 2000)), rows = Math.max(1, Math.round(H / 2000));
-  const tbW = Math.min(4400, W - 2 * m - 200), tbH = 900, tx = W - m - tbW, ty = H - m - tbH;
+  const { w: tbW, h: tbH } = titleBlockSize(frame, W); const tx = W - m - tbW, ty = H - m - tbH;
+  const sx = tbW / 4400, sy = tbH / 900; // 列 / 行按标题栏尺寸等比缩放
+  const X = (v: number) => tx + v * sx, Y = (v: number) => ty + v * sy;
   const date = frame.date || project.updatedAt.slice(0, 10);
   const L = frame.labels;
   const sizeText = frame.size === 'custom' ? `${Math.round(W * 0.0254)}×${Math.round(H * 0.0254)} mm` : `${frame.size}${frame.landscape ? '' : ' 纵向'}`;
@@ -56,18 +58,18 @@ function SheetFrame({ project, sheetName, index, total, frame }: { project: { na
         <text x={m / 2} y={(y0 + y1) / 2 + 40} fontSize={110} fill={text} textAnchor="middle">{ch}</text><text x={W - m / 2} y={(y0 + y1) / 2 + 40} fontSize={110} fill={text} textAnchor="middle">{ch}</text></g>; })}
       <g stroke={ink} strokeWidth={12} fill="#FBFAF7">
         <rect x={tx} y={ty} width={tbW} height={tbH} />
-        <line x1={tx} y1={ty + 300} x2={tx + tbW} y2={ty + 300} /><line x1={tx} y1={ty + 600} x2={tx + tbW} y2={ty + 600} />
-        <line x1={tx + 2600} y1={ty + 600} x2={tx + 2600} y2={ty + tbH} /><line x1={tx + 3500} y1={ty + 600} x2={tx + 3500} y2={ty + tbH} />
+        <line x1={tx} y1={Y(300)} x2={tx + tbW} y2={Y(300)} /><line x1={tx} y1={Y(600)} x2={tx + tbW} y2={Y(600)} />
+        <line x1={X(2600)} y1={Y(600)} x2={X(2600)} y2={ty + tbH} /><line x1={X(3500)} y1={Y(600)} x2={X(3500)} y2={ty + tbH} />
       </g>
       <g fill={text} fontSize={100}>
-        <text x={tx + 80} y={ty + 110}>{frame.company || 'Tracelet'}</text>
-        <text x={tx + 80} y={ty + 240} fontSize={170} fontWeight={600} fill="#3A3835">{frame.title || project.name}</text>
-        <text x={tx + 80} y={ty + 410}>{L.sheet}</text><text x={tx + 80} y={ty + 540} fontSize={140} fill="#3A3835">{sheetName}</text>
-        <text x={tx + 80} y={ty + 700}>{L.date}</text><text x={tx + 80} y={ty + 840} fontSize={130} fill="#3A3835">{date}</text>
-        <text x={tx + 2680} y={ty + 700}>{L.revision}</text><text x={tx + 2680} y={ty + 840} fontSize={130} fill="#3A3835">{frame.revision}</text>
-        <text x={tx + 3580} y={ty + 700}>{L.page}</text><text x={tx + 3580} y={ty + 840} fontSize={130} fill="#3A3835">{index + 1} / {total}</text>
-        <text x={tx + 2680} y={ty + 240} fontSize={100}>{sizeText}{frame.author ? `  ${L.author}: ${frame.author}` : ''}</text>
-        <text x={tx + 2680} y={ty + 540} fontSize={100}>{frame.comment}</text>
+        <text x={X(80)} y={Y(110)}>{frame.company || 'Tracelet'}</text>
+        <text x={X(80)} y={Y(240)} fontSize={Math.min(170, 170 * sy)} fontWeight={600} fill="#3A3835">{frame.title || project.name}</text>
+        <text x={X(80)} y={Y(410)}>{L.sheet}</text><text x={X(80)} y={Y(540)} fontSize={140} fill="#3A3835">{sheetName}</text>
+        <text x={X(80)} y={Y(700)}>{L.date}</text><text x={X(80)} y={Y(840)} fontSize={130} fill="#3A3835">{date}</text>
+        <text x={X(2680)} y={Y(700)}>{L.revision}</text><text x={X(2680)} y={Y(840)} fontSize={130} fill="#3A3835">{frame.revision}</text>
+        <text x={X(3580)} y={Y(700)}>{L.page}</text><text x={X(3580)} y={Y(840)} fontSize={130} fill="#3A3835">{index + 1} / {total}</text>
+        <text x={X(2680)} y={Y(240)} fontSize={100}>{sizeText}{frame.author ? `  ${L.author}: ${frame.author}` : ''}</text>
+        <text x={X(2680)} y={Y(540)} fontSize={100}>{frame.comment}</text>
       </g>
     </g>
   );
@@ -99,6 +101,15 @@ export function SchematicCanvas() {
     setTimeout(() => { if (u) view.fit(u, 80); else if (paperSize(sheet.frame)) { const p = paperSize(sheet.frame)!; view.fit({ x: 0, y: 0, w: p.w, h: p.h }, 40); } else view.centerOn({ x: 4000, y: 2500 }, 0.1); }, 0);
   }, [project.id, sheet.id, sheet.components, sheet.frame, view]);
 
+  useEffect(() => {
+    if (!app.fitSeq) return;
+    const bs = sheet.components.map((c) => componentBounds(c));
+    const pts = [...sheet.wires.flatMap((w) => w.points), ...sheet.labels.map((l) => ({ x: l.x, y: l.y }))];
+    if (!bs.length && !pts.length) { const p = paperSize(sheet.frame); if (p) view.fit({ x: 0, y: 0, w: p.w, h: p.h }, 40); return; }
+    const xs = [...bs.map((b) => b.x), ...bs.map((b) => b.x + b.w), ...pts.map((p) => p.x)], ys = [...bs.map((b) => b.y), ...bs.map((b) => b.y + b.h), ...pts.map((p) => p.y)];
+    view.fit({ x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }, 80);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app.fitSeq]);
   useEffect(() => {
     if (app.flyTo && app.flyTo.space === 'sch') view.centerOn({ x: app.flyTo.x, y: app.flyTo.y }, Math.max(vp.k, 0.15));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -286,10 +297,19 @@ export function SchematicCanvas() {
   const beginDrag = (label: string, dr: Drag, e: RPE<SVGElement>) => { e.stopPropagation(); drag.current = dr; editor.begin(label); };
   const editable = tool === 'select';
 
+  const dblRef = useRef<{ t: number; id: string }>({ t: 0, id: '' });
+  const isDbl = (id: string) => { const now = Date.now(); const d = now - dblRef.current.t < 350 && dblRef.current.id === id; dblRef.current = { t: now, id }; return d; };
   const onBodyDown = (id: string) => (e: RPE<SVGElement>) => {
     if (e.button !== 0 || view.spaceDown || !editable) return;
     const c = sheet.components.find((x) => x.id === id)!;
     const p = view.toWorld(e.clientX, e.clientY);
+    if (isDbl(id)) { // 双击：就地改值（电源符号改网络名）
+      e.stopPropagation();
+      const sym = getSymbol(c.symbolId);
+      const v = prompt(sym.power ? `${c.ref} 网络名` : `${c.ref} 的值`, c.value);
+      if (v !== null && v.trim() && v !== c.value) editor.dispatch(sch.setComponentValue(sheet.id, c.id, v.trim()));
+      return;
+    }
     if (e.altKey) {
       // Option + 拖动：复制选中元件并拖动副本（macOS 习惯）
       e.stopPropagation();
@@ -330,6 +350,9 @@ export function SchematicCanvas() {
     if (!editable) return;
     const p = view.toWorld(e.clientX, e.clientY);
     const wasSole = app.selection.length === 1 && app.selection[0] === w.id;
+    // 单击导线：高亮它所在的整个网络（状态栏显示网络名）
+    const netOfWire = analysis.netlist.nets.find((n) => n.pins.some((pin) => w.points.some((pt) => Math.abs(pt.x - pin.pos.x) < 0.5 && Math.abs(pt.y - pin.pos.y) < 0.5))) ?? analysis.netlist.nets.find((n) => sheet.labels.some((l) => l.text === n.name && w.points.some((pt) => Math.abs(pt.x - l.x) < 0.5 && Math.abs(pt.y - l.y) < 0.5)));
+    if (netOfWire && !wasSole) setTimeout(() => app.set('highlightNet', netOfWire.name), 0);
     selectId(w.id, e);
     if (wasSole) {
       let best = 0, bd = Infinity;
@@ -341,6 +364,7 @@ export function SchematicCanvas() {
   const onLabelDown = (id: string) => (e: RPE<SVGElement>) => {
     if (e.button !== 0 || !editable) { if (e.button === 0) e.stopPropagation(); return; }
     const l = sheet.labels.find((x) => x.id === id)!; const p = view.toWorld(e.clientX, e.clientY);
+    if (isDbl(id)) { e.stopPropagation(); const v = prompt('网络标签', l.text); if (v !== null && v.trim() && v.trim() !== l.text) { editor.begin('重命名标签'); editor.dispatch(sch.deleteLabels(sheet.id, [l.id])); editor.dispatch(sch.addLabel(sheet.id, v.trim(), { x: l.x, y: l.y })); editor.commit(); } return; }
     selectId(id, e); beginDrag('移动标签', { kind: 'label', id, dx: p.x - l.x, dy: p.y - l.y }, e);
   };
   const onSimpleDown = (id: string) => (e: RPE<SVGElement>) => { if (e.button !== 0 || !editable) return; e.stopPropagation(); selectId(id, e); };
@@ -486,6 +510,12 @@ export function SchematicCanvas() {
       )}
       {app.pasting && <div className="banner"><span className="dim">粘贴：</span>{app.pasting.clip.components.length} 个元件 · {app.pasting.clip.wires.length} 根导线 · 点击放置 · Esc 取消</div>}
       {app.busDraft && <div className="banner"><span style={{ color: '#4D7FC4' }}>■</span>总线 · 点击加点 · 双击结束 · 连到总线的导线用标签命名（如 D0、D1）</div>}
+      {editable && app.selection.filter((id) => sheet.components.some((c) => c.id === id)).length >= 2 && (
+        <div className="banner" style={{ gap: 6, width: 'max-content' }} onPointerDown={(e) => e.stopPropagation()}>
+          <span className="dim">对齐 {app.selection.filter((id) => sheet.components.some((c) => c.id === id)).length} 个元件</span>
+          {([['left', '左'], ['hcenter', '水平居中'], ['right', '右'], ['top', '上'], ['vcenter', '垂直居中'], ['bottom', '下'], ['hdist', '水平等距'], ['vdist', '垂直等距']] as const).map(([m, label]) => <button key={m} className="btn sm" onClick={() => editor.dispatch(sch.alignComponents(sheet.id, app.selection.filter((id) => sheet.components.some((c) => c.id === id)), m))}>{label}</button>)}
+        </div>
+      )}
       <Hint space="sch" />
       {sheet.components.length === 0 && !app.placing && !app.pasting && (
         <div className="empty-state">

@@ -47,6 +47,8 @@ export class RoutingSpace {
     }
   }
   segment(a: Vec, b: Vec, radius: number, layers: CopperLayer[], net: string) { this.add({ a, b, radius, layers, net, clearance: this.gap(net) }); }
+  /** 移除某网络的全部障碍（拆线重布用）。 */
+  removeNet(net: string) { for (const [k, list] of this.buckets) { const kept = list.filter((o) => o.net !== net); if (kept.length !== list.length) { if (kept.length) this.buckets.set(k, kept); else this.buckets.delete(k); } } }
   free(p: Vec, radius: number, layer: CopperLayer, net: string, clearance: number): boolean {
     const list = this.buckets.get(`${Math.floor(p.x / this.bucketSize)},${Math.floor(p.y / this.bucketSize)}`) ?? [];
     for (const o of list) {

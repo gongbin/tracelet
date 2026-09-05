@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { sch, PAPER_SIZES, paperSize, type SheetFrame } from '@tracelet/kernel';
+import { sch, PAPER_SIZES, paperSize, TITLE_BLOCK, type SheetFrame } from '@tracelet/kernel';
 import { useEditor, useSheet } from '../store/app.js';
 
 const mm = (mil: number) => Math.round(mil * 0.0254);
@@ -31,6 +31,13 @@ export function SheetFrameDialog({ close }: { close: () => void }) {
           </div>
           {f.size !== 'none' && f.size !== 'custom' && <><span className="k">方向</span><div className="seg sm" style={{ width: 120 }}><span className={`seg-opt${f.landscape ? ' on' : ''}`} onClick={() => set({ landscape: true })}>横向</span><span className={`seg-opt${!f.landscape ? ' on' : ''}`} onClick={() => set({ landscape: false })}>纵向</span></div></>}
           {f.size === 'custom' && <><span className="k">长 × 宽 (mm)</span><div className="row" style={{ gap: 6 }}><input className="input mono" style={{ width: 90 }} value={w} onChange={(e) => setW(e.target.value)} onBlur={commitSize} onKeyDown={(e) => { if (e.key === 'Enter') commitSize(); }} /><span className="muted">×</span><input className="input mono" style={{ width: 90 }} value={h} onChange={(e) => setH(e.target.value)} onBlur={commitSize} onKeyDown={(e) => { if (e.key === 'Enter') commitSize(); }} /><span className="dim xs">50–2000 mm</span></div></>}
+          <span className="k">标题栏 宽 × 高 (mm)</span>
+          <div className="row" style={{ gap: 6 }}>
+            <input className="input mono" style={{ width: 80 }} key={`tw${f.titleBlockWidth ?? ''}`} defaultValue={mm(f.titleBlockWidth ?? TITLE_BLOCK.w)} onBlur={(e) => { const v = Number(e.target.value); if (v >= 60 && v <= 400) set({ titleBlockWidth: mil(v) }); }} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
+            <span className="muted">×</span>
+            <input className="input mono" style={{ width: 80 }} key={`th${f.titleBlockHeight ?? ''}`} defaultValue={mm(f.titleBlockHeight ?? TITLE_BLOCK.h)} onBlur={(e) => { const v = Number(e.target.value); if (v >= 15 && v <= 50) set({ titleBlockHeight: mil(v) }); }} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
+            <button className="btn sm" onClick={() => set({ titleBlockWidth: undefined, titleBlockHeight: undefined })}>默认 112×23</button>
+          </div>
           <span className="k" style={{ gridColumn: '1 / -1', marginTop: 6 }}>标题栏内容（留空使用默认）</span>
           <Field k="title" label="标题" placeholder="默认：项目名" />
           <Field k="company" label="公司 / 作者单位" placeholder="默认：Tracelet" />

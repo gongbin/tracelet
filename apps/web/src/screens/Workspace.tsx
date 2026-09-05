@@ -36,7 +36,8 @@ const PCB_TOOLS: ToolDef[] = [
   { id: 'route', name: '走线', key: 'X', d: I.route, desc: '点击焊盘开始；默认 45° 拐角；双击结束。走线中按 V 放过孔换层。' },
   { id: 'via', name: '过孔', key: '', d: I.via, desc: '放置过孔，尺寸跟随网络类。' },
   { id: 'zone', name: '铺铜', key: 'Z', d: I.zone, desc: '画一个区域并选网络（默认 GND），自动填充铜。' },
-  { id: 'place', name: '放置', key: 'A', d: I.comp, desc: '在 PCB 上直接放置新元件，同时同步回原理图。' },
+  { id: 'place', name: '放置', key: 'A', d: I.comp, desc: '在板上直接放仅板级封装：定位孔、基准点、Logo、测试点（不进原理图 / BOM）。' },
+  { id: 'hole', name: '开孔', key: 'H', d: I.junc, desc: '点击放置螺丝孔（M2–M4 非金属化）或金属化通孔；盘中孔请用过孔工具点在焊盘上。' },
   { id: 'edge', name: '板框', key: 'E', d: I.edge, desc: '改长宽、拖动整板（可连同元件）、板框自动包住内容；拖顶点微调，点板外画新的多边形板框（双击闭合）。' },
   { id: 'text', name: '文字', key: 'T', d: I.text, desc: '在丝印层写文字，如版本号、标识。' },
   { id: 'measure', name: '测量', key: 'M', d: I.ruler, desc: '点两点显示距离与 ΔX / ΔY。' },
@@ -79,12 +80,14 @@ export function Workspace() {
       if (S.screen === 'sch' && mod && k === 'a') { e.preventDefault(); S.patch({ selection: [...cur.components.map((c) => c.id), ...cur.wires.map((w) => w.id), ...cur.labels.map((l) => l.id)] }); return; }
       if (mod) return;
       if (e.key === 'Tab') { e.preventDefault(); S.set('focusMode', !S.focusMode); return; }
-      if (e.key === '?') { S.toast('快捷键：A 放元件 · W 连线 · P 电源 · L 标签 · R 旋转 · X 走线 · Z 铺铜 · 1-9 切层 · ⌘K 命令面板 · Tab 焦点模式'); return; }
+      if (e.key === 'Home' || (k === 'f' && S.screen === 'sch' && !S.selection.length)) { e.preventDefault(); S.set('fitSeq', S.fitSeq + 1); return; }
+      if (e.key === '?') { S.toast(S.screen === 'pcb' ? '快捷键：X 走线 · V 过孔换层 · Z 铺铜 · A 放置 · H 开孔 · E 板框 · T 文字 · M 测量 · F 翻面 · R 旋转 · L 对齐 · 1-9 切层 · Home 适配 · ⌘Z 撤销' : '快捷键：A 放元件 · W 连线 · P 电源 · L 标签 · B 总线 · J 结点 · G 图形 · R 旋转 · X 镜像 · F/Home 适配全图 · 双击元件改值 · 双击标签改名 · ⌘C/V/D 复制粘贴 · ⌘K 命令面板'); return; }
       if (e.key === 'F8') { e.preventDefault(); const rep = S.screen === 'pcb' ? a.drc : a.erc; if (!rep.items.length) return; const i = rep.items.findIndex((x) => x.id === S.checkHighlight); const n = rep.items[(i + (e.shiftKey ? -1 : 1) + rep.items.length) % rep.items.length]; locateItem(n, S.screen === 'pcb' ? 'pcb' : 'sch'); return; }
       if (S.screen === 'sch') {
         if (e.key === 'Escape') {
           if (S.pasting) S.patch({ pasting: null }); else if (S.placing) S.stopPlacing(); else if (S.wireDraft || S.busDraft || S.drawDraft || S.measure) S.patch({ wireDraft: null, busDraft: null, drawDraft: null, measure: null }); else if (S.pendingPin) S.patch({ pendingPin: null }); else if (S.labelPrompt) S.patch({ labelPrompt: null }); else if (S.pwrMenuOpen || S.drawMenuOpen) S.patch({ pwrMenuOpen: false, drawMenuOpen: false }); else if (S.schTool !== 'select') S.setSchTool('select'); else S.patch({ selection: [], highlightNet: null, checkHighlight: null });
         }
+        else if (k === 'x' && S.selection.length) { editor.begin('镜像'); for (const id of S.selection) if (cur.components.some((c) => c.id === id)) editor.dispatch(sch.mirrorComponent(sheetId, id)); editor.commit(); }
         else if (k === 'a') S.setSchTool('place');
         else if (k === 'w') S.setSchTool('wire');
         else if (k === 'v') S.setSchTool('select');
@@ -133,6 +136,7 @@ export function Workspace() {
         else if (k === 'x') S.setPcbTool('route');
         else if (k === 'z') S.setPcbTool('zone');
         else if (k === 'a') S.setPcbTool('place');
+        else if (k === 'h') S.setPcbTool('hole');
         else if (k === 'e') S.setPcbTool('edge');
         else if (k === 'l') S.setPcbTool('align');
         else if (k === 't') S.setPcbTool('text');

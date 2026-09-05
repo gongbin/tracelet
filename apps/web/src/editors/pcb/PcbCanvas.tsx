@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from 'react';
-import { pcb, LAYER_COLORS, copperLayers, footprintPads, footprintBody, boardBounds, netClassFor, snapTo, PCB_GRID, dist, segRectDist, segSegDist, pointSegDist, pointInPolygon, rectsOverlap, alignFootprints, autoroute, type Vec, type Rect, type CopperLayer, type Layer, type WorldPad, type AlignMode } from '@tracelet/kernel';
+import { pcb, holeFootprint, SCREW_HOLES, LAYER_COLORS, copperLayers, footprintPads, footprintBody, boardBounds, netClassFor, snapTo, PCB_GRID, dist, segRectDist, segSegDist, pointSegDist, pointInPolygon, rectsOverlap, alignFootprints, autoroute, type Vec, type Rect, type CopperLayer, type Layer, type WorldPad, type AlignMode } from '@tracelet/kernel';
 import { useApp, useEditor, useProject } from '../../store/app.js';
+import { lib } from '@tracelet/kernel';
 import { getAnalysis } from '../../store/analysis.js';
 import { useViewport, gridStep } from '../../hooks/useViewport.js';
 import { Hint } from '../../components/Hint.js';
@@ -64,6 +65,13 @@ export function PcbCanvas() {
     setTimeout(() => view.fit({ x: bb.x - 2, y: bb.y - 2, w: bb.w + 4 + 30, h: bb.h + 4 }, 60), 0);
   }, [project.id, board, view]);
 
+  useEffect(() => {
+    if (!app.fitSeq) return;
+    const c = pcb.contentBounds(board); const o = boardBounds(board);
+    const x = Math.min(o.x, c?.x ?? o.x), y = Math.min(o.y, c?.y ?? o.y), x2 = Math.max(o.x + o.w, c ? c.x + c.w : 0), y2 = Math.max(o.y + o.h, c ? c.y + c.h : 0);
+    view.fit({ x: x - 2, y: y - 2, w: x2 - x + 4, h: y2 - y + 4 }, 60);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app.fitSeq]);
   useEffect(() => {
     if (app.flyTo && app.flyTo.space === 'pcb') view.centerOn({ x: app.flyTo.x, y: app.flyTo.y }, Math.max(vp.k, 20));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -154,6 +162,13 @@ export function PcbCanvas() {
       // 在板内按下：拖动 = 移动板框（可连同内容），单击 = 开始画新板框
       if (!d.length && board.outline.length >= 3 && pointInPolygon(raw, board.outline)) { drag.current = { kind: 'outlineMaybe', raw, p, client: { x: e.clientX, y: e.clientY } }; (e.currentTarget as Element).setPointerCapture(e.pointerId); return; }
       app.patch({ outlineDraft: [...d, p] });
+      return;
+    }
+    if (tool === 'hole') {
+      const def = holeFootprint(app.hole.drill, app.hole.plated, app.hole.ring);
+      if (!editor.project.library.footprints.some((f) => f.id === def.id)) editor.dispatch(lib.addLibraryItems({ footprints: [def] }));
+      const r = pcb.addBoardFootprint(editor.project, { footprintId: def.id, x: p.x, y: p.y, prefix: app.hole.plated ? 'PTH' : 'H' });
+      editor.dispatch(r.command);
       return;
     }
     if (tool === 'measure') { const m = app.measure ?? []; app.patch({ measure: m.length >= 2 ? [p] : [...m, p] }); return; }
@@ -369,6 +384,7 @@ export function PcbCanvas() {
     editor.dispatch(pcb.applyRoutes(r.traces, r.vias, r.moves));
     app.patch({ autoroute: { status: 'idle', result: null } });
     app.toast(`已接受自动布线：${r.traces.length} 段走线 · ${r.vias.length} 个过孔${r.moves?.length ? ` · 微调 ${r.moves.length} 个器件` : ''}（可 Undo）`, 'success');
+    app.set('rightTab', 'guide');
   };
   useEffect(() => { if (tool === 'autoroute' && app.autoroute.status === 'idle') { runAutoroute(); app.set('pcbTool', 'select'); } // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool]);
@@ -382,7 +398,7 @@ export function PcbCanvas() {
   const cursorSnap = { x: sg(app.cursorWorld.x), y: sg(app.cursorWorld.y) };
   const routePreview = app.routing ? previewPath(app.cursorWorld) : null;
   const drcMarks = analysis.drc.items.filter((i) => i.location && i.rule !== 'outside-board');
-  const cursor = tool === 'route' || tool === 'zone' || tool === 'measure' || tool === 'via' || tool === 'edge' ? 'crosshair' : view.panning ? 'grabbing' : view.spaceDown ? 'grab' : 'default';
+  const cursor = tool === 'route' || tool === 'zone' || tool === 'measure' || tool === 'via' || tool === 'edge' || tool === 'hole' ? 'crosshair' : view.panning ? 'grabbing' : view.spaceDown ? 'grab' : 'default';
   const hlItem = app.checkHighlight ? analysis.drc.items.find((i) => i.id === app.checkHighlight) : null;
   const selTrace = app.pcbSelection.length === 1 ? board.traces.find((t) => t.id === app.pcbSelection[0]) : undefined;
   const showOutlineHandles = tool === 'edge' && !app.outlineDraft;
@@ -468,6 +484,7 @@ export function PcbCanvas() {
               <circle cx={routePreview[routePreview.length - 1].x} cy={routePreview[routePreview.length - 1].y} r={app.routing.width} fill="none" stroke={previewBad ? '#FF3B30' : '#fff'} strokeWidth={0.06} />
             </g>
           )}
+          {tool === 'hole' && (() => { const d = app.hole.drill, pad = app.hole.plated ? d + 2 * app.hole.ring : d; return <g pointerEvents="none" opacity={0.7}><circle cx={cursorSnap.x} cy={cursorSnap.y} r={pad / 2} fill={app.hole.plated ? '#3D8BFF' : 'none'} stroke="#3D8BFF" strokeWidth={0.1} strokeDasharray="0.3 0.2" /><circle cx={cursorSnap.x} cy={cursorSnap.y} r={d / 2} fill="#1A1D23" stroke="#D0D2D6" strokeWidth={0.08} /></g>; })()}
           {/* 板级封装放置预览 */}
           {tool === 'place' && app.pcbPlacing && (() => { const ghost = { id: 'ghost', ref: '?', footprintId: app.pcbPlacing.footprintId, value: '', x: cursorSnap.x, y: cursorSnap.y, rotation: app.pcbPlacing.rotation, side: (app.activeLayer === 'B.Cu' ? 'B' : 'F') as 'F' | 'B', padNets: {} }; const b = footprintBody(ghost); return (
             <g pointerEvents="none" opacity={0.75}>
@@ -536,6 +553,17 @@ export function PcbCanvas() {
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: LAYER_COLORS[app.routing.layer] }} />
           走线中 <span className="mono">{app.routing.net || '无网络'}</span> · {app.routing.layer} · <span className="mono">{fmt(app.routing.width)}mm</span>
           {previewBad ? <span style={{ color: 'var(--error)' }}>间距不足（&lt; {analysis.rules.minClearance}mm）</span> : <span className="dim">点击加点 · 双击或点同网络焊盘结束 · V 过孔换层 · Esc 取消</span>}
+        </div>
+      )}
+      {tool === 'hole' && (
+        <div className="banner" style={{ gap: 8, flexWrap: 'wrap', width: 'max-content', maxWidth: 'calc(100% - 24px)' }} onPointerDown={(e) => e.stopPropagation()}>
+          <span className="dim">开孔</span>
+          {SCREW_HOLES.map((h) => <span key={h.label} className={`chip mono${Math.abs(app.hole.drill - h.drill) < 1e-6 ? ' on' : ''}`} onClick={() => app.set('hole', { ...app.hole, drill: h.drill })}>{h.label} ⌀{h.drill}</span>)}
+          <span className="row mono xs" style={{ gap: 4 }}>⌀<input className="input mono" style={{ width: 56, height: 22 }} key={app.hole.drill} defaultValue={app.hole.drill} onBlur={(e) => { const v = Number(e.target.value); if (v >= 0.3 && v <= 20) app.set('hole', { ...app.hole, drill: v }); }} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} /> mm</span>
+          <span className={`chip${!app.hole.plated ? ' on' : ''}`} onClick={() => app.set('hole', { ...app.hole, plated: false })}>非金属化（螺丝孔）</span>
+          <span className={`chip${app.hole.plated ? ' on' : ''}`} onClick={() => app.set('hole', { ...app.hole, plated: true })}>金属化（可接地 / 接线）</span>
+          {app.hole.plated && <span className="row mono xs" style={{ gap: 4 }}>环宽<input className="input mono" style={{ width: 48, height: 22 }} key={app.hole.ring} defaultValue={app.hole.ring} onBlur={(e) => { const v = Number(e.target.value); if (v >= 0.15 && v <= 3) app.set('hole', { ...app.hole, ring: v }); }} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} /></span>}
+          <span className="dim">点击板面放置 · 盘中孔：用过孔工具点在焊盘中心 · Esc 结束</span>
         </div>
       )}
       {tool === 'edge' && !app.routing && (

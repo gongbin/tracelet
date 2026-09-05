@@ -174,7 +174,7 @@ function RefDesigns() {
     setBusy(label); setProgress(null);
     const ac = new AbortController(); abortRef.current = ac;
     try { const spec = await recognizeSchematic(cfg, src, { onProgress: setProgress, signal: ac.signal }); setExtracted({ spec, from: label }); app.toast(`识别完成：${spec.components.length} 个元件`, 'success'); }
-    catch (e) { if (!ac.signal.aborted) app.toast(`识别失败：${(e as Error).message}`, 'error'); }
+    catch (e) { if (!ac.signal.aborted) { const msg = (e as Error).message; app.toast(`识别失败：${msg}${src.kind === 'url' && /404|not found|fetch|url|下载|无法/i.test(msg) ? '（该链接可能已失效：请在浏览器打开链接下载 PDF 后用「选择文件…」上传）' : ''}`, 'error'); } }
     finally { setBusy(null); setProgress(null); abortRef.current = null; }
   };
   const generate = () => {

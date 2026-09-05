@@ -5,7 +5,7 @@
  */
 import type { Project } from '../model/project.js';
 import type { Sheet } from '../model/schematic.js';
-import { paperSize } from '../model/schematic.js';
+import { paperSize, titleBlockSize } from '../model/schematic.js';
 import { getSymbol } from '../library/symbols.js';
 import { componentStrokes } from '../schematic/render.js';
 import { allPads, footprintBody, boardBounds } from '../board/geometry.js';
@@ -108,18 +108,19 @@ export function paintSheet(project: Project, sheet: Sheet, index: number): { w: 
     const cols = Math.round(W / 2000), rows = Math.round(H / 2000);
     for (let i = 0; i < cols; i++) { const x0 = m + ((W - 2 * m) / cols) * i, x1 = m + ((W - 2 * m) / cols) * (i + 1); if (i) { P.polyline([{ x: x0, y: 0 }, { x: x0, y: m }], 8); P.polyline([{ x: x0, y: H - m }, { x: x0, y: H }], 8); } P.text((x0 + x1) / 2, m * 0.68, String(i + 1), 110, 'middle'); P.text((x0 + x1) / 2, H - m * 0.32, String(i + 1), 110, 'middle'); }
     for (let i = 0; i < rows; i++) { const y0 = m + ((H - 2 * m) / rows) * i, y1 = m + ((H - 2 * m) / rows) * (i + 1); if (i) { P.polyline([{ x: 0, y: y0 }, { x: m, y: y0 }], 8); P.polyline([{ x: W - m, y: y0 }, { x: W, y: y0 }], 8); } const ch = String.fromCharCode(65 + i); P.text(m / 2, (y0 + y1) / 2 + 40, ch, 110, 'middle'); P.text(W - m / 2, (y0 + y1) / 2 + 40, ch, 110, 'middle'); }
-    const tbW = 4400, tbH = 900, tx = W - m - tbW, ty = H - m - tbH;
-    P.rect(tx, ty, tbW, tbH, 12); P.polyline([{ x: tx, y: ty + 300 }, { x: tx + tbW, y: ty + 300 }], 12); P.polyline([{ x: tx, y: ty + 600 }, { x: tx + tbW, y: ty + 600 }], 12);
-    P.polyline([{ x: tx + 2600, y: ty + 600 }, { x: tx + 2600, y: ty + tbH }], 12); P.polyline([{ x: tx + 3500, y: ty + 600 }, { x: tx + 3500, y: ty + tbH }], 12);
+    const { w: tbW, h: tbH } = titleBlockSize(fr, W); const tx = W - m - tbW, ty = H - m - tbH;
+    const sx = tbW / 4400, sy = tbH / 900, X = (v: number) => tx + v * sx, Y = (v: number) => ty + v * sy;
+    P.rect(tx, ty, tbW, tbH, 12); P.polyline([{ x: tx, y: Y(300) }, { x: tx + tbW, y: Y(300) }], 12); P.polyline([{ x: tx, y: Y(600) }, { x: tx + tbW, y: Y(600) }], 12);
+    P.polyline([{ x: X(2600), y: Y(600) }, { x: X(2600), y: ty + tbH }], 12); P.polyline([{ x: X(3500), y: Y(600) }, { x: X(3500), y: ty + tbH }], 12);
     P.color('#3A3835', false);
     const L = fr.labels;
-    P.text(tx + 80, ty + 110, fr.company || 'Tracelet', 100); P.text(tx + 80, ty + 240, fr.title || project.name, 170, 'start', { bold: true });
-    P.text(tx + 80, ty + 410, L.sheet, 100); P.text(tx + 80, ty + 540, sheet.name, 140);
-    P.text(tx + 80, ty + 700, L.date, 100); P.text(tx + 80, ty + 840, fr.date || project.updatedAt.slice(0, 10), 130);
-    P.text(tx + 2680, ty + 700, L.revision, 100); P.text(tx + 2680, ty + 840, fr.revision, 130);
-    P.text(tx + 3580, ty + 700, L.page, 100); P.text(tx + 3580, ty + 840, `${index + 1} / ${project.schematic.sheets.length}`, 130);
-    P.text(tx + 2680, ty + 240, `${fr.size === 'custom' ? `${Math.round(W * 0.0254)}x${Math.round(H * 0.0254)}mm` : fr.size}${fr.author ? '  ' + L.author + ': ' + fr.author : ''}`, 100);
-    P.text(tx + 2680, ty + 540, fr.comment, 100);
+    P.text(X(80), Y(110), fr.company || 'Tracelet', 100); P.text(X(80), Y(240), fr.title || project.name, Math.min(170, 170 * sy), 'start', { bold: true });
+    P.text(X(80), Y(410), L.sheet, 100); P.text(X(80), Y(540), sheet.name, 140);
+    P.text(X(80), Y(700), L.date, 100); P.text(X(80), Y(840), fr.date || project.updatedAt.slice(0, 10), 130);
+    P.text(X(2680), Y(700), L.revision, 100); P.text(X(2680), Y(840), fr.revision, 130);
+    P.text(X(3580), Y(700), L.page, 100); P.text(X(3580), Y(840), `${index + 1} / ${project.schematic.sheets.length}`, 130);
+    P.text(X(2680), Y(240), `${fr.size === 'custom' ? `${Math.round(W * 0.0254)}x${Math.round(H * 0.0254)}mm` : fr.size}${fr.author ? '  ' + L.author + ': ' + fr.author : ''}`, 100);
+    P.text(X(2680), Y(540), fr.comment, 100);
   }
   // 导线 / 总线 / 结点
   P.color('#1F5F2B'); for (const w of sheet.wires) P.polyline(w.points, 16);

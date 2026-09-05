@@ -96,6 +96,8 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   const occ = new Int32Array(N * L); // 值 = 网络 id（0 空，-1 硬障碍 / 无网络铜）—— 只用于"沿自家已有铜"的代价
   const space = new RoutingSpace(board, rules);
   space.reserveEscapes();
+  // 新走线的精确几何索引（严格模式的硬障碍；按网络增删）
+  const dyn = new RoutingSpace({ ...board, footprints: [], traces: [], vias: [], zones: [] }, rules);
   const edgeDistance = new Float32Array(N);
   const markCell = (i: number, value: number) => { const old = occ[i]; occ[i] = old === 0 || old === value ? value : -1; };
   const netIds = new Map<string, number>();
@@ -162,8 +164,12 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   };
   const ownOnlyAt = (i: number, nid: number) => cnt[i] === 1 && own1[i] === nid;
   /** 标记一个网络：每格记录到该网络铜边的最小距离（标记带宽 = 最大间距 + 最宽线半宽）。 */
+  let useMarks = false; // 仅协商模式需要网格冲突图
   const markNet = (nr: NetRoutes) => {
     if (nr.cells) unmarkNet(nr);
+    dyn.removeNet(nr.net);
+    for (const r of nr.routes) { for (const t of r.traces) for (let i = 1; i < t.points.length; i++) dyn.segment(t.points[i - 1], t.points[i], t.width / 2, [t.layer], nr.net); for (const v of r.vias) dyn.segment(v, v, v.size / 2, layers, nr.net); }
+    if (!useMarks) return;
     const dmap = new Map<number, number>();
     const band = clMax + wMax / 2;
     const all = layers.map((_, i) => i);
@@ -185,6 +191,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     nr.cells = cells;
   };
   const unmarkNet = (nr: NetRoutes) => {
+    dyn.removeNet(nr.net);
     if (!nr.cells) return;
     for (const i of nr.cells) {
       if (cnt[i] > 0) cnt[i]--;
@@ -245,6 +252,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   const came = new Int32Array(N * L);
   const heap = new MinHeap();
   const freeStamp = new Int32Array(N * L), freeVal = new Int8Array(N * L);
+  const dynS = new Int32Array(N * L), dynV = new Int8Array(N * L);
   const viaStamp = new Int32Array(N), viaVal = new Int8Array(N);
   let generation = 0;
   let routedLines = 0;
@@ -287,7 +295,21 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       return true;
     };
     const hw = preferredWidth / 2;
-    const free = (x: number, y: number, l: number) => { if (!staticFree(x, y, l)) return false; const c = conflictAt(idx(x, y, l), nid, hw, net); return c === 0 || (c === 1 && mode === 'negotiate'); };
+    const dynFree = (x: number, y: number, l: number): boolean => {
+      const i = idx(x, y, l);
+      if (dynS[i] === generation) return dynV[i] === 1;
+      dynS[i] = generation;
+      const p = toWorld(x, y);
+      const nearPad = [pa, pb].some((pd) => pd && segRectDist(p, p, pd.rect) < 1.25);
+      const ok = dyn.free(p, (nearPad ? width : preferredWidth) / 2, layers[l], net, clearance);
+      dynV[i] = ok ? 1 : -1;
+      return ok;
+    };
+    const free = (x: number, y: number, l: number) => {
+      if (!staticFree(x, y, l)) return false;
+      if (mode === 'strict') return dynFree(x, y, l);
+      const c = conflictAt(idx(x, y, l), nid, hw, net); return c === 0 || c === 1;
+    };
     const viaDrill = Math.max(rules.minDrill, netClassFor(board, net)?.viaDrill ?? 0.3);
     const viaSize = Math.max(netClassFor(board, net)?.viaSize ?? 0.6, viaDrill + 2 * rules.minAnnularRing);
     const viaFree = (x: number, y: number): boolean => {
@@ -334,7 +356,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
         if (ng < gScore[ni]) { gScore[ni] = ng; came[ni] = i; heap.push(ng + h(nx, ny), ni); }
       }
       if (L > 1 && viaFree(x, y)) {
-        const vc = viaConflict(x, y);
+        const vc = mode === 'strict' ? (layers.every((layer) => dyn.free(toWorld(x, y), viaSize / 2, layer, net, clearance)) ? 0 : -1) : viaConflict(x, y);
         if (vc >= 0 && !(mode === 'strict' && vc)) for (let nl = 0; nl < L; nl++) {
           if (nl === l) continue;
           const ni = idx(x, y, nl); const ng = gi + viaCost + (vc ? pf * vc * (1 + hist[ni]) : 0);
@@ -438,6 +460,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     return out;
   };
   let rounds = 0;
+  void useMarks; void conflictNets;
   /** 一组网络按"全局最短飞线优先"交替布线（先布完 priority 组的所有线）；每条线布完只重算该网络的连通性。 */
   const routeGroup = (group: NetRoutes[], mode: 'negotiate' | 'strict', pf: number, first: Set<string> = new Set()) => {
     const pending = new Map<string, RatsnestLine[]>();
@@ -475,7 +498,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   };
   // 第 2 阶段：拆线重布——失败网络 + 挡路网络一起拆掉，失败网络优先重布，挡路网络随后按最短优先补回；变差则回滚
   let rollbacks = 0;
-  for (let pass = 0; pass < 4 && rollbacks < 2; pass++) {
+  for (let pass = 0; pass < 4 && rollbacks < 1; pass++) {
     const failedNets = [...nets.values()].filter(retryable);
     if (!failedNets.length || Date.now() > deadline) break;
     const blockers = blockersOf(failedNets, 2.5 + pass * 1.5);
@@ -489,6 +512,20 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     routeGroup(subset, 'strict', 0, new Set(failedNets.map((n) => n.net)));
     const after = remainingLines().length;
     if (after >= before) { rollbacks++; for (const [nr, snap] of snapshot) { ripNet(nr); nr.routes = snap.routes; nr.failures = snap.failures; markNet(nr); } } // 没有变好：回滚，下一轮扩大拆线范围；连续两次无效即停
+  }
+  // 第 3 阶段：还有失败就整板重布一到两次，失败网络优先（相当于换一种布线顺序）；没有变好则回滚
+  for (let attempt = 0; attempt < 1; attempt++) {
+    const failedNets = [...nets.values()].filter(retryable);
+    if (!failedNets.length || Date.now() > deadline || Date.now() - t0 > 20000) break; // 大板不再整板重布，时间花在刀刃上
+    rounds++;
+    opts.debug?.({ full: attempt, t: Date.now() - t0, failed: failedNets.map((n) => n.net) });
+    const before = remainingLines().length;
+    const all = [...nets.values()];
+    const snapshot = new Map(all.map((nr) => [nr, { routes: nr.routes, failures: new Map(nr.failures) }]));
+    for (const nr of all) ripNet(nr);
+    routeGroup(all, 'strict', 0, new Set(failedNets.map((n) => n.net)));
+    const after = remainingLines().length;
+    if (after >= before) { for (const [nr, snap] of snapshot) { ripNet(nr); nr.routes = snap.routes; nr.failures = snap.failures; markNet(nr); } break; }
   }
   let stuck: NetRoutes[] = [];
   // 最终几何校验（保守栅格标记之外的漏网之鱼）：不合格的网络严格重布一次

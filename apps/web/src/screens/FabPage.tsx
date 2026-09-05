@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { pcb, command, RULE_SETS, exportFabZip, boardBounds, DEFAULT_STACKUP } from '@tracelet/kernel';
 import { StackupDialog } from '../components/StackupDialog.js';
+import { OrderTipsDialog } from '../components/OrderTipsDialog.js';
 import { modelFor, needsModel } from '../editors/three/models.js';
 import { GerberPreview } from '../editors/pcb/GerberPreview.js';
 import { useT } from '../i18n/index.js';
@@ -47,13 +48,7 @@ export function FabPage() {
     download(z.name, z.data, 'application/zip');
     app.toast(`已下载 ${z.name}（Gerber ${b.copperCount + 7} 层 + 钻孔${exports.bom ? ' + BOM' : ''}${exports.pnp ? ' + 坐标' : ''}${exports.asm ? ' + 装配图 PDF' : ''}${exports.sch ? ' + 原理图 PDF' : ''}）`, 'success');
   };
-  const VENDOR: Record<string, { name: string; url: string }> = { jlc: { name: '嘉立创', url: 'https://www.jlc.com/' }, jlcpcb: { name: 'JLCPCB', url: 'https://cart.jlcpcb.com/quote' } };
-  const order = () => {
-    doExport();
-    const v = VENDOR[project.settings.ruleSetId];
-    if (v) { window.open(v.url, '_blank', 'noopener'); app.toast(`已打开${v.name}下单页：上传刚下载的 zip，按 README 里的参数（${b.copperCount} 层 · ${b.thickness}mm · ${st.finish} · ${st.maskColor}阻焊）填写即可`); }
-    else app.toast('通用规则集没有绑定板厂：把 zip 上传到你的板厂下单页即可');
-  };
+  const [orderTips, setOrderTips] = useState(false);
   const setSetting = (patch: Partial<typeof project.settings>) => editor.dispatch(command('项目设置', (p) => ({ ...p, settings: { ...p.settings, ...patch } })));
 
   const EXPORTS = [['gerber', `Gerber + 钻孔（${project.settings.fab}格式）`], ['bom', 'BOM（LCSC 模板）'], ['pnp', '坐标文件'], ['asm', '装配图 PDF（顶 / 底）'], ['sch', '原理图 PDF']];
@@ -96,7 +91,7 @@ export function FabPage() {
         <div className="row" style={{ gap: 10 }}>
           <button className="btn lg quiet" onClick={() => setPreview(true)}>{t('fab.preview')}</button>
           <button className="btn lg quiet" onClick={doExport}>⇩ {t('fab.download')}</button>
-          <button className="btn lg primary" onClick={order} title="下载制造包并打开板厂下单页">{t('fab.order')}</button>
+          <button className="btn lg primary" onClick={() => setOrderTips(true)} title="下单参数与平台建议（不跳转厂商）">{t('fab.order')}</button>
           <span className="ml-auto xs dim mono">{exportFabZip.name && `${slug}_${new Date().toISOString().slice(0, 10)}.zip`}</span>
         </div>
         <section className="col" style={{ gap: 6 }}>
@@ -106,6 +101,7 @@ export function FabPage() {
       </div>
       {preview && <GerberPreview onClose={() => setPreview(false)} />}
       {stackup && <StackupDialog close={() => setStackup(false)} />}
+      {orderTips && <OrderTipsDialog close={() => setOrderTips(false)} onDownload={doExport} />}
     </div>
   );
 }

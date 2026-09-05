@@ -152,3 +152,12 @@ export function ensureGenerated(spec: FootprintSpec): FootprintDef {
   registerFootprints([def]);
   return def;
 }
+
+/** 开孔封装：非金属化（螺丝孔）或金属化（带环宽的通孔焊盘，可接网络）。 */
+export function holeFootprint(drill: number, plated = false, ring = 0.5): FootprintDef {
+  const d = Math.round(drill * 100) / 100, pad = plated ? Math.round((d + 2 * ring) * 100) / 100 : d;
+  const name = plated ? `PTH_${d}mm_Ring${ring}mm` : `Hole_${d}mm`;
+  return { id: `fp:gen:${name}`, name, body: { w: pad + 0.6, h: pad + 0.6 }, height: 0, description: plated ? `金属化孔 ⌀${d}mm，环宽 ${ring}mm` : `非金属化孔 ⌀${d}mm`, pads: [{ number: '1', x: 0, y: 0, w: pad, h: pad, shape: 'circle', drill: d, npth: !plated }] };
+}
+/** 常用螺丝孔（孔径含间隙）。 */
+export const SCREW_HOLES: { label: string; drill: number }[] = [{ label: 'M2', drill: 2.2 }, { label: 'M2.5', drill: 2.7 }, { label: 'M3', drill: 3.2 }, { label: 'M4', drill: 4.3 }];

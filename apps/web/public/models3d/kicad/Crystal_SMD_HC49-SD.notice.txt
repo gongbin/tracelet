@@ -1,0 +1,3 @@
+Source: https://gitlab.com/kicad/libraries/kicad-packages3D/-/blob/master/Crystal.3dshapes/Crystal_SMD_HC49-SD.step
+ISO-10303-21;
+HEADER;

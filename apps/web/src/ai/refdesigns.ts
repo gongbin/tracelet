@@ -7,10 +7,10 @@ import type { AiConfig } from './config.js';
 
 export interface RefDesign { title: string; vendor: string; url: string; note?: string; source: 'catalog' | 'search' }
 
-/** 精选目录（官方 PDF 链接，可能随厂商站点调整）。 */
+/** 精选目录（官方 PDF 直链，2026-09 逐条核对过；厂商改链接时请用联网搜索或手动下载后上传）。 */
 export const REF_CATALOG: RefDesign[] = [
-  { title: 'ESP32-S3-DevKitC-1 v1.1 原理图', vendor: 'Espressif', url: 'https://dl.espressif.com/dl/schematics/SCH_ESP32-S3-DEVKITC-1_V1.1_20220413.pdf', source: 'catalog' },
-  { title: 'ESP32-S3-DevKitM-1 原理图', vendor: 'Espressif', url: 'https://dl.espressif.com/dl/schematics/SCH_ESP32-S3-DevKitM-1_V1_20210310A.pdf', source: 'catalog' },
+  { title: 'ESP32-S3-DevKitC-1 v1.1 原理图', vendor: 'Espressif', url: 'https://dl.espressif.com/dl/schematics/SCH_ESP32-S3-DevKitC-1_V1.1_20221130.pdf', source: 'catalog' },
+  { title: 'ESP32-C3-DevKitC-02 原理图', vendor: 'Espressif', url: 'https://dl.espressif.com/dl/schematics/SCH_ESP32-C3-DEVKITC-02_V1_1_20210126A.pdf', source: 'catalog' },
   { title: 'ESP32-DevKitC v4 原理图', vendor: 'Espressif', url: 'https://dl.espressif.com/dl/schematics/esp32_devkitc_v4-sch.pdf', source: 'catalog' },
   { title: 'ESP32-C3-DevKitM-1 原理图', vendor: 'Espressif', url: 'https://dl.espressif.com/dl/schematics/SCH_ESP32-C3-DEVKITM-1_V1_20200915A.pdf', source: 'catalog' },
   { title: 'ESP32-C6-DevKitC-1 原理图', vendor: 'Espressif', url: 'https://dl.espressif.com/dl/schematics/esp32-c6-devkitc-1-schematics_v1.2.pdf', source: 'catalog' },

@@ -1,362 +1,7562 @@
 {
-  "R_0805_2012Metric": [
-    {
-      "path": "Resistor_SMD.3dshapes/R_0805_2012Metric.step",
-      "offset": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ],
-  "SOT-23": [
-    {
-      "path": "Package_TO_SOT_SMD.3dshapes/SOT-23.step",
-      "offset": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ],
-  "DIP-4_W7.62mm": [
-    {
-      "path": "Package_DIP.3dshapes/DIP-4_W7.62mm.step",
-      "offset": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ],
-  "C_0805_2012Metric": [
-    {
-      "path": "Capacitor_SMD.3dshapes/C_0805_2012Metric.step",
-      "offset": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ],
-  "SOIC-16_3.9x9.9mm_P1.27mm": [
-    {
-      "path": "Package_SO.3dshapes/SOIC-16_3.9x9.9mm_P1.27mm.step",
-      "offset": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ],
-  "PinHeader_1x02_P2.54mm_Vertical": [
-    {
-      "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x02_P2.54mm_Vertical.step",
-      "offset": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ],
-  "Fuse_1206_3216Metric": [
-    {
-      "path": "Fuse.3dshapes/Fuse_1206_3216Metric.step",
-      "offset": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ],
-  "C_1206_3216Metric": [
-    {
-      "path": "Capacitor_SMD.3dshapes/C_1206_3216Metric.step",
-      "offset": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ],
-  "TSOT-23-6": [
-    {
-      "path": "Package_TO_SOT_SMD.3dshapes/TSOT-23-6.step",
-      "offset": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ],
-  "SW_Tactile_SPST_Angled_PTS645Vx58-2LFS": [
-    {
-      "path": "Button_Switch_THT.3dshapes/SW_Tactile_SPST_Angled_PTS645Vx58-2LFS.step",
-      "offset": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ],
-  "PinHeader_1x04_P2.54mm_Vertical": [
-    {
-      "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x04_P2.54mm_Vertical.step",
-      "offset": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ],
-  "USB_C_Receptacle_HRO_TYPE-C-31-M-12": [
-    {
-      "path": "Connector_USB.3dshapes/USB_C_Receptacle_HRO_TYPE-C-31-M-12.step",
-      "offset": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ],
-  "LED_RGB_Wuerth-PLCC4_3.2x2.8mm_150141M173100": [
-    {
-      "path": "LED_SMD.3dshapes/LED_RGB_Wuerth-PLCC4_3.2x2.8mm_150141M173100.step",
-      "offset": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ],
-  "L_Bourns_SRP5030T": [
-    {
-      "path": "Inductor_SMD.3dshapes/L_Bourns_SRP5030T.step",
-      "offset": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ],
-  "SOT-23-6": [
-    {
-      "path": "Package_TO_SOT_SMD.3dshapes/SOT-23-6.step",
-      "offset": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ],
-  "LED_0805_2012Metric": [
-    {
-      "path": "LED_SMD.3dshapes/LED_0805_2012Metric.step",
-      "offset": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ],
-  "ESP32-C6-WROOM-1": [
-    {
-      "path": "3dmodels/com_github_espressif_kicad-libraries/espressif.3dshapes/ESP32-C6-WROOM-1.STEP",
-      "offset": [
-        -9,
-        -9.75,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ],
-  "SOT-583-8": [
-    {
-      "path": "Package_TO_SOT_SMD.3dshapes/SOT-583-8.step",
-      "offset": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ]
-    }
-  ]
+ "R_0805_2012Metric": [
+  {
+   "path": "Resistor_SMD.3dshapes/R_0805_2012Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOT-23": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/SOT-23.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "DIP-4_W7.62mm": [
+  {
+   "path": "Package_DIP.3dshapes/DIP-4_W7.62mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "C_0805_2012Metric": [
+  {
+   "path": "Capacitor_SMD.3dshapes/C_0805_2012Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOIC-16_3.9x9.9mm_P1.27mm": [
+  {
+   "path": "Package_SO.3dshapes/SOIC-16_3.9x9.9mm_P1.27mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x02_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x02_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "Fuse_1206_3216Metric": [
+  {
+   "path": "Fuse.3dshapes/Fuse_1206_3216Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "C_1206_3216Metric": [
+  {
+   "path": "Capacitor_SMD.3dshapes/C_1206_3216Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TSOT-23-6": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/TSOT-23-6.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SW_Tactile_SPST_Angled_PTS645Vx58-2LFS": [
+  {
+   "path": "Button_Switch_THT.3dshapes/SW_Tactile_SPST_Angled_PTS645Vx58-2LFS.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x04_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x04_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "USB_C_Receptacle_HRO_TYPE-C-31-M-12": [
+  {
+   "path": "Connector_USB.3dshapes/USB_C_Receptacle_HRO_TYPE-C-31-M-12.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_RGB_Wuerth-PLCC4_3.2x2.8mm_150141M173100": [
+  {
+   "path": "LED_SMD.3dshapes/LED_RGB_Wuerth-PLCC4_3.2x2.8mm_150141M173100.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_Bourns_SRP5030T": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_Bourns_SRP5030T.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOT-23-6": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/SOT-23-6.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_0805_2012Metric": [
+  {
+   "path": "LED_SMD.3dshapes/LED_0805_2012Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "ESP32-C6-WROOM-1": [
+  {
+   "path": "3dmodels/com_github_espressif_kicad-libraries/espressif.3dshapes/ESP32-C6-WROOM-1.STEP",
+   "offset": [
+    -9,
+    -9.75,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOT-583-8": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/SOT-583-8.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_0201_0603Metric": [
+  {
+   "path": "Resistor_SMD.3dshapes/R_0201_0603Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_0201": [
+  {
+   "path": "Resistor_SMD.3dshapes/R_0201_0603Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "C_0201_0603Metric": [
+  {
+   "path": "Capacitor_SMD.3dshapes/C_0201_0603Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "C_0201": [
+  {
+   "path": "Capacitor_SMD.3dshapes/C_0201_0603Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_0201_0603Metric": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_0201_0603Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_0201": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_0201_0603Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_0201_0603Metric": [
+  {
+   "path": "LED_SMD.3dshapes/LED_0201_0603Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_0201": [
+  {
+   "path": "LED_SMD.3dshapes/LED_0201_0603Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_0402_1005Metric": [
+  {
+   "path": "Resistor_SMD.3dshapes/R_0402_1005Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_0402": [
+  {
+   "path": "Resistor_SMD.3dshapes/R_0402_1005Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "C_0402_1005Metric": [
+  {
+   "path": "Capacitor_SMD.3dshapes/C_0402_1005Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "C_0402": [
+  {
+   "path": "Capacitor_SMD.3dshapes/C_0402_1005Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_0402_1005Metric": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_0402_1005Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_0402": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_0402_1005Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_0402_1005Metric": [
+  {
+   "path": "LED_SMD.3dshapes/LED_0402_1005Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_0402": [
+  {
+   "path": "LED_SMD.3dshapes/LED_0402_1005Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_0603_1608Metric": [
+  {
+   "path": "Resistor_SMD.3dshapes/R_0603_1608Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_0603": [
+  {
+   "path": "Resistor_SMD.3dshapes/R_0603_1608Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "C_0603_1608Metric": [
+  {
+   "path": "Capacitor_SMD.3dshapes/C_0603_1608Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "C_0603": [
+  {
+   "path": "Capacitor_SMD.3dshapes/C_0603_1608Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_0603_1608Metric": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_0603_1608Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_0603": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_0603_1608Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_0603_1608Metric": [
+  {
+   "path": "LED_SMD.3dshapes/LED_0603_1608Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_0603": [
+  {
+   "path": "LED_SMD.3dshapes/LED_0603_1608Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "D_0603_1608Metric": [
+  {
+   "path": "Diode_SMD.3dshapes/D_0603_1608Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "D_0603": [
+  {
+   "path": "Diode_SMD.3dshapes/D_0603_1608Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_0805": [
+  {
+   "path": "Resistor_SMD.3dshapes/R_0805_2012Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "C_0805": [
+  {
+   "path": "Capacitor_SMD.3dshapes/C_0805_2012Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_0805_2012Metric": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_0805_2012Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_0805": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_0805_2012Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_0805": [
+  {
+   "path": "LED_SMD.3dshapes/LED_0805_2012Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "D_0805_2012Metric": [
+  {
+   "path": "Diode_SMD.3dshapes/D_0805_2012Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "D_0805": [
+  {
+   "path": "Diode_SMD.3dshapes/D_0805_2012Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_1206_3216Metric": [
+  {
+   "path": "Resistor_SMD.3dshapes/R_1206_3216Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_1206": [
+  {
+   "path": "Resistor_SMD.3dshapes/R_1206_3216Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "C_1206": [
+  {
+   "path": "Capacitor_SMD.3dshapes/C_1206_3216Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_1206_3216Metric": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_1206_3216Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_1206": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_1206_3216Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_1206_3216Metric": [
+  {
+   "path": "LED_SMD.3dshapes/LED_1206_3216Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_1206": [
+  {
+   "path": "LED_SMD.3dshapes/LED_1206_3216Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "D_1206_3216Metric": [
+  {
+   "path": "Diode_SMD.3dshapes/D_1206_3216Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "D_1206": [
+  {
+   "path": "Diode_SMD.3dshapes/D_1206_3216Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_1210_3225Metric": [
+  {
+   "path": "Resistor_SMD.3dshapes/R_1210_3225Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_1210": [
+  {
+   "path": "Resistor_SMD.3dshapes/R_1210_3225Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "C_1210_3225Metric": [
+  {
+   "path": "Capacitor_SMD.3dshapes/C_1210_3225Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "C_1210": [
+  {
+   "path": "Capacitor_SMD.3dshapes/C_1210_3225Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_1210_3225Metric": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_1210_3225Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_1210": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_1210_3225Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_1210_3225Metric": [
+  {
+   "path": "LED_SMD.3dshapes/LED_1210_3225Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_1210": [
+  {
+   "path": "LED_SMD.3dshapes/LED_1210_3225Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_2010_5025Metric": [
+  {
+   "path": "Resistor_SMD.3dshapes/R_2010_5025Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_2010": [
+  {
+   "path": "Resistor_SMD.3dshapes/R_2010_5025Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "C_2010_5025Metric": [
+  {
+   "path": "Capacitor_SMD.3dshapes/C_2010_5025Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "C_2010": [
+  {
+   "path": "Capacitor_SMD.3dshapes/C_2010_5025Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_2010_5025Metric": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_2010_5025Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_2010": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_2010_5025Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_2010_5025Metric": [
+  {
+   "path": "LED_SMD.3dshapes/LED_2010_5025Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_2010": [
+  {
+   "path": "LED_SMD.3dshapes/LED_2010_5025Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "D_2010_5025Metric": [
+  {
+   "path": "Diode_SMD.3dshapes/D_2010_5025Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "D_2010": [
+  {
+   "path": "Diode_SMD.3dshapes/D_2010_5025Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_2512_6332Metric": [
+  {
+   "path": "Resistor_SMD.3dshapes/R_2512_6332Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_2512": [
+  {
+   "path": "Resistor_SMD.3dshapes/R_2512_6332Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "C_2512_6332Metric": [
+  {
+   "path": "Capacitor_SMD.3dshapes/C_2512_6332Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "C_2512": [
+  {
+   "path": "Capacitor_SMD.3dshapes/C_2512_6332Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_2512_6332Metric": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_2512_6332Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_2512": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_2512_6332Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_2512_6332Metric": [
+  {
+   "path": "LED_SMD.3dshapes/LED_2512_6332Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_2512": [
+  {
+   "path": "LED_SMD.3dshapes/LED_2512_6332Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOT-23-3": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/SOT-23-3.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOT-23-5": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/SOT-23-5.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOT-23-8": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/SOT-23-8.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOT-23W": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/SOT-23W.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOT-23W_Handsoldering": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/SOT-23W_Handsoldering.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOT-223-8": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/SOT-223-8.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOT-223": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/SOT-223.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOT-89-3": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/SOT-89-3.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TSOT-23-5": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/TSOT-23-5.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TSOT-23-8": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/TSOT-23-8.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TSOT-23": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/TSOT-23.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOT-563": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/SOT-563.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOT-363_SC-70-6": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/SOT-363_SC-70-6.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOT-353_SC-70-5": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/SOT-353_SC-70-5.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TO-252-2": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/TO-252-2.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TO-263-2": [
+  {
+   "path": "Package_TO_SOT_SMD.3dshapes/TO-263-2.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TO-92_Inline": [
+  {
+   "path": "Package_TO_SOT_THT.3dshapes/TO-92_Inline.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TO-220-3_Vertical": [
+  {
+   "path": "Package_TO_SOT_THT.3dshapes/TO-220-3_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TO-220-3_Horizontal_TabDown": [
+  {
+   "path": "Package_TO_SOT_THT.3dshapes/TO-220-3_Horizontal_TabDown.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOIC-8_3.9x4.9mm_P1.27mm": [
+  {
+   "path": "Package_SO.3dshapes/SOIC-8_3.9x4.9mm_P1.27mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOIC-14_3.9x8.7mm_P1.27mm": [
+  {
+   "path": "Package_SO.3dshapes/SOIC-14_3.9x8.7mm_P1.27mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SOIC-16W_7.5x10.3mm_P1.27mm": [
+  {
+   "path": "Package_SO.3dshapes/SOIC-16W_7.5x10.3mm_P1.27mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TSSOP-8_4.4x3mm_P0.65mm": [
+  {
+   "path": "Package_SO.3dshapes/TSSOP-8_4.4x3mm_P0.65mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TSSOP-14_4.4x5mm_P0.65mm": [
+  {
+   "path": "Package_SO.3dshapes/TSSOP-14_4.4x5mm_P0.65mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TSSOP-16_4.4x5mm_P0.65mm": [
+  {
+   "path": "Package_SO.3dshapes/TSSOP-16_4.4x5mm_P0.65mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TSSOP-20_4.4x6.5mm_P0.65mm": [
+  {
+   "path": "Package_SO.3dshapes/TSSOP-20_4.4x6.5mm_P0.65mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TSSOP-24_4.4x7.8mm_P0.65mm": [
+  {
+   "path": "Package_SO.3dshapes/TSSOP-24_4.4x7.8mm_P0.65mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TSSOP-28_4.4x9.7mm_P0.65mm": [
+  {
+   "path": "Package_SO.3dshapes/TSSOP-28_4.4x9.7mm_P0.65mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "MSOP-8_3x3mm_P0.65mm": [
+  {
+   "path": "Package_SO.3dshapes/MSOP-8_3x3mm_P0.65mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "MSOP-10_3x3mm_P0.5mm": [
+  {
+   "path": "Package_SO.3dshapes/MSOP-10_3x3mm_P0.5mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SSOP-20_5.3x7.2mm_P0.65mm": [
+  {
+   "path": "Package_SO.3dshapes/SSOP-20_5.3x7.2mm_P0.65mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SSOP-28_5.3x10.2mm_P0.65mm": [
+  {
+   "path": "Package_SO.3dshapes/SSOP-28_5.3x10.2mm_P0.65mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LQFP-32_7x7mm_P0.8mm": [
+  {
+   "path": "Package_QFP.3dshapes/LQFP-32_7x7mm_P0.8mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LQFP-44_10x10mm_P0.8mm": [
+  {
+   "path": "Package_QFP.3dshapes/LQFP-44_10x10mm_P0.8mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LQFP-48_7x7mm_P0.5mm": [
+  {
+   "path": "Package_QFP.3dshapes/LQFP-48_7x7mm_P0.5mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LQFP-64_10x10mm_P0.5mm": [
+  {
+   "path": "Package_QFP.3dshapes/LQFP-64_10x10mm_P0.5mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LQFP-100_14x14mm_P0.5mm": [
+  {
+   "path": "Package_QFP.3dshapes/LQFP-100_14x14mm_P0.5mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LQFP-144_20x20mm_P0.5mm": [
+  {
+   "path": "Package_QFP.3dshapes/LQFP-144_20x20mm_P0.5mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TQFP-32_7x7mm_P0.8mm": [
+  {
+   "path": "Package_QFP.3dshapes/TQFP-32_7x7mm_P0.8mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TQFP-44_10x10mm_P0.8mm": [
+  {
+   "path": "Package_QFP.3dshapes/TQFP-44_10x10mm_P0.8mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TQFP-64_10x10mm_P0.5mm": [
+  {
+   "path": "Package_QFP.3dshapes/TQFP-64_10x10mm_P0.5mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "QFN-16-1EP_3x3mm_P0.5mm_EP1.7x1.7mm": [
+  {
+   "path": "Package_DFN_QFN.3dshapes/QFN-16-1EP_3x3mm_P0.5mm_EP1.7x1.7mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "QFN-20-1EP_4x4mm_P0.5mm_EP2.5x2.5mm": [
+  {
+   "path": "Package_DFN_QFN.3dshapes/QFN-20-1EP_4x4mm_P0.5mm_EP2.5x2.5mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "QFN-24-1EP_4x4mm_P0.5mm_EP2.6x2.6mm": [
+  {
+   "path": "Package_DFN_QFN.3dshapes/QFN-24-1EP_4x4mm_P0.5mm_EP2.6x2.6mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "QFN-28-1EP_5x5mm_P0.5mm_EP3.35x3.35mm": [
+  {
+   "path": "Package_DFN_QFN.3dshapes/QFN-28-1EP_5x5mm_P0.5mm_EP3.35x3.35mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "QFN-32-1EP_5x5mm_P0.5mm_EP3.45x3.45mm": [
+  {
+   "path": "Package_DFN_QFN.3dshapes/QFN-32-1EP_5x5mm_P0.5mm_EP3.45x3.45mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "DFN-8-1EP_3x3mm_P0.65mm_EP1.55x2.4mm": [
+  {
+   "path": "Package_DFN_QFN.3dshapes/DFN-8-1EP_3x3mm_P0.65mm_EP1.55x2.4mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "DIP-6_W7.62mm": [
+  {
+   "path": "Package_DIP.3dshapes/DIP-6_W7.62mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "DIP-8_W7.62mm": [
+  {
+   "path": "Package_DIP.3dshapes/DIP-8_W7.62mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "DIP-14_W7.62mm": [
+  {
+   "path": "Package_DIP.3dshapes/DIP-14_W7.62mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "DIP-16_W7.62mm": [
+  {
+   "path": "Package_DIP.3dshapes/DIP-16_W7.62mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "DIP-18_W7.62mm": [
+  {
+   "path": "Package_DIP.3dshapes/DIP-18_W7.62mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "DIP-20_W7.62mm": [
+  {
+   "path": "Package_DIP.3dshapes/DIP-20_W7.62mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "DIP-28_W7.62mm": [
+  {
+   "path": "Package_DIP.3dshapes/DIP-28_W7.62mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "DIP-28_W15.24mm": [
+  {
+   "path": "Package_DIP.3dshapes/DIP-28_W15.24mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "DIP-40_W15.24mm": [
+  {
+   "path": "Package_DIP.3dshapes/DIP-40_W15.24mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x01_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x01_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x03_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x03_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x05_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x05_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x06_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x06_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x07_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x07_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x08_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x08_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x09_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x09_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x10_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x10_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x11_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x11_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x12_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x12_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x13_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x13_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x14_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x14_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x15_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x15_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x16_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x16_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x17_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x17_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x18_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x18_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x19_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x19_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x20_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x20_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x21_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x21_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x22_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x22_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x23_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x23_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x24_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x24_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x25_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x25_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x26_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x26_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x27_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x27_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x28_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x28_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x29_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x29_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x30_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x30_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x31_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x31_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x32_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x32_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x33_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x33_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x34_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x34_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x35_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x35_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x36_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x36_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x37_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x37_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x38_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x38_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x39_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x39_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x40_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x40_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x01_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x01_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x02_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x02_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x03_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x03_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x04_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x04_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x05_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x05_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x06_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x06_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x07_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x07_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x08_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x08_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x09_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x09_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x10_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x10_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x11_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x11_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x12_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x12_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x13_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x13_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x14_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x14_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x15_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x15_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x16_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x16_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x17_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x17_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x18_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x18_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x19_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x19_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x20_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x20_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x21_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x21_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x22_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x22_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x23_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x23_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x24_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x24_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x25_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x25_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x26_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x26_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x27_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x27_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x28_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x28_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x29_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x29_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x30_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x30_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x31_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x31_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x32_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x32_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x33_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x33_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x34_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x34_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x35_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x35_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x36_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x36_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x37_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x37_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x38_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x38_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x39_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x39_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_2x40_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.54mm.3dshapes/PinHeader_2x40_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x01_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x01_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x02_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x02_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x03_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x03_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x04_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x04_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x05_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x05_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x06_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x06_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x07_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x07_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x08_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x08_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x09_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x09_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x10_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x10_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x11_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x11_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x12_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x12_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x13_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x13_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x14_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x14_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x15_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x15_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x16_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x16_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x17_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x17_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x18_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x18_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x19_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x19_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x20_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x20_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x21_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x21_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x22_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x22_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x23_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x23_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x24_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x24_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x25_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x25_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x26_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x26_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x27_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x27_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x28_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x28_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x29_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x29_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x30_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x30_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x31_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x31_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x32_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x32_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x33_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x33_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x34_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x34_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x35_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x35_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x36_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x36_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x37_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x37_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x38_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x38_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x39_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x39_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_1x40_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x40_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x01_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x01_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x02_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x02_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x03_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x03_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x04_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x04_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x05_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x05_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x06_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x06_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x07_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x07_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x08_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x08_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x09_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x09_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x10_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x10_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x11_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x11_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x12_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x12_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x13_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x13_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x14_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x14_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x15_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x15_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x16_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x16_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x17_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x17_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x18_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x18_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x19_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x19_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x20_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x20_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x21_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x21_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x22_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x22_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x23_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x23_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x24_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x24_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x25_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x25_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x26_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x26_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x27_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x27_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x28_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x28_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x29_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x29_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x30_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x30_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x31_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x31_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x32_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x32_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x33_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x33_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x34_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x34_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x35_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x35_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x36_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x36_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x37_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x37_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x38_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x38_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x39_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x39_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinSocket_2x40_P2.54mm_Vertical": [
+  {
+   "path": "Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x40_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x02_P1.27mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_1.27mm.3dshapes/PinHeader_1x02_P1.27mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x03_P1.27mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_1.27mm.3dshapes/PinHeader_1x03_P1.27mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x04_P1.27mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_1.27mm.3dshapes/PinHeader_1x04_P1.27mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x05_P1.27mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_1.27mm.3dshapes/PinHeader_1x05_P1.27mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x06_P1.27mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_1.27mm.3dshapes/PinHeader_1x06_P1.27mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x07_P1.27mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_1.27mm.3dshapes/PinHeader_1x07_P1.27mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x08_P1.27mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_1.27mm.3dshapes/PinHeader_1x08_P1.27mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x02_P2.00mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.00mm.3dshapes/PinHeader_1x02_P2.00mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x03_P2.00mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.00mm.3dshapes/PinHeader_1x03_P2.00mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x04_P2.00mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.00mm.3dshapes/PinHeader_1x04_P2.00mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x05_P2.00mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.00mm.3dshapes/PinHeader_1x05_P2.00mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x06_P2.00mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.00mm.3dshapes/PinHeader_1x06_P2.00mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x07_P2.00mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.00mm.3dshapes/PinHeader_1x07_P2.00mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "PinHeader_1x08_P2.00mm_Vertical": [
+  {
+   "path": "Connector_PinHeader_2.00mm.3dshapes/PinHeader_1x08_P2.00mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "USB_C_Receptacle_GCT_USB4085": [
+  {
+   "path": "Connector_USB.3dshapes/USB_C_Receptacle_GCT_USB4085.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "USB_A_Molex_67643_Horizontal": [
+  {
+   "path": "Connector_USB.3dshapes/USB_A_Molex_67643_Horizontal.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "USB_Mini-B_Lumberg_2486_01_Horizontal": [
+  {
+   "path": "Connector_USB.3dshapes/USB_Mini-B_Lumberg_2486_01_Horizontal.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "ESP32-WROOM-32": [
+  {
+   "path": "RF_Module.3dshapes/ESP32-WROOM-32.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "ESP32-WROOM-32E": [
+  {
+   "path": "RF_Module.3dshapes/ESP32-WROOM-32E.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "ESP32-S3-WROOM-1": [
+  {
+   "path": "RF_Module.3dshapes/ESP32-S3-WROOM-1.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "ESP-12E": [
+  {
+   "path": "RF_Module.3dshapes/ESP-12E.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "ESP-WROOM-02": [
+  {
+   "path": "RF_Module.3dshapes/ESP-WROOM-02.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "Crystal_SMD_3225-4Pin_3.2x2.5mm": [
+  {
+   "path": "Crystal.3dshapes/Crystal_SMD_3225-4Pin_3.2x2.5mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "Crystal_SMD_5032-2Pin_5.0x3.2mm": [
+  {
+   "path": "Crystal.3dshapes/Crystal_SMD_5032-2Pin_5.0x3.2mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "Crystal_SMD_2016-4Pin_2.0x1.6mm": [
+  {
+   "path": "Crystal.3dshapes/Crystal_SMD_2016-4Pin_2.0x1.6mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "Crystal_HC49-4H_Vertical": [
+  {
+   "path": "Crystal.3dshapes/Crystal_HC49-4H_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "Crystal_SMD_HC49-SD": [
+  {
+   "path": "Crystal.3dshapes/Crystal_SMD_HC49-SD.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "Resonator_SMD_muRata_CSTxExxV-3Pin_3.0x1.1mm": [
+  {
+   "path": "Crystal.3dshapes/Resonator_SMD_muRata_CSTxExxV-3Pin_3.0x1.1mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SW_SPST_TL3342": [
+  {
+   "path": "Button_Switch_SMD.3dshapes/SW_SPST_TL3342.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SW_PUSH_6mm": [
+  {
+   "path": "Button_Switch_THT.3dshapes/SW_PUSH_6mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SW_PUSH_6mm_H5mm": [
+  {
+   "path": "Button_Switch_THT.3dshapes/SW_PUSH_6mm_H5mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SW_SPDT_PCM12": [
+  {
+   "path": "Button_Switch_SMD.3dshapes/SW_SPDT_PCM12.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm": [
+  {
+   "path": "LED_SMD.3dshapes/LED_WS2812B_PLCC4_5.0x5.0mm_P3.2mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_D3.0mm": [
+  {
+   "path": "LED_THT.3dshapes/LED_D3.0mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "LED_D5.0mm": [
+  {
+   "path": "LED_THT.3dshapes/LED_D5.0mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "CP_Elec_6.3x5.4": [
+  {
+   "path": "Capacitor_SMD.3dshapes/CP_Elec_6.3x5.4.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "CP_Elec_5x5.4": [
+  {
+   "path": "Capacitor_SMD.3dshapes/CP_Elec_5x5.4.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "CP_Elec_8x10": [
+  {
+   "path": "Capacitor_SMD.3dshapes/CP_Elec_8x10.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "CP_Radial_D5.0mm_P2.50mm": [
+  {
+   "path": "Capacitor_THT.3dshapes/CP_Radial_D5.0mm_P2.50mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "CP_Radial_D6.3mm_P2.50mm": [
+  {
+   "path": "Capacitor_THT.3dshapes/CP_Radial_D6.3mm_P2.50mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "CP_Radial_D8.0mm_P3.50mm": [
+  {
+   "path": "Capacitor_THT.3dshapes/CP_Radial_D8.0mm_P3.50mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "CP_EIA-3216-18_Kemet-A": [
+  {
+   "path": "Capacitor_Tantalum_SMD.3dshapes/CP_EIA-3216-18_Kemet-A.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "CP_EIA-3528-21_Kemet-B": [
+  {
+   "path": "Capacitor_Tantalum_SMD.3dshapes/CP_EIA-3528-21_Kemet-B.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal": [
+  {
+   "path": "Resistor_THT.3dshapes/R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal": [
+  {
+   "path": "Resistor_THT.3dshapes/R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_Bourns_SRR1260": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_Bourns_SRR1260.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "L_Sunlord_SWPA3012S": [
+  {
+   "path": "Inductor_SMD.3dshapes/L_Sunlord_SWPA3012S.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "D_SOD-123": [
+  {
+   "path": "Diode_SMD.3dshapes/D_SOD-123.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "D_SOD-123F": [
+  {
+   "path": "Diode_SMD.3dshapes/D_SOD-123F.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "D_SOD-323": [
+  {
+   "path": "Diode_SMD.3dshapes/D_SOD-323.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "D_SMA": [
+  {
+   "path": "Diode_SMD.3dshapes/D_SMA.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "D_SMB": [
+  {
+   "path": "Diode_SMD.3dshapes/D_SMB.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "D_SMC": [
+  {
+   "path": "Diode_SMD.3dshapes/D_SMC.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "D_SOD-523": [
+  {
+   "path": "Diode_SMD.3dshapes/D_SOD-523.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "D_DO-41_SOD81_P10.16mm_Horizontal": [
+  {
+   "path": "Diode_THT.3dshapes/D_DO-41_SOD81_P10.16mm_Horizontal.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TerminalBlock_Phoenix_MKDS-1,5-2_1x02_P5.00mm_Horizontal": [
+  {
+   "path": "TerminalBlock_Phoenix.3dshapes/TerminalBlock_Phoenix_MKDS-1,5-2_1x02_P5.00mm_Horizontal.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "TerminalBlock_Phoenix_MKDS-1,5-3_1x03_P5.00mm_Horizontal": [
+  {
+   "path": "TerminalBlock_Phoenix.3dshapes/TerminalBlock_Phoenix_MKDS-1,5-3_1x03_P5.00mm_Horizontal.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "BarrelJack_Horizontal": [
+  {
+   "path": "Connector_BarrelJack.3dshapes/BarrelJack_Horizontal.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "SMA_Amphenol_132289_EdgeMount": [
+  {
+   "path": "Connector_Coaxial.3dshapes/SMA_Amphenol_132289_EdgeMount.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical": [
+  {
+   "path": "Connector_JST.3dshapes/JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical": [
+  {
+   "path": "Connector_JST.3dshapes/JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical": [
+  {
+   "path": "Connector_JST.3dshapes/JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical": [
+  {
+   "path": "Connector_JST.3dshapes/JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "JST_PH_B4B-PH-K_1x04_P2.00mm_Vertical": [
+  {
+   "path": "Connector_JST.3dshapes/JST_PH_B4B-PH-K_1x04_P2.00mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "JST_SH_BM04B-SRSS-TB_1x04-1MP_P1.00mm_Vertical": [
+  {
+   "path": "Connector_JST.3dshapes/JST_SH_BM04B-SRSS-TB_1x04-1MP_P1.00mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "microSD_HC_Hirose_DM3AT-SF-PEJM5": [
+  {
+   "path": "Connector_Card.3dshapes/microSD_HC_Hirose_DM3AT-SF-PEJM5.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "IDC-Header_2x05_P2.54mm_Vertical": [
+  {
+   "path": "Connector_IDC.3dshapes/IDC-Header_2x05_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "IDC-Header_2x08_P2.54mm_Vertical": [
+  {
+   "path": "Connector_IDC.3dshapes/IDC-Header_2x08_P2.54mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "Relay_SPDT_SANYOU_SRD_Series_Form_C": [
+  {
+   "path": "Relay_THT.3dshapes/Relay_SPDT_SANYOU_SRD_Series_Form_C.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "Buzzer_12x9.5RM7.6": [
+  {
+   "path": "Buzzer_Beeper.3dshapes/Buzzer_12x9.5RM7.6.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "R_LDR_5.1x4.3mm_P3.4mm_Vertical": [
+  {
+   "path": "OptoDevice.3dshapes/R_LDR_5.1x4.3mm_P3.4mm_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "Potentiometer_Bourns_3296W_Vertical": [
+  {
+   "path": "Potentiometer_THT.3dshapes/Potentiometer_Bourns_3296W_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "Potentiometer_Bourns_3314J_Vertical": [
+  {
+   "path": "Potentiometer_SMD.3dshapes/Potentiometer_Bourns_3314J_Vertical.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "Fuse_0805_2012Metric": [
+  {
+   "path": "Fuse.3dshapes/Fuse_0805_2012Metric.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "BGA-64_9.0x9.0mm_Layout10x10_P0.8mm": [
+  {
+   "path": "Package_BGA.3dshapes/BGA-64_9.0x9.0mm_Layout10x10_P0.8mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "WSON-6-1EP_2x2mm_P0.65mm_EP1x1.6mm": [
+  {
+   "path": "Package_SON.3dshapes/WSON-6-1EP_2x2mm_P0.65mm_EP1x1.6mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "BatteryHolder_Keystone_3034_1x20mm": [
+  {
+   "path": "Battery.3dshapes/BatteryHolder_Keystone_3034_1x20mm.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "BatteryHolder_Keystone_1060_1x2032": [
+  {
+   "path": "Battery.3dshapes/BatteryHolder_Keystone_1060_1x2032.step",
+   "offset": [
+    0,
+    0,
+    0
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ]
+  }
+ ]
 }

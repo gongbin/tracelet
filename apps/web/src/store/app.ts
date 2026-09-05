@@ -6,8 +6,8 @@ import { createProjectStore, type ProjectMeta, type ProjectStore } from './proje
 export type Screen = 'home' | 'sch' | 'pcb' | '3d' | 'lib' | 'bom' | 'fab';
 export type SchTool = 'select' | 'wire' | 'place' | 'pwr' | 'label' | 'bus' | 'junction' | 'draw' | 'measure';
 export type DrawMode = 'line' | 'rect' | 'text';
-export type PcbTool = 'select' | 'route' | 'via' | 'zone' | 'place' | 'edge' | 'text' | 'measure' | 'flip' | 'align' | 'autoroute' | 'refill';
-export type RightTab = 'props' | 'layers' | 'lib' | 'check' | 'ai' | '3d';
+export type PcbTool = 'select' | 'route' | 'via' | 'zone' | 'place' | 'hole' | 'edge' | 'text' | 'measure' | 'flip' | 'align' | 'autoroute' | 'refill';
+export type RightTab = 'props' | 'layers' | 'lib' | 'check' | 'ai' | '3d' | 'guide';
 
 export interface Placing { symbolId: string; value: string; footprint: string; props?: Record<string, string>; rotation: number; partLabel?: string }
 export interface PcbPlacing { footprintId: string; label: string; rotation: number }
@@ -57,6 +57,10 @@ export interface AppState {
   measure: Vec[] | null;
   /** 仅板级封装放置（定位孔 / 基准点 / Logo） */
   pcbPlacing: PcbPlacing | null;
+  /** 开孔工具参数 */
+  hole: { drill: number; plated: boolean; ring: number };
+  /** 请求画布适配全部内容（递增触发） */
+  fitSeq: number;
   /** 栅格与走线 / 过孔覆盖（null = 跟随网络类） */
   pcbGrid: number;
   schGrid: number;
@@ -134,6 +138,8 @@ export const useApp = create<AppState>((set, get) => ({
   outlineDraft: null,
   measure: null,
   pcbPlacing: null,
+  hole: { drill: 3.2, plated: false, ring: 0.5 },
+  fitSeq: 0,
   pcbGrid: 0.25,
   schGrid: 100,
   traceWidthOverride: null,
