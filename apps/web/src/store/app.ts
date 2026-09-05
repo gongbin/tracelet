@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ProjectEditor, pcb, type Project, type CopperLayer, type Layer, type Vec } from '@tracelet/kernel';
+import { ProjectEditor, pcb, type Project, type CopperLayer, type Layer, type Vec, type AutorouteResult } from '@tracelet/kernel';
 import { createProjectStore, type ProjectMeta, type ProjectStore } from './projectStore.js';
 
 export type Screen = 'home' | 'sch' | 'pcb' | '3d' | 'lib' | 'bom' | 'fab';
@@ -43,7 +43,9 @@ export interface AppState {
   pcbSelection: string[];
   routing: Routing | null;
   zoneDraft: Vec[] | null;
+  outlineDraft: Vec[] | null;
   measure: Vec[] | null;
+  autoroute: { status: 'idle' | 'running' | 'done'; result: AutorouteResult | null };
   otherLayerOpacity: number;
   highlightNet: string | null;
   checkHighlight: string | null;
@@ -102,7 +104,9 @@ export const useApp = create<AppState>((set, get) => ({
   pcbSelection: [],
   routing: null,
   zoneDraft: null,
+  outlineDraft: null,
   measure: null,
+  autoroute: { status: 'idle', result: null },
   otherLayerOpacity: 0.4,
   highlightNet: null,
   checkHighlight: null,
@@ -140,7 +144,7 @@ export const useApp = create<AppState>((set, get) => ({
     await get().refreshProjects();
   },
   go(screen) {
-    set({ screen, rightTab: null, projMenuOpen: false, hoverTool: -1, pwrMenuOpen: false, placing: null, pendingPin: null, routing: null, zoneDraft: null, measure: null, labelPrompt: null, cursorWorld: { x: 0, y: 0 } });
+    set({ screen, rightTab: null, projMenuOpen: false, hoverTool: -1, pwrMenuOpen: false, placing: null, pendingPin: null, routing: null, zoneDraft: null, outlineDraft: null, measure: null, labelPrompt: null, cursorWorld: { x: 0, y: 0 } });
   },
   set(key, value) { set({ [key]: value } as Partial<AppState>); },
   patch(p) { set(p); },
@@ -159,7 +163,7 @@ export const useApp = create<AppState>((set, get) => ({
   },
   startPlacing(p) { set({ placing: p, schTool: 'place', pendingPin: null, pwrMenuOpen: false, labelPrompt: null }); },
   stopPlacing() { set({ placing: null, schTool: 'select' }); },
-  setPcbTool(t) { set({ pcbTool: t, routing: null, zoneDraft: null, measure: null }); },
+  setPcbTool(t) { set({ pcbTool: t, routing: null, zoneDraft: null, outlineDraft: null, measure: null }); },
   setLayerHidden(layer, hidden) {
     const ed = get().editor; if (!ed) return;
     ed.dispatch(pcb.setLayerHidden(layer, hidden));

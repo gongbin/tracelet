@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { parseProject } from '@tracelet/kernel';
+import { importProjectFiles, backupAllProjects } from '../store/backup.js';
 import { useApp } from '../store/app.js';
 import { Icon } from '../components/Icon.js';
 import { I } from '../icons.js';
@@ -22,20 +22,14 @@ const COMMUNITY = [
 ];
 
 export function Home() {
-  const { projects, openProject, deleteProject, set, toast, openProjectObject, store } = useApp();
+  const { projects, openProject, deleteProject, set, toast, store } = useApp();
   const fileRef = useRef<HTMLInputElement>(null);
   const t = useT();
 
-  const onImport = async (file: File) => {
-    try {
-      const p = parseProject(await file.text());
-      openProjectObject(p);
-      toast(`已导入 ${p.name}`, 'success');
-    } catch (e) { toast(`导入失败：${(e as Error).message}`, 'error'); }
-  };
+  const onImport = async (files: File[]) => { await importProjectFiles(files); };
 
   return (
-    <div className="home" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) void onImport(f); }}>
+    <div className="home" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const fs = Array.from(e.dataTransfer.files); if (fs.length) void onImport(fs); }}>
       <div className="home-nav">
         <div className="row" style={{ gap: 8, flexShrink: 0, color: '#F5F5F7', fontWeight: 600, fontSize: 18, letterSpacing: '-0.5px' }}>
           <img src={`${import.meta.env.BASE_URL}brand/tracelet-mark-white.svg`} alt="" width={28} height={28} style={{ display: 'block' }} />
@@ -59,8 +53,8 @@ export function Home() {
           </div>
           <div className="action-card" onClick={() => fileRef.current?.click()}>
             <div className="row" style={{ fontWeight: 600, fontSize: 14 }}><Icon d={I.upload} size={16} stroke={2} color="var(--text-2)" />{t('home.import')}</div>
-            <div className="small muted">.eda.json · 拖入文件即可（KiCad / EasyEDA 下一里程碑）</div>
-            <input ref={fileRef} type="file" accept=".json,.eda.json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void onImport(f); e.target.value = ''; }} />
+            <div className="small muted">.eda.json 或备份 zip · 拖入即可（KiCad 导入开发中）</div>
+            <input ref={fileRef} type="file" accept=".json,.eda.json,.zip" multiple hidden onChange={(e) => { const fs = e.target.files ? Array.from(e.target.files) : []; if (fs.length) void onImport(fs); e.target.value = ''; }} />
           </div>
           <div className="action-card" onClick={() => set('wizardOpen', true)}>
             <div className="row" style={{ fontWeight: 600, fontSize: 14 }}><Icon d={I.file} size={16} stroke={2} color="var(--text-2)" />{t('home.template')}</div>
@@ -70,7 +64,8 @@ export function Home() {
         <div className="col" style={{ gap: 14 }}>
           <div className="row" style={{ gap: 12 }}>
             <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>{t('home.recent')}</h2>
-            <div className="ml-auto seg sm" style={{ height: 24 }}><span className="seg-opt" style={{ padding: '0 8px' }}>列表</span><span className="seg-opt" style={{ padding: '0 8px', background: 'var(--bg-raised)', color: 'var(--text)' }}>网格</span></div>
+            <button className="btn sm ml-auto" onClick={() => void backupAllProjects().then((n) => toast(`已备份 ${n} 个项目`, 'success'))}>⧉ {t('proj.backup')}</button>
+            <div className="seg sm" style={{ height: 24 }}><span className="seg-opt" style={{ padding: '0 8px' }}>列表</span><span className="seg-opt" style={{ padding: '0 8px', background: 'var(--bg-raised)', color: 'var(--text)' }}>网格</span></div>
           </div>
           <div className="proj-grid">
             {projects.length === 0 && <div className="dim">还没有项目，点上面"新建项目"开始。</div>}

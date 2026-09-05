@@ -75,6 +75,25 @@ describe('应用冒烟测试', () => {
     expect(ed.project.schematic.sheets[0].components.length).toBe(before);
   });
 
+  it('自动布线：进入 running → done，接受后飞线清零', async () => {
+    render(<App />);
+    await screen.findByText('ESP32 传感器板');
+    act(() => useApp.getState().openProjectObject(createDemoProject()));
+    act(() => useApp.getState().go('pcb'));
+    act(() => useApp.getState().patch({ pcbTool: 'autoroute' }));
+    expect(useApp.getState().autoroute.status).toBe('running');
+    await new Promise((r) => setTimeout(r, 200));
+    expect(useApp.getState().autoroute.status).toBe('done');
+    expect(await screen.findByText('接受')).toBeTruthy();
+    fireEvent.click(screen.getByText('接受'));
+    expect(useApp.getState().autoroute.status).toBe('idle');
+    const { computeRatsnest, ruleSetOf } = await import('@tracelet/kernel');
+    const ed = useApp.getState().editor!;
+    expect(computeRatsnest(ed.project.board, ruleSetOf(ed.project)).unrouted).toBe(0);
+    act(() => { fireEvent.keyDown(window, { key: 'z', metaKey: true }); });
+    expect(computeRatsnest(ed.project.board, ruleSetOf(ed.project)).unrouted).toBeGreaterThan(0);
+  });
+
   it('命令面板打开并列出命令与元件', async () => {
     render(<App />);
     await screen.findByText('ESP32 传感器板');

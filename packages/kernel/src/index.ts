@@ -17,6 +17,8 @@ export * from './board/ratsnest.js';
 export * from './board/drc.js';
 export * from './board/shapes.js';
 export * from './board/zones.js';
+export * from './board/align.js';
+export * from './board/autoroute.js';
 export * from './commands/types.js';
 export * as sch from './commands/schematic.js';
 export * as pcb from './commands/board.js';

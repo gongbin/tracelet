@@ -15,7 +15,7 @@ export function LibPage() {
       <div className="page-inner" style={{ maxWidth: 1100 }}>
         <div className="row"><h1>{t('lib.title')}</h1><span className="muted small">内置 {BUILTIN_PARTS.length} 个零件 · KiCad 官方库 / LCSC 导入在下一里程碑</span></div>
         <input className="input lg" style={{ maxWidth: 420 }} placeholder="搜索型号、参数、关键字（例如 0402 100nF、esp32、ldo）" value={q} onChange={(e) => setQ(e.target.value)} />
-        <CategoryFilter value={cat} onChange={setCat} variant="cards" onlyUsed={false} />
+        <CategoryFilter value={cat} onChange={setCat} onlyUsed={false} />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
           {results.map((p) => (
             <div key={p.id} className="card col" style={{ padding: 14, gap: 6 }}>

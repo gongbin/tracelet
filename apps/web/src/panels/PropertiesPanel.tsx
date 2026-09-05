@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { sch, pcb, getSymbol, BUILTIN_FOOTPRINTS, BUILTIN_PARTS, findFootprint, footprintPads, milToMm, formatLength } from '@tracelet/kernel';
+import { sch, pcb, getSymbol, BUILTIN_FOOTPRINTS, BUILTIN_PARTS, findFootprint, footprintPads, milToMm, formatLength, copperLayers } from '@tracelet/kernel';
 import { useApp, useEditor, useProject } from '../store/app.js';
 import { getAnalysis } from '../store/analysis.js';
 
@@ -48,13 +48,36 @@ export function PropertiesPanel() {
     if (tr) return (
       <div className="panel-pad">
         <div className="row"><span style={{ fontWeight: 500 }}>走线</span><span className="ml-auto muted" style={{ cursor: 'pointer' }} onClick={() => { editor.dispatch(pcb.deleteTraces([tr.id])); app.patch({ pcbSelection: [] }); }}>删除</span></div>
-        <div className="kv"><span className="k">网络</span><span className="field mono">{tr.net || '—'}</span><span className="k">层</span><span className="field mono">{tr.layer}</span><span className="k">宽度</span><span className="field mono">{tr.width} mm</span><span className="k">段数</span><span className="field mono">{tr.points.length - 1}</span></div>
+        <div className="kv">
+          <span className="k">网络</span><span className="field mono">{tr.net || '—'}</span>
+          <span className="k">层</span><select className="input mono" value={tr.layer} onChange={(e) => editor.dispatch(pcb.setTraceProps(tr.id, { layer: e.target.value as typeof tr.layer }))}>{copperLayers(project.board.copperCount).map((l) => <option key={l} value={l}>{l}</option>)}</select>
+          <span className="k">宽度 (mm)</span><ValueInput value={String(tr.width)} onCommit={(v) => { const n = Number(v); if (n > 0) editor.dispatch(pcb.setTraceProps(tr.id, { width: n })); }} />
+          <span className="k">段数</span><span className="field mono">{tr.points.length - 1}</span>
+        </div>
+        <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>{[0.15, 0.25, 0.3, 0.5, 0.8, 1.0].map((w) => <span key={w} className={`chip mono${Math.abs(tr.width - w) < 1e-9 ? ' on' : ''}`} onClick={() => editor.dispatch(pcb.setTraceProps(tr.id, { width: w }))}>{w}</span>)}</div>
+        <div className="dim xs">再次点击已选中的走线并拖动可平移线段；拖动黄色手柄移动顶点。</div>
       </div>
     );
     if (via) return (
       <div className="panel-pad">
         <div className="row"><span style={{ fontWeight: 500 }}>过孔</span><span className="ml-auto muted" style={{ cursor: 'pointer' }} onClick={() => { editor.dispatch(pcb.deleteVias([via.id])); app.patch({ pcbSelection: [] }); }}>删除</span></div>
-        <div className="kv"><span className="k">网络</span><span className="field mono">{via.net || '—'}</span><span className="k">外径/孔径</span><span className="field mono">{via.size} / {via.drill} mm</span><span className="k">位置</span><span className="field mono">{via.x.toFixed(2)}, {via.y.toFixed(2)}</span></div>
+        <div className="kv">
+          <span className="k">网络</span><ValueInput value={via.net} onCommit={(v) => editor.dispatch(pcb.setViaProps(via.id, { net: v }))} />
+          <span className="k">外径 (mm)</span><ValueInput value={String(via.size)} onCommit={(v) => { const n = Number(v); if (n > 0) editor.dispatch(pcb.setViaProps(via.id, { size: n })); }} />
+          <span className="k">孔径 (mm)</span><ValueInput value={String(via.drill)} onCommit={(v) => { const n = Number(v); if (n > 0) editor.dispatch(pcb.setViaProps(via.id, { drill: n })); }} />
+          <span className="k">位置</span><div className="row" style={{ gap: 6 }}><ValueInput value={via.x.toFixed(2)} onCommit={(v) => editor.dispatch(pcb.setViaProps(via.id, { x: Number(v) }))} /><ValueInput value={via.y.toFixed(2)} onCommit={(v) => editor.dispatch(pcb.setViaProps(via.id, { y: Number(v) }))} /></div>
+        </div>
+      </div>
+    );
+    const txt = project.board.texts.find((t) => t.id === id);
+    if (txt) return (
+      <div className="panel-pad">
+        <div className="row"><span style={{ fontWeight: 500 }}>丝印文字</span><span className="ml-auto muted" style={{ cursor: 'pointer' }} onClick={() => { editor.dispatch(pcb.deleteTexts([txt.id])); app.patch({ pcbSelection: [] }); }}>删除</span></div>
+        <div className="kv">
+          <span className="k">内容</span><ValueInput value={txt.text} onCommit={(v) => editor.dispatch(pcb.setTextProps(txt.id, { text: v }))} />
+          <span className="k">大小 (mm)</span><ValueInput value={String(txt.size)} onCommit={(v) => { const n = Number(v); if (n > 0) editor.dispatch(pcb.setTextProps(txt.id, { size: n })); }} />
+          <span className="k">层</span><div className="seg sm">{(['F.Silk', 'B.Silk'] as const).map((l) => <span key={l} className={`seg-opt mono${txt.layer === l ? ' on' : ''}`} onClick={() => editor.dispatch(pcb.setTextProps(txt.id, { layer: l }))}>{l}</span>)}</div>
+        </div>
       </div>
     );
     if (zone) return (

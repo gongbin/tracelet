@@ -10,7 +10,8 @@ export const zhCN = {
   'home.storage.local': '本地存储', 'home.storage.remote': '远程协同',
   'theme.dark': '深色', 'theme.light': '浅色', 'theme.system': '跟随系统',
   'lang.zh-CN': '简体中文', 'lang.en': 'English',
-  'settings.language': '语言', 'settings.theme': '主题',
+  'settings.language': '语言', 'settings.theme': '主题', 'settings.wheel': '画布手势', 'wheel.pan': '触控板：双指平移 · 捏合缩放', 'wheel.zoom': '鼠标：滚轮缩放 · 中键平移',
+  'proj.export': '导出项目 (.eda.json)', 'proj.backup': '备份全部项目 (zip)', 'proj.import': '导入项目 / 备份…',
   'fab.title': '制造', 'fab.precheck': '打板前检查', 'fab.export': '导出', 'fab.download': '下载制造文件 (zip)', 'fab.preview': '预览 Gerber', 'fab.order': '直接下单 →',
   'lib.all': '全部分类', 'lib.title': '元件库', 'lib.place': '放置到原理图',
   'palette.placeholder': '输入命令；@ 搜元件，# 搜网络', 'palette.empty': '没有匹配项'

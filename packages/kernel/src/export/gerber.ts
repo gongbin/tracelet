@@ -3,7 +3,7 @@
  * 坐标：mm，格式 4.6 绝对坐标；Y 轴翻转（板坐标 y 向下 → Gerber y 向上）。
  * 底层不做镜像（Gerber 约定从顶面看）。
  */
-import { zipSync, strToU8 } from 'fflate';
+import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import type { Project, RuleSet } from '../model/project.js';
 import type { Board, CopperLayer, Layer } from '../model/board.js';
 import { copperLayers } from '../model/board.js';
@@ -193,6 +193,12 @@ export function zipFiles(files: FabFile[]): Uint8Array {
   const entries: Record<string, Uint8Array> = {};
   for (const f of files) entries[f.name] = strToU8(f.content);
   return zipSync(entries, { level: 6 });
+}
+
+/** 解包 zip（用于导入备份）。 */
+export function unzipFiles(data: Uint8Array): { name: string; content: string }[] {
+  const entries = unzipSync(data);
+  return Object.entries(entries).filter(([name]) => !name.endsWith('/')).map(([name, bytes]) => ({ name, content: strFromU8(bytes) }));
 }
 
 export function exportFabZip(project: Project, opts?: Parameters<typeof exportFabFiles>[1]): { name: string; data: Uint8Array } {

@@ -33,12 +33,12 @@ const PCB_TOOLS: ToolDef[] = [
   { id: 'via', name: '过孔', key: '', d: I.via, desc: '放置过孔，尺寸跟随网络类。' },
   { id: 'zone', name: '铺铜', key: 'Z', d: I.zone, desc: '画一个区域并选网络（默认 GND），自动填充铜。' },
   { id: 'place', name: '放置', key: 'A', d: I.comp, desc: '在 PCB 上直接放置新元件，同时同步回原理图。' },
-  { id: 'edge', name: '板框', key: 'E', d: I.edge, desc: '画板子外形（Edge.Cuts），支持圆角与异形。' },
+  { id: 'edge', name: '板框', key: 'E', d: I.edge, desc: '拖动顶点调整板框，或点击画新的多边形板框（双击闭合）。' },
   { id: 'text', name: '文字', key: 'T', d: I.text, desc: '在丝印层写文字，如版本号、标识。' },
   { id: 'measure', name: '测量', key: 'M', d: I.ruler, desc: '点两点显示距离与 ΔX / ΔY。' },
   { id: 'flip', name: '翻面', key: 'F', d: I.flip, desc: '把选中元件放到板子另一面。', sep: true },
-  { id: 'align', name: '对齐 / 分布', key: '', d: I.align, desc: '选中多个元件时可用：左对齐、等间距等。' },
-  { id: 'autoroute', name: '自动布线', key: '', d: I.auto, desc: '异步布完剩余飞线，结果先以"建议"形式预览，接受后才生效，可 Undo。' },
+  { id: 'align', name: '对齐 / 分布', key: 'L', d: I.align, desc: '框选 2 个以上元件后：左/右/上/下对齐、居中、等距分布。' },
+  { id: 'autoroute', name: '自动布线', key: '', d: I.auto, desc: '内置网格 A* 布线器布完剩余飞线（支持过孔换层），结果先以"建议"预览，接受后才生效，可 Undo。' },
   { id: 'refill', name: '重填铺铜', key: 'B', d: I.refill, desc: '移动元件后重新计算铺铜区域。' }
 ];
 const PWR_OPTIONS = [['+3V3', '#C0392B', '常用 · 3.3V 逻辑'], ['+5V', '#C0392B', 'USB 供电'], ['VCC', '#C0392B', '通用电源'], ['GND', '#1F5F2B', '地']];
@@ -96,7 +96,7 @@ export function Workspace() {
         else return;
         e.preventDefault();
       } else if (S.screen === 'pcb') {
-        if (e.key === 'Escape') { if (S.routing || S.zoneDraft || S.measure) S.patch({ routing: null, zoneDraft: null, measure: null }); else if (S.pcbTool !== 'select') S.setPcbTool('select'); else S.patch({ pcbSelection: [], highlightNet: null, checkHighlight: null }); }
+        if (e.key === 'Escape') { if (S.autoroute.status === 'done') S.patch({ autoroute: { status: 'idle', result: null } }); else if (S.routing || S.zoneDraft || S.outlineDraft || S.measure) S.patch({ routing: null, zoneDraft: null, outlineDraft: null, measure: null }); else if (S.pcbTool !== 'select') S.setPcbTool('select'); else S.patch({ pcbSelection: [], highlightNet: null, checkHighlight: null }); }
         else if (k === 'v') {
           if (S.routing) {
             const r = S.routing; const last = r.points[r.points.length - 1];
@@ -113,6 +113,7 @@ export function Workspace() {
         else if (k === 'z') S.setPcbTool('zone');
         else if (k === 'a') S.setPcbTool('place');
         else if (k === 'e') S.setPcbTool('edge');
+        else if (k === 'l') S.setPcbTool('align');
         else if (k === 't') S.setPcbTool('text');
         else if (k === 'm') S.setPcbTool('measure');
         else if (k === 'b') S.toast('铺铜实时计算，无需重填');
@@ -121,10 +122,10 @@ export function Workspace() {
         else if (/^[1-9]$/.test(k) && cu[Number(k) - 1]) S.set('activeLayer', cu[Number(k) - 1]);
         else if ((e.key === 'Delete' || e.key === 'Backspace') && S.pcbSelection.length) {
           const b = editor.project.board;
-          const tr = S.pcbSelection.filter((id) => b.traces.some((t) => t.id === id)), vi = S.pcbSelection.filter((id) => b.vias.some((v) => v.id === id)), zo = S.pcbSelection.filter((id) => b.zones.some((z) => z.id === id));
-          if (!tr.length && !vi.length && !zo.length) { S.toast('封装由原理图决定：请在原理图删除元件后同步'); return; }
+          const tr = S.pcbSelection.filter((id) => b.traces.some((t) => t.id === id)), vi = S.pcbSelection.filter((id) => b.vias.some((v) => v.id === id)), zo = S.pcbSelection.filter((id) => b.zones.some((z) => z.id === id)), tx = S.pcbSelection.filter((id) => b.texts.some((t) => t.id === id));
+          if (!tr.length && !vi.length && !zo.length && !tx.length) { S.toast('封装由原理图决定：请在原理图删除元件后同步'); return; }
           editor.begin('删除');
-          if (tr.length) editor.dispatch(pcb.deleteTraces(tr)); if (vi.length) editor.dispatch(pcb.deleteVias(vi)); if (zo.length) editor.dispatch(pcb.deleteZones(zo));
+          if (tr.length) editor.dispatch(pcb.deleteTraces(tr)); if (vi.length) editor.dispatch(pcb.deleteVias(vi)); if (zo.length) editor.dispatch(pcb.deleteZones(zo)); if (tx.length) editor.dispatch(pcb.deleteTexts(tx));
           editor.commit(); S.patch({ pcbSelection: [] });
         }
         else return;
@@ -142,9 +143,8 @@ export function Workspace() {
     app.setSchTool(id as typeof app.schTool);
   };
   const onPcbTool = (id: string) => {
-    if (id === 'autoroute') { app.toast('自动布线将通过 Freerouting（DSN/SES）接入，结果以建议形式预览'); return; }
-    if (id === 'align') { app.toast('对齐 / 分布在下一里程碑'); return; }
     if (id === 'refill') { app.toast('铺铜实时计算，无需重填'); return; }
+    if (id === 'autoroute') { if (a.ratsnest.unrouted === 0) { app.toast('没有未布线的连接'); return; } app.patch({ pcbTool: 'autoroute', routing: null, zoneDraft: null, outlineDraft: null, measure: null }); return; }
     app.setPcbTool(id as typeof app.pcbTool);
   };
 

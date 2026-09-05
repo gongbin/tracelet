@@ -1,4 +1,6 @@
 import { pcb, sch, diffBoardFromSchematic } from '@tracelet/kernel';
+import { exportProjectFile, backupAllProjects, importProjectFiles } from '../store/backup.js';
+import { useRef } from 'react';
 import { useApp, useEditor, useProject, type Screen } from '../store/app.js';
 import { Icon } from './Icon.js';
 import { I } from '../icons.js';
@@ -22,6 +24,7 @@ export function TopBar() {
   const project = useProject();
   const editor = useEditor();
   const t = useT();
+  const fileRef = useRef<HTMLInputElement>(null);
   const { screen, go, projMenuOpen, set, projects, openProject, closeProject, lastSavedAt, saving, toast } = useApp();
   const pendingSync = screen === 'pcb' && (() => { const d = diffBoardFromSchematic(project); return d.added.length + d.removed.length > 0; })();
 
@@ -50,7 +53,10 @@ export function TopBar() {
             ))}
             <div className="menu-sep" />
             <div className="menu-item" onClick={() => { set('projMenuOpen', false); set('wizardOpen', true); }}><span style={{ color: 'var(--accent)', width: 14, textAlign: 'center' }}>+</span>新建项目<span className="ml-auto kbd">⌘N</span></div>
-            <div className="menu-item" onClick={() => toast('KiCad / EasyEDA 导入在下一里程碑接入，目前支持 .eda.json')}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇪</span>导入 KiCad / EasyEDA…</div>
+            <div className="menu-item" onClick={() => { set('projMenuOpen', false); fileRef.current?.click(); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇪</span>{t('proj.import')}</div>
+            <div className="menu-item" onClick={() => { set('projMenuOpen', false); exportProjectFile(project); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇩</span>{t('proj.export')}</div>
+            <div className="menu-item" onClick={() => { set('projMenuOpen', false); void backupAllProjects().then((n) => toast(`已备份 ${n} 个项目`, 'success')); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⧉</span>{t('proj.backup')}</div>
+            <input ref={fileRef} type="file" accept=".json,.zip" multiple hidden onChange={(e) => { const fs = e.target.files; if (fs?.length) void importProjectFiles(Array.from(fs)); e.target.value = ''; }} />
             <div className="menu-sep" />
             <div className="menu-item" onClick={() => { const n = prompt('项目名', project.name); if (n && n !== project.name) editor.dispatch(sch.renameProject(n)); set('projMenuOpen', false); }}><span style={{ width: 14 }} />重命名</div>
             <div className="menu-item" onClick={() => { set('projMenuOpen', false); go('fab'); }}><span style={{ width: 14 }} />项目设置<span className="ml-auto dim">层数 · 板厂规则 · 单位</span></div>

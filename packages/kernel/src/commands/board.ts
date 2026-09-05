@@ -1,5 +1,5 @@
 import type { Project } from '../model/project.js';
-import type { Board, CopperLayer, Layer, Trace, Zone } from '../model/board.js';
+import type { Board, BoardText, CopperLayer, Layer, Trace, Via, Zone } from '../model/board.js';
 import type { Vec } from '../geometry.js';
 import { newId } from '../ids.js';
 import { command, type Command } from './types.js';
@@ -51,6 +51,47 @@ export function deleteZones(ids: string[]): Command {
 
 export function addBoardText(t: { layer: 'F.Silk' | 'B.Silk'; text: string; x: number; y: number; size?: number }): Command {
   return command('丝印文字', (proj) => updateBoard(proj, (b) => ({ ...b, texts: [...b.texts, { id: newId('x'), size: 1, ...t }] })));
+}
+
+export function setTracePoints(id: string, points: Vec[]): Command {
+  return command('编辑走线', (proj) => updateBoard(proj, (b) => ({ ...b, traces: b.traces.map((t) => (t.id === id ? { ...t, points } : t)) })));
+}
+
+export function setTraceProps(id: string, props: Partial<Pick<Trace, 'width' | 'layer' | 'net'>>): Command {
+  return command('修改走线', (proj) => updateBoard(proj, (b) => ({ ...b, traces: b.traces.map((t) => (t.id === id ? { ...t, ...props } : t)) })));
+}
+
+export function setViaProps(id: string, props: Partial<Pick<Via, 'x' | 'y' | 'size' | 'drill' | 'net'>>): Command {
+  return command('修改过孔', (proj) => updateBoard(proj, (b) => ({ ...b, vias: b.vias.map((v) => (v.id === id ? { ...v, ...props } : v)) })));
+}
+
+export function setTextProps(id: string, props: Partial<Pick<BoardText, 'x' | 'y' | 'text' | 'size' | 'layer'>>): Command {
+  return command('修改文字', (proj) => updateBoard(proj, (b) => ({ ...b, texts: b.texts.map((t) => (t.id === id ? { ...t, ...props } : t)) })));
+}
+
+export function deleteTexts(ids: string[]): Command {
+  const set = new Set(ids);
+  return command('删除文字', (proj) => updateBoard(proj, (b) => ({ ...b, texts: b.texts.filter((t) => !set.has(t.id)) })));
+}
+
+/** 设置任意多边形板框（至少 3 点）。 */
+export function setOutline(points: Vec[]): Command {
+  return command('板框', (proj) => (points.length < 3 ? proj : updateBoard(proj, (b) => ({ ...b, outline: points }))));
+}
+
+/** 批量移动封装（对齐 / 分布）。 */
+export function moveFootprints(moves: { id: string; x: number; y: number }[]): Command {
+  const m = new Map(moves.map((x) => [x.id, x]));
+  return command('对齐 / 分布', (proj) => updateBoard(proj, (b) => ({ ...b, footprints: b.footprints.map((f) => (m.has(f.id) ? { ...f, x: m.get(f.id)!.x, y: m.get(f.id)!.y } : f)) })));
+}
+
+/** 应用自动布线结果。 */
+export function applyRoutes(traces: Omit<Trace, 'id'>[], vias: Omit<Via, 'id'>[]): Command {
+  return command(`自动布线（${traces.length} 段）`, (proj) => updateBoard(proj, (b) => ({
+    ...b,
+    traces: [...b.traces, ...traces.map((t) => ({ id: newId('t'), ...t }))],
+    vias: [...b.vias, ...vias.map((v) => ({ id: newId('v'), ...v }))]
+  })));
 }
 
 export function setOutlineRect(w: number, h: number): Command {

@@ -21,7 +21,7 @@ export function CategoryFilter({ value, onChange, variant = 'chips', onlyUsed = 
   }
   return (
     <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-      <span className={`cat-chip${value === null ? ' on' : ''}`} onClick={() => onChange(null)}>全部</span>
+      <span className={`cat-chip${value === null ? ' on' : ''}`} onClick={() => onChange(null)}>∗ 全部</span>
       {cats.map((c) => (
         <span key={c.id} className={`cat-chip${value === c.id ? ' on' : ''}`} onClick={() => onChange(value === c.id ? null : c.id)} title={`${c.group} · ${c.name}`}>
           <span className="cat-icon" style={{ width: 16, height: 16, ['--icon' as string]: `url(${iconUrl(c.id)})` }} />{c.name}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as RPE, type RefObject } from 'react';
 import type { Vec, Rect } from '@tracelet/kernel';
+import { usePrefs } from '../i18n/index.js';
 
 /** 视口：screen = world * k + (x, y) */
 export interface VP { x: number; y: number; k: number }
@@ -56,9 +57,13 @@ export function useViewport(svgRef: RefObject<SVGSVGElement | null>, opts: { ini
       e.preventDefault();
       const r = svg.getBoundingClientRect();
       const v = vpRef.current;
-      if (e.shiftKey && !e.ctrlKey && !e.metaKey) { setVp({ ...v, x: v.x - e.deltaY }); return; }
+      const mode = usePrefs.getState().wheelMode;
+      const pinch = e.ctrlKey || e.metaKey;
+      // 触控板模式：双指滚动 = 平移，捏合（ctrlKey）= 缩放；鼠标模式：滚轮 = 缩放，Shift+滚轮 = 水平平移
+      if (mode === 'pan' && !pinch) { setVp({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }); return; }
+      if (mode === 'zoom' && e.shiftKey && !pinch) { setVp({ ...v, x: v.x - e.deltaY }); return; }
       const sx = e.clientX - r.left, sy = e.clientY - r.top;
-      const factor = Math.exp(-e.deltaY * (e.ctrlKey || e.metaKey ? 0.01 : 0.0015));
+      const factor = Math.exp(-e.deltaY * (pinch ? 0.01 : 0.0015));
       const k = Math.max(opts.minK, Math.min(opts.maxK, v.k * factor));
       const wx = (sx - v.x) / v.k, wy = (sy - v.y) / v.k;
       setVp({ k, x: sx - wx * k, y: sy - wy * k });

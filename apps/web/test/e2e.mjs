@@ -40,6 +40,29 @@ await page.screenshot({ path: `${outDir}/06-ai.png` });
 await page.click('.ws-tab:has-text("PCB")');
 await page.waitForTimeout(500);
 await page.screenshot({ path: `${outDir}/07-pcb.png` });
+// 框选（从左上到右下框住 R1/D1 区域）→ 对齐条出现
+const stage = await page.$('.canvas-wrap.pcb svg.stage');
+const box = await stage.boundingBox();
+await page.mouse.move(box.x + 400, box.y + 452); await page.mouse.down(); await page.mouse.move(box.x + 530, box.y + 505, { steps: 8 }); await page.mouse.up();
+await page.waitForTimeout(200);
+await page.screenshot({ path: `${outDir}/07a-pcb-marquee-align.png` });
+await page.click('button:has-text("上对齐")');
+await page.keyboard.press('Escape');
+// 自动布线 → 建议预览 → 接受
+await page.click('.tool[title^="自动布线"]');
+await page.waitForSelector('text=自动布线完成');
+await page.waitForTimeout(300);
+await page.screenshot({ path: `${outDir}/07b-pcb-autoroute-preview.png` });
+await page.click('button:has-text("接受")');
+await page.waitForTimeout(300);
+await page.screenshot({ path: `${outDir}/07c-pcb-autorouted.png` });
+// 板框工具：拖右下角顶点
+await page.keyboard.press('e');
+await page.waitForTimeout(200);
+await page.screenshot({ path: `${outDir}/07d-pcb-edge-tool.png` });
+await page.keyboard.press('Escape');
+// 撤销自动布线，让后面的 DRC 截图仍有未布线错误
+await page.keyboard.press('Meta+z');
 await page.click('button:has-text("检查")');
 await page.click('text=定位');
 await page.waitForTimeout(300);
@@ -58,7 +81,7 @@ await page.keyboard.press('Escape');
 await page.click('.dialog-head span.muted');
 await page.click('.ws-tab:has-text("库")');
 await page.waitForTimeout(300);
-await page.click('.cat-card:has-text("电容")');
+await page.click('.cat-chip:has-text("电容")');
 await page.screenshot({ path: `${outDir}/10c-library-categories.png` });
 await page.click('.ws-tab:has-text("制造")');
 const [download] = await Promise.all([page.waitForEvent('download'), page.click('button:has-text("zip")')]);

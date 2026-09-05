@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from 'react';
-import { sch, getSymbol, findPin, previewRoute, snapComponentOrigin, componentBounds, SCH_GRID, snapTo, pointOnSeg, type Vec, type Rect } from '@tracelet/kernel';
+import { sch, getSymbol, findPin, previewRoute, snapComponentOrigin, componentBounds, SCH_GRID, snapTo, pointOnSeg, rectsOverlap, type Vec, type Rect } from '@tracelet/kernel';
 import { useApp, useEditor, useProject } from '../../store/app.js';
 import { getAnalysis } from '../../store/analysis.js';
 import { useViewport, gridStep } from '../../hooks/useViewport.js';
@@ -24,6 +24,8 @@ export function SchematicCanvas() {
   const analysis = getAnalysis(project);
   const drag = useRef<{ id: string; dx: number; dy: number; moved: boolean } | null>(null);
   const [labelText, setLabelText] = useState('');
+  const marq = useRef<{ start: Vec; add: boolean } | null>(null);
+  const [marquee, setMarquee] = useState<{ a: Vec; b: Vec } | null>(null);
   const fitted = useRef<string | null>(null);
 
   // 首次打开：适配全部内容
@@ -84,25 +86,47 @@ export function SchematicCanvas() {
     if (app.pendingPin) { app.patch({ pendingPin: null }); return; }
     if (app.pwrMenuOpen) { app.patch({ pwrMenuOpen: false }); return; }
     if (app.labelPrompt) { app.patch({ labelPrompt: null }); return; }
-    app.patch({ selection: [], highlightNet: null, checkHighlight: null });
+    marq.current = { start: p, add: e.shiftKey };
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
   };
 
   const onMove = (e: RPE<SVGSVGElement>) => {
     if (view.panMove(e)) return;
     const p = view.toWorld(e.clientX, e.clientY);
     app.set('cursorWorld', p);
+    if (marq.current) { setMarquee({ a: marq.current.start, b: p }); return; }
     const d = drag.current;
     if (d) {
       const c = editor.project.schematic.sheets[0].components.find((x) => x.id === d.id);
       if (!c) return;
       const sym = getSymbol(c.symbolId);
       const origin = snapComponentOrigin(sym, { x: p.x - d.dx + sym.width / 2, y: p.y - d.dy + sym.height / 2 });
-      if (origin.x !== c.x || origin.y !== c.y) { d.moved = true; editor.dispatch(sch.moveComponent(sheet.id, d.id, origin)); }
+      if (origin.x !== c.x || origin.y !== c.y) {
+        d.moved = true;
+        const ddx = origin.x - c.x, ddy = origin.y - c.y;
+        const group = app.selection.includes(d.id) ? app.selection : [d.id];
+        for (const gid of group) { const gc = editor.project.schematic.sheets[0].components.find((x) => x.id === gid); if (gc) editor.dispatch(sch.moveComponent(sheet.id, gid, { x: gc.x + ddx, y: gc.y + ddy })); }
+      }
     }
   };
 
   const onUp = (e: RPE<SVGSVGElement>) => {
     if (view.panEnd(e)) return;
+    if (marq.current) {
+      const m = marq.current; marq.current = null; setMarquee(null);
+      const end = view.toWorld(e.clientX, e.clientY);
+      const w = Math.abs(end.x - m.start.x), h = Math.abs(end.y - m.start.y);
+      if (w * vp.k < 4 && h * vp.k < 4) { if (!m.add) app.patch({ selection: [], highlightNet: null, checkHighlight: null }); return; }
+      const rect: Rect = { x: Math.min(m.start.x, end.x), y: Math.min(m.start.y, end.y), w, h };
+      const strict = end.x >= m.start.x;
+      const inside = (b: Rect) => (strict ? b.x >= rect.x && b.y >= rect.y && b.x + b.w <= rect.x + rect.w && b.y + b.h <= rect.y + rect.h : rectsOverlap(rect, b));
+      const ids = [
+        ...sheet.components.filter((c) => inside(componentBounds(c))).map((c) => c.id),
+        ...sheet.labels.filter((l) => inside({ x: l.x, y: l.y - 180, w: 120 + l.text.length * 70, h: 180 })).map((l) => l.id)
+      ];
+      app.patch({ selection: m.add ? [...new Set([...app.selection, ...ids])] : ids, rightTab: ids.length ? (app.rightTab === 'lib' || app.rightTab === 'ai' ? app.rightTab : 'props') : app.rightTab });
+      return;
+    }
     if (drag.current) { drag.current = null; editor.commit(); }
   };
 
@@ -114,7 +138,8 @@ export function SchematicCanvas() {
     const c = sheet.components.find((x) => x.id === id)!;
     drag.current = { id, dx: p.x - c.x, dy: p.y - c.y, moved: false };
     editor.begin('移动元件');
-    app.patch({ selection: e.shiftKey ? [...new Set([...app.selection, id])] : [id], rightTab: app.rightTab === 'lib' || app.rightTab === 'ai' ? app.rightTab : 'props', pendingPin: null, highlightNet: null });
+    const sel = e.shiftKey ? [...new Set([...app.selection, id])] : app.selection.includes(id) ? app.selection : [id];
+    app.patch({ selection: sel, rightTab: app.rightTab === 'lib' || app.rightTab === 'ai' ? app.rightTab : 'props', pendingPin: null, highlightNet: null });
   };
 
   const onPinDown = (componentId: string) => (pin: string, e: RPE<SVGElement>) => {
@@ -181,6 +206,7 @@ export function SchematicCanvas() {
             <SymbolGlyph comp={{ id: 'ghost', ref: `${placingSym.prefix.replace('#', '')}${project.schematic.counters[placingSym.prefix] ?? 1}`, symbolId: placingSym.id, value: app.placing.value, footprint: '', x: ghostOrigin.x, y: ghostOrigin.y, rotation: app.placing.rotation, mirror: false, props: {} }} sym={placingSym} ghost />
           )}
         </g>
+        {marquee && (() => { const a = view.toScreen(marquee.a), b = view.toScreen(marquee.b); const ltr = marquee.b.x >= marquee.a.x; return <rect x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)} width={Math.abs(b.x - a.x)} height={Math.abs(b.y - a.y)} fill={ltr ? 'rgba(61,139,255,.12)' : 'rgba(52,199,89,.12)'} stroke={ltr ? '#3D8BFF' : '#34C759'} strokeWidth={1} strokeDasharray={ltr ? undefined : '4 3'} pointerEvents="none" />; })()}
       </svg>
       {labelScreen && app.labelPrompt && (
         <div className="label-prompt" style={{ left: labelScreen.x + 8, top: labelScreen.y - 40 }} onPointerDown={(e) => e.stopPropagation()}>

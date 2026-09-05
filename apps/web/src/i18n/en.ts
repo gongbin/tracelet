@@ -9,7 +9,8 @@ export const en: Partial<Record<MessageKey, string>> = {
   'home.onboard.title': 'First time? Build an LED blinker in 5 minutes', 'home.onboard.body': 'Guided on the canvas: place parts → wire → generate PCB → export. Dismiss anytime.', 'home.start': 'Start',
   'home.storage.local': 'Local storage', 'home.storage.remote': 'Remote (team)',
   'theme.dark': 'Dark', 'theme.light': 'Light', 'theme.system': 'System',
-  'settings.language': 'Language', 'settings.theme': 'Theme',
+  'settings.language': 'Language', 'settings.theme': 'Theme', 'settings.wheel': 'Canvas gestures', 'wheel.pan': 'Trackpad: two-finger pan · pinch zoom', 'wheel.zoom': 'Mouse: wheel zoom · middle-drag pan',
+  'proj.export': 'Export project (.eda.json)', 'proj.backup': 'Back up all projects (zip)', 'proj.import': 'Import project / backup…',
   'fab.title': 'Fabrication', 'fab.precheck': 'Pre-flight checks', 'fab.export': 'Export', 'fab.download': 'Download fab files (zip)', 'fab.preview': 'Preview Gerber', 'fab.order': 'Order →',
   'lib.all': 'All categories', 'lib.title': 'Parts library', 'lib.place': 'Place in schematic',
   'palette.placeholder': 'Type a command; @ parts, # nets', 'palette.empty': 'No matches'

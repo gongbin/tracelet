@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { usePrefs, useT, LOCALES, type Theme } from '../i18n/index.js';
+import { usePrefs, useT, LOCALES, type Theme, type WheelMode } from '../i18n/index.js';
 import { useApp } from '../store/app.js';
 import { loadStoreConfig, saveStoreConfig } from '../store/projectStore.js';
 
@@ -34,6 +34,10 @@ export function PrefsMenu({ large }: { large?: boolean }) {
           <div className="menu-head">{t('settings.theme')}</div>
           <div className="row" style={{ padding: '0 6px 6px', gap: 6 }}>
             {themes.map((th) => <span key={th} className={`chip${prefs.theme === th ? ' on' : ''}`} onClick={() => prefs.setTheme(th)}>{t(`theme.${th}` as 'theme.dark')}</span>)}
+          </div>
+          <div className="menu-head">{t('settings.wheel')}</div>
+          <div className="col" style={{ padding: '0 6px 6px', gap: 4 }}>
+            {(['pan', 'zoom'] as WheelMode[]).map((m) => <span key={m} className={`chip${prefs.wheelMode === m ? ' on' : ''}`} style={{ textAlign: 'left' }} onClick={() => prefs.setWheelMode(m)}>{t(`wheel.${m}` as 'wheel.pan')}</span>)}
           </div>
           <div className="menu-sep" />
           <div className="menu-head">存储</div>

@@ -4,16 +4,19 @@ import { en } from './en.js';
 
 export type Locale = 'zh-CN' | 'en';
 export type Theme = 'dark' | 'light' | 'system';
+export type WheelMode = 'pan' | 'zoom';
 const DICTS: Record<Locale, Partial<Record<MessageKey, string>>> = { 'zh-CN': zhCN, en };
 export const LOCALES: Locale[] = ['zh-CN', 'en'];
 
-interface PrefState { locale: Locale; theme: Theme; setLocale: (l: Locale) => void; setTheme: (t: Theme) => void }
+interface PrefState { locale: Locale; theme: Theme; wheelMode: WheelMode; setLocale: (l: Locale) => void; setTheme: (t: Theme) => void; setWheelMode: (m: WheelMode) => void }
 const load = <T,>(k: string, d: T): T => { try { return (localStorage.getItem(k) as T) ?? d; } catch { return d; } };
 
 /** 界面偏好：语言与主题。持久化到 localStorage，主题写到 <html data-theme>。 */
 export const usePrefs = create<PrefState>((set) => ({
   locale: load<Locale>('tracelet:locale', (typeof navigator !== 'undefined' && navigator.language.startsWith('en') ? 'en' : 'zh-CN')),
   theme: load<Theme>('tracelet:theme', 'dark'),
+  wheelMode: load<WheelMode>('tracelet:wheel', 'pan'),
+  setWheelMode: (wheelMode) => { try { localStorage.setItem('tracelet:wheel', wheelMode); } catch { /* ignore */ } set({ wheelMode }); },
   setLocale: (locale) => { try { localStorage.setItem('tracelet:locale', locale); } catch { /* ignore */ } set({ locale }); },
   setTheme: (theme) => { try { localStorage.setItem('tracelet:theme', theme); } catch { /* ignore */ } applyTheme(theme); set({ theme }); }
 }));
