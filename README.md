@@ -51,6 +51,8 @@ pnpm cli footprint gen demo.eda.json LQFP-48_7x7mm_P0.5mm                       
 
 ## MCP server
 
+完整说明（两种模式、各客户端配置、全部工具参数、排错）见 [MCP.md](./MCP.md)。
+
 把 Tracelet 内核暴露给 Claude Code / Claude Desktop / Cursor 等 MCP 客户端（stdio）。两种目标：
 
 **1. 浏览器里正在打开的项目（推荐，类似 Figma 的实时桥）**
