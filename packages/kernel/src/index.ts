@@ -13,6 +13,7 @@ export * from './library/templates.js';
 export * from './io/sexpr.js';
 export * from './io/kicad.js';
 export * from './io/kicadLib.js';
+export * from './io/easyeda.js';
 export * from './schematic/geometry.js';
 export * from './schematic/connectivity.js';
 export * from './schematic/erc.js';

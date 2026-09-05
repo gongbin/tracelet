@@ -72,6 +72,7 @@ export function runDrc(board: Board, rules: RuleSet): CheckReport {
   const inner = board.outline.length >= 3 ? board.outline : null;
   if (inner) {
     for (const p of pads) {
+      if (p.def.npth) continue; // 非金属化孔没有铜
       const r = expandRect(p.rect, rules.copperToEdge);
       const corners = [{ x: r.x, y: r.y }, { x: r.x + r.w, y: r.y }, { x: r.x + r.w, y: r.y + r.h }, { x: r.x, y: r.y + r.h }];
       if (!corners.every((c) => pointInPolygon(c, inner))) push({ rule: 'copper-to-edge', severity: 'warning', message: `焊盘靠近板边 < ${f(rules.copperToEdge)}mm`, why: '切割公差可能切到铜，导致露铜或短路。', refs: [`${p.ref}.${p.number}`], location: p.center, objectIds: [p.footprintId] });

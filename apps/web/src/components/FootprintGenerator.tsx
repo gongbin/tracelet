@@ -26,7 +26,7 @@ export function FootprintGenerator({ close }: { close: () => void }) {
   }, [kind, p]);
   const error = validateSpec(spec);
   const def = useMemo(() => { try { return error ? null : generateFootprint(spec); } catch { return null; } }, [spec, error]);
-  const set = (k: string, v: number | string | boolean) => setP({ ...p, [k]: v });
+  const set = (k: string, v: number | string | boolean) => setP((prev) => ({ ...prev, [k]: v }));
   const N = ({ k, label, step = 0.01, min = 0 }: { k: string; label: string; step?: number; min?: number }) => <><span className="k">{label}</span><input className="input mono" type="number" step={step} min={min} value={String(p[k] ?? '')} onChange={(e) => set(k, e.target.value)} onKeyDown={(e) => e.stopPropagation()} /></>;
   const add = (thenPlace: boolean) => {
     if (!def) return;
@@ -41,7 +41,7 @@ export function FootprintGenerator({ close }: { close: () => void }) {
         <div className="dialog-head"><div><div style={{ fontWeight: 600, fontSize: 15 }}>参数化生成封装</div><div className="small muted" style={{ marginTop: 2 }}>命名与 KiCad 一致，pin 1 左上、逆时针编号；尺寸为通用值，量产前请按数据手册核对</div></div><span className="ml-auto muted" style={{ cursor: 'pointer', fontSize: 16 }} onClick={close}>✕</span></div>
         <div className="dialog-body row" style={{ gap: 18, alignItems: 'flex-start' }}>
           <div className="col" style={{ gap: 4, width: 150, flex: 'none' }}>
-            {KINDS.map(([k, name, desc]) => <div key={k} className={`next-step${kind === k ? ' on' : ''}`} style={{ background: kind === k ? 'var(--bg-raised)' : undefined }} onClick={() => setKind(k)}><div><div>{name}</div><div className="dim xs">{desc}</div></div></div>)}
+            {KINDS.map(([k, name, desc]) => <div key={k} className={`next-step${kind === k ? ' on' : ''}`} style={{ background: kind === k ? 'var(--bg-raised)' : undefined }} onClick={() => { setKind(k); const d: Record<string, number> = { soic: 8, qfp: 48, qfn: 32, dip: 8 }; if (d[k] && !(p.pins && Number(p.pins) % (k === 'qfp' || k === 'qfn' ? 4 : 2) === 0 && Number(p.pins) >= (k === 'qfp' || k === 'qfn' ? 8 : 4))) set('pins', d[k]); if (k === 'qfp' || k === 'qfn') { if (Number(p.pitch) > 0.8) set('pitch', 0.5); } else if (k === 'soic' && Number(p.pitch) < 0.6) set('pitch', 1.27); }}><div><div>{name}</div><div className="dim xs">{desc}</div></div></div>)}
           </div>
           <div className="kv grow" style={{ gap: '8px 10px' }}>
             {kind === 'chip' && <>

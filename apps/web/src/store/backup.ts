@@ -1,4 +1,4 @@
-import { parseProject, serializeProject, zipFiles, unzipFiles, importKicadProject, type Project } from '@tracelet/kernel';
+import { parseProject, serializeProject, zipFiles, unzipFiles, importKicadProject, importEasyEdaProject, looksLikeEasyEda, type Project } from '@tracelet/kernel';
 import { useApp } from './app.js';
 
 export function downloadFile(name: string, content: string | Uint8Array, type: string) {
@@ -7,6 +7,8 @@ export function downloadFile(name: string, content: string | Uint8Array, type: s
   a.download = name; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
+/** 读文本：jsdom / 旧浏览器的 File 可能没有 text()。 */
+export const readFileText = (f: File): Promise<string> => typeof f.text === 'function' ? f.text() : new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(r.error); r.readAsText(f); });
 export const slug = (s: string) => s.replace(/[^\w一-龥-]+/g, '-').replace(/^-|-$/g, '') || 'project';
 
 /** 导出单个项目为 .eda.json。 */
@@ -31,6 +33,7 @@ export async function importProjectFiles(files: File[]): Promise<void> {
   const projects: Project[] = [];
   const errors: string[] = [];
   const kicad: { name: string; text: string }[] = [];
+  const easy: { name: string; text: string }[] = [];
   for (const f of files) {
     try {
       const lower = f.name.toLowerCase();
@@ -38,12 +41,13 @@ export async function importProjectFiles(files: File[]): Promise<void> {
         const entries = unzipFiles(new Uint8Array(await f.arrayBuffer()));
         for (const e of entries) {
           const el = e.name.toLowerCase();
-          if (el.endsWith('.json')) { try { projects.push(parseProject(e.content)); } catch (err) { errors.push(`${e.name}: ${(err as Error).message}`); } }
+          if (el.endsWith('.json')) { if (looksLikeEasyEda(e.content)) easy.push({ name: e.name.split('/').pop()!, text: e.content }); else { try { projects.push(parseProject(e.content)); } catch (err) { errors.push(`${e.name}: ${(err as Error).message}`); } } }
           else if (el.endsWith('.kicad_sch') || el.endsWith('.kicad_pcb')) kicad.push({ name: e.name.split('/').pop()!, text: e.content });
         }
-      } else if (lower.endsWith('.kicad_sch') || lower.endsWith('.kicad_pcb')) kicad.push({ name: f.name, text: await f.text() });
+      } else if (lower.endsWith('.kicad_sch') || lower.endsWith('.kicad_pcb')) kicad.push({ name: f.name, text: await readFileText(f) });
       else if (lower.endsWith('.kicad_pro') || lower.endsWith('.kicad_prl')) { /* 项目设置文件暂不使用 */ }
-      else projects.push(parseProject(await f.text()));
+      else if (lower.endsWith('.eprj') || lower.endsWith('.esch') || lower.endsWith('.epcb') || lower.endsWith('.epro')) errors.push(`${f.name}: 嘉立创 EDA 专业版文件暂不支持，请在专业版里「文件 → 导出 → 标准版 / KiCad」后导入`);
+      else { const text = await readFileText(f); if (looksLikeEasyEda(text)) easy.push({ name: f.name, text }); else projects.push(parseProject(text)); }
     } catch (err) { errors.push(`${f.name}: ${(err as Error).message}`); }
   }
   if (kicad.length) {
@@ -59,6 +63,15 @@ export async function importProjectFiles(files: File[]): Promise<void> {
       app.toast(`KiCad：${schs.length} 页原理图 · ${comps} 元件${pcbFile ? ` · PCB ${r.project.board.footprints.length} 封装 / ${r.project.board.traces.length} 走线` : ' · 未选 .kicad_pcb，PCB 为空，可用「同步到 PCB」按封装名生成'}`, 'success');
       for (const w of r.warnings.slice(0, 3)) app.toast(`KiCad 导入提示 · ${w.where}: ${w.message}`);
     } catch (err) { errors.push(`KiCad: ${(err as Error).message}`); }
+  }
+  if (easy.length) {
+    try {
+      const r = importEasyEdaProject({ name: easy[0].name.replace(/\.json$/i, '').replace(/^(Schematic|PCB)[_-]?/i, '') || 'EasyEDA 导入', files: easy });
+      projects.push(r.project);
+      const comps = r.project.schematic.sheets.reduce((n, sh) => n + sh.components.length, 0);
+      app.toast(`嘉立创 EDA：${r.project.schematic.sheets.length} 页原理图 · ${comps} 元件 · PCB ${r.project.board.footprints.length} 封装 / ${r.project.board.traces.length} 走线`, 'success');
+      for (const w of r.warnings.slice(0, 3)) app.toast(`EasyEDA 导入提示 · ${w.where}: ${w.message}`);
+    } catch (err) { errors.push(`EasyEDA: ${(err as Error).message}`); }
   }
   for (const p of projects) await app.store.save(p);
   await app.refreshProjects();

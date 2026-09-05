@@ -53,8 +53,8 @@ export function Home() {
           </div>
           <div className="action-card" onClick={() => fileRef.current?.click()}>
             <div className="row" style={{ fontWeight: 600, fontSize: 14 }}><Icon d={I.upload} size={16} stroke={2} color="var(--text-2)" />{t('home.import')}</div>
-            <div className="small muted">KiCad：多选同一工程的全部 .kicad_sch（每个一页）+ .kicad_pcb 一起导入，或直接拖整个工程 zip · 也支持 .eda.json / 备份 zip</div>
-            <input ref={fileRef} type="file" accept=".json,.eda.json,.zip,.kicad_sch,.kicad_pcb,.kicad_pro" multiple hidden onChange={(e) => { const fs = e.target.files ? Array.from(e.target.files) : []; if (fs.length) void onImport(fs); e.target.value = ''; }} />
+            <div className="small muted">KiCad：多选全部 .kicad_sch + .kicad_pcb 或拖整个工程 zip · 嘉立创 EDA 标准版：文件 → 导出 → EasyEDA 源码（JSON）· 也支持 .eda.json / 备份 zip</div>
+            <input ref={fileRef} type="file" accept=".json,.eda.json,.zip,.kicad_sch,.kicad_pcb,.kicad_pro,.eprj,.esch,.epcb" multiple hidden onChange={(e) => { const fs = e.target.files ? Array.from(e.target.files) : []; if (fs.length) void onImport(fs); e.target.value = ''; }} />
           </div>
           <div className="action-card" onClick={() => set('wizardOpen', true)}>
             <div className="row" style={{ fontWeight: 600, fontSize: 14 }}><Icon d={I.file} size={16} stroke={2} color="var(--text-2)" />{t('home.template')}</div>

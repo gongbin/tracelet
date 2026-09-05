@@ -7,6 +7,7 @@ import { parseSymbolNodes, buildSymbolDef, parseFootprintNode } from './kicad.js
 import type { SymbolDef } from '../model/schematic.js';
 import type { FootprintDef } from '../model/board.js';
 import { registerSymbols, registerFootprints } from '../library/registry.js';
+import { findEasyEdaDocs, importEasyEdaSymbolDoc, importEasyEdaFootprintDoc, looksLikeEasyEda } from './easyeda.js';
 
 export interface LibImportResult { symbols: SymbolDef[]; footprints: FootprintDef[]; warnings: string[] }
 
@@ -57,12 +58,17 @@ export function importLibraryFile(fileName: string, text: string): LibImportResu
   if (lower.endsWith('.kicad_sym')) res.symbols = importKicadSymbolLib(text, fileName.split('/').pop()!);
   else if (lower.endsWith('.kicad_mod')) res.footprints = [importKicadFootprintMod(text, fileName.split('/').pop()!)];
   else if (lower.endsWith('.lib') || lower.endsWith('.dcm')) res.warnings.push(`${fileName}: KiCad 5 旧版库请先用 KiCad 6+ 另存为 .kicad_sym`);
-  else if (lower.endsWith('.json') && /"docType"\s*:\s*"(SCHEMATIC|PCB)/i.test(text)) res.warnings.push(`${fileName}: 立创 EDA 库请先导出为 KiCad 格式（EasyEDA → 文件 → 导出 → KiCad）`);
+  else if (lower.endsWith('.json') && looksLikeEasyEda(text)) {
+    let docs: ReturnType<typeof findEasyEdaDocs> = [];
+    try { docs = findEasyEdaDocs(JSON.parse(text), fileName.replace(/\.json$/i, '')); } catch (e) { res.warnings.push(`${fileName}: ${(e as Error).message}`); }
+    for (const d of docs) { const t = String(d.head.docType); if (t === '2') res.symbols.push(importEasyEdaSymbolDoc(d)); else if (t === '4') res.footprints.push(importEasyEdaFootprintDoc(d)); else res.warnings.push(`${fileName}: docType ${t} 不是符号 / 封装文档，请在首页「导入项目」里导入`); }
+    if (!docs.length) res.warnings.push(`${fileName}: 没有找到 EasyEDA 文档`);
+  }
   else res.warnings.push(`${fileName}: 不支持的库文件类型（支持 .kicad_sym / .kicad_mod）`);
   return res;
 }
 
 /** 供 UI 用的库文件类型说明。 */
-export const LIBRARY_FILE_HINT = '支持 KiCad 6+ 的 .kicad_sym（符号库）与 .kicad_mod（封装）；.pretty 目录里可多选多个 .kicad_mod。立创 EDA 请先在 EasyEDA 里导出 KiCad 格式。';
+export const LIBRARY_FILE_HINT = '支持 KiCad 6+ 的 .kicad_sym（符号库）与 .kicad_mod（封装），.pretty 目录里可多选；嘉立创 EDA 标准版的符号 / 封装 JSON（文件 → 导出 → EasyEDA 源码）。';
 // 预留：确保 child 被引用（用于将来读取库级别属性）
 void child;

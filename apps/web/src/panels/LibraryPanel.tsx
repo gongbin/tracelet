@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { BUILTIN_PARTS, searchParts, getSymbol, findFootprint, BUILTIN_FOOTPRINTS, importLibraryFile, lib, LIBRARY_FILE_HINT, type Part, type SymbolDef, type FootprintDef } from '@tracelet/kernel';
 import { useApp, useProject, useEditor } from '../store/app.js';
+import { readFileText } from '../store/backup.js';
 import { Icon } from '../components/Icon.js';
 import { I } from '../icons.js';
 import { CategoryFilter } from '../components/CategoryFilter.js';
@@ -58,7 +59,7 @@ export function LibraryPanel() {
   const importFiles = async (files: File[]) => {
     const symbols: SymbolDef[] = [], footprints: FootprintDef[] = [], warnings: string[] = [];
     for (const f of files) {
-      try { const r = importLibraryFile(f.name, await f.text()); symbols.push(...r.symbols); footprints.push(...r.footprints); warnings.push(...r.warnings); }
+      try { const r = importLibraryFile(f.name, await readFileText(f)); symbols.push(...r.symbols); footprints.push(...r.footprints); warnings.push(...r.warnings); }
       catch (err) { warnings.push(`${f.name}: ${(err as Error).message}`); }
     }
     if (symbols.length || footprints.length) { editor.dispatch(lib.addLibraryItems({ symbols, footprints })); setTab('project'); app.toast(`已导入 ${symbols.length} 个符号 · ${footprints.length} 个封装到项目库（可 Undo）`, 'success'); }
@@ -91,9 +92,9 @@ export function LibraryPanel() {
         </div>}
         <div className="lib-tabs">{TABS.map(([id, label]) => <span key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}{id === 'project' && (project.library.symbols.length + project.library.footprints.length) > 0 ? ` ${project.library.symbols.length + project.library.footprints.length}` : ''}{id === 'fav' && app.favorites.length ? ` ${app.favorites.length}` : ''}</span>)}<a className="ml-auto xs" href={`https://so.szlcsc.com/global.html?k=${encodeURIComponent(app.libQuery || sel?.name || '')}`} target="_blank" rel="noreferrer" title="在立创商城搜索（新窗口）">LCSC ↗</a></div>
         <div className="row" style={{ gap: 6 }}>
-          <button className="btn sm" onClick={() => fileRef.current?.click()} title={LIBRARY_FILE_HINT}>⇪ 导入 KiCad 库</button>
+          <button className="btn sm" onClick={() => fileRef.current?.click()} title={LIBRARY_FILE_HINT}>⇪ 导入库（KiCad / 立创）</button>
           <button className="btn sm" onClick={() => setGen(true)}>⚙ 参数化封装</button>
-          <input ref={fileRef} type="file" accept=".kicad_sym,.kicad_mod" multiple hidden onChange={(e) => { const fs = e.target.files ? Array.from(e.target.files) : []; if (fs.length) void importFiles(fs); e.target.value = ''; }} />
+          <input ref={fileRef} type="file" accept=".kicad_sym,.kicad_mod,.json" multiple hidden onChange={(e) => { const fs = e.target.files ? Array.from(e.target.files) : []; if (fs.length) void importFiles(fs); e.target.value = ''; }} />
         </div>
         {tab !== 'project' && <div style={{ paddingBottom: 4 }}><CategoryFilter value={cat} onChange={setCat} /></div>}
       </div>
@@ -112,7 +113,7 @@ export function LibraryPanel() {
         {entries.length === 0 && (
           <div className="col" style={{ padding: 12, gap: 8 }}>
             <div className="muted">{tab === 'fav' ? '还没有收藏：在条目右侧点 ☆' : tab === 'project' ? '项目库为空：导入 KiCad 库文件、参数化生成封装，或导入 KiCad 工程时自动带入' : `没有找到「${app.libQuery}」`}</div>
-            <button className="btn" onClick={() => fileRef.current?.click()}>从 KiCad 库文件导入（.kicad_sym / .kicad_mod）</button>
+            <button className="btn" onClick={() => fileRef.current?.click()}>导入库文件（KiCad .kicad_sym / .kicad_mod，立创 EDA 符号 / 封装 JSON）</button>
             <button className="btn" onClick={() => setGen(true)}>参数化生成封装</button>
             <button className="btn ai" onClick={() => app.set('rightTab', 'ai')}>✨ 向 AI 描述让它画符号</button>
           </div>

@@ -9,7 +9,7 @@ import { Command } from 'commander';
 import {
   parseProject, serializeProject, createProject, createDemoProject, buildNetlist, runErc, runDrc, computeRatsnest, reviewSchematic, ruleSetOf, RULE_SETS,
   exportBomCsv, exportNetlistJson, exportPickAndPlaceCsv, exportFabFiles, exportFabZip, importKicadProject, ProjectEditor, pcb, sch, lib, diffBoardFromSchematic, getSymbol, type Project, type CheckReport,
-  PROJECT_TEMPLATES, createFromTemplate, exportSchematicPdf, exportAssemblyPdf, importLibraryFile, footprintFromName, generateFootprint, type FootprintSpec
+  PROJECT_TEMPLATES, createFromTemplate, exportSchematicPdf, exportAssemblyPdf, importLibraryFile, footprintFromName, generateFootprint, importEasyEdaProject, type FootprintSpec
 } from '@tracelet/kernel';
 import { basename } from 'node:path';
 
@@ -114,6 +114,12 @@ imp.command('kicad <files...>').description('导入 KiCad 工程（.kicad_sch �
   console.log(`已导入 ${schs.length} 页原理图（${comps} 元件）${pcbFile ? `、PCB（${r.project.board.footprints.length} 封装 / ${r.project.board.traces.length} 走线）` : ''} → ${out}`);
 });
 
+imp.command('easyeda <files...>').description('导入嘉立创 EDA 标准版 JSON（原理图 / PCB / 工程导出，可多个）').option('-o, --out <file>', '输出 .eda.json').option('-n, --name <name>').action((files: string[], o) => {
+  const r = importEasyEdaProject({ name: o.name ?? basename(files[0]).replace(/\.json$/i, ''), files: files.map((f) => ({ name: basename(f), text: readFileSync(resolve(f), 'utf8') })) });
+  for (const w of r.warnings) console.warn(`提示 ${w.where}: ${w.message}`);
+  const outp = o.out ?? files[0].replace(/\.json$/i, '') + '.eda.json'; save(outp, r.project);
+  console.log(`已导入 ${r.project.schematic.sheets.length} 页 · ${r.project.schematic.sheets.reduce((n, sh) => n + sh.components.length, 0)} 元件 · PCB ${r.project.board.footprints.length} 封装 → ${outp}`);
+});
 imp.command('lib <project> <files...>').description('把 KiCad 库文件（.kicad_sym / .kicad_mod）导入项目库').action((project: string, files: string[]) => {
   const ed = new ProjectEditor(load(project));
   const symbols = [] as ReturnType<typeof importLibraryFile>['symbols'], footprints = [] as ReturnType<typeof importLibraryFile>['footprints'];

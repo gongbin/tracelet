@@ -26,6 +26,7 @@ pnpm cli new stm32.eda.json -t stm32  # 模板：blank | esp32 | stm32 | arduino
 pnpm cli export zip demo.eda.json     # 全套制造文件（含装配图 PDF）
 pnpm cli export pdf demo.eda.json     # 原理图 PDF
 pnpm cli import kicad board.kicad_sch board.kicad_pcb -o board.eda.json
+pnpm cli import easyeda Schematic_x.json PCB_x.json -o x.eda.json          # 嘉立创 EDA 标准版
 pnpm cli import lib demo.eda.json MyParts.kicad_sym Package.pretty/*.kicad_mod   # KiCad 库 → 项目库
 pnpm cli footprint gen demo.eda.json LQFP-48_7x7mm_P0.5mm                        # 参数化封装
 ```
@@ -37,7 +38,7 @@ pnpm cli footprint gen demo.eda.json LQFP-48_7x7mm_P0.5mm                       
 - 制造：Gerber RS-274X（铜 / 阻焊 / 锡膏 / 丝印 / 板框）+ Excellon（PTH / NPTH）+ BOM + 坐标文件 + 装配图 PDF（顶 / 底）+ 原理图 PDF + README（工艺参数），一键 zip 并打开板厂下单页；Gerber 预览由第三方解析器（tracespace）读取导出文件后渲染
 - 库：内置零件目录，按型号 / 参数搜索，42 类元器件分类图标筛选；全部 / 项目库 / 收藏 / 官方库标签；导入 KiCad 库文件（`.kicad_sym` 多符号 / 多单元 / 派生符号，`.kicad_mod`）；参数化封装生成（0201–2512 贴片、SOIC/TSSOP、LQFP、QFN、DIP、排针排母、SOT-23），KiCad 风格封装名（如 `LQFP-48_7x7mm_P0.5mm`）在导入与同步时自动生成真实几何
 - 模板：ESP32 最小系统 / STM32F103 最小系统 / Arduino UNO 扩展板，一键生成原理图 + 预布局 PCB
-- 导入：KiCad 6/7/8 工程（多个 `.kicad_sch` = 多页，`.kicad_pcb`），符号 / 封装随项目保存；项目备份 zip 导入导出
+- 导入：KiCad 6/7/8 工程（多个 `.kicad_sch` = 多页，`.kicad_pcb`）；嘉立创 EDA 标准版 JSON（文件 → 导出 → EasyEDA 源码：原理图 / PCB / 符号 / 封装，专业版请先导出标准版或 KiCad）；符号 / 封装随项目保存；项目备份 zip 导入导出
 - 原理图：多页与图纸模板（A5–A1 / 自定义长宽，标题栏文字与标签可编辑）、总线、结点、图形注释（均可拖动）、测量、复制粘贴、⌥拖动复制、自定义属性、栅格切换
 - PCB：框选、板框编辑、走线顶点/线段拖动、走线中实时间距检查、对齐分布、内置 A* 自动布线（Web Worker，进度 / 取消，建议预览后接受，可微调器件）、仅板级封装（定位孔 / 基准点 / Logo）直接放置、状态栏栅格 / 线宽 / 过孔选择、层叠与工艺参数（板厚、铜厚、表面处理、阻焊 / 丝印颜色）
 - 手势：触控板双指平移 / 捏合缩放（可切回滚轮缩放）、右键或双指轻触结束当前操作
@@ -57,7 +58,7 @@ pnpm cli footprint gen demo.eda.json LQFP-48_7x7mm_P0.5mm                       
 claude mcp add tracelet -- pnpm --dir /path/to/tracelet cli serve --mcp -f /path/to/project.eda.json
 ```
 
-工具：`open_project / new_project / new_from_template / list_templates / import_kicad / import_library / generate_footprint / project_summary / get_netlist / get_component / run_erc / run_drc / review_schematic / search_parts / place_component / connect_pins / add_net_label / set_component_value / sync_to_pcb / move_footprint / set_board_outline / autoroute / export_fab / export_pdf / undo`。每次修改自动保存到打开的文件。
+工具：`open_project / new_project / new_from_template / list_templates / import_kicad / import_easyeda / import_library / generate_footprint / project_summary / get_netlist / get_component / run_erc / run_drc / review_schematic / search_parts / place_component / connect_pins / add_net_label / set_component_value / sync_to_pcb / move_footprint / set_board_outline / autoroute / export_fab / export_pdf / undo`。每次修改自动保存到打开的文件。
 
 ## 存储模式
 

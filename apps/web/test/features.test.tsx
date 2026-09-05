@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, act, fireEvent, cleanup } from '@testing-library/react';
 import { createDemoProject, createFromTemplate, paperSize } from '@tracelet/kernel';
+import { importProjectFiles } from '../src/store/backup';
 import { App } from '../src/App';
 import { useApp } from '../src/store/app';
 import { usePrefs } from '../src/i18n/index';
@@ -90,5 +91,20 @@ describe('新功能冒烟', () => {
     expect(p.name).toBe('STM32F103 最小系统');
     expect(p.board.footprints.some((f) => f.footprintId === 'fp:gen:LQFP-48_7x7mm_P0.5mm')).toBe(true);
     expect(createFromTemplate('arduino').board.footprints.length).toBe(8);
+  });
+
+  it('导入嘉立创 EDA 标准版 JSON（原理图 + PCB）', async () => {
+    render(<App />);
+    await screen.findByText('ESP32 传感器板');
+    const pin = (x: number, y: number, n: string, dy: number) => `P~show~0~1~${x}~${y}~0~g${n}~0^^${x}~${y}^^M ${x} ${y} v ${dy}~#880000^^0~${x + 3}~${y}~0~${n}~start~~~#0000FF^^1~${x - 2}~${y}~0~${n}~end~~~#0000FF^^0~${x}~${y}^^0~M ${x} ${y}`;
+    const sch = { head: { docType: '1', c_para: { title: '立创测试' } }, canvas: 'CA~1000~1000~#FFFFFF~yes~#CCCCCC~5~1000~1000~line~5~pixel~5~0~0', shape: [`LIB~400~300~package\`R0603\`spicePre\`R\`~0~~gge1~0#@$T~P~410~290~0~#000080~~7pt~~~~~R1~1~start~a~0#@$R~395~300~2~2~10~30~#A00000~1~0~none~c~0#@$${pin(400, 290, '1', 10)}#@$${pin(400, 340, '2', -10)}`, 'W~400 290 400 270~#008800~1~0~none~w~0', 'N~400~270~0~#0000FF~VIN~n~400~270~1~start'] };
+    const pcb = { head: { docType: '3' }, canvas: 'CA~1000~1000~#000000~yes~#FFFFFF~10~1000~1000~line~1~mil~1~45~45~4000~3000~0~yes', shape: ['LIB~4100~3050~package`R0603`~0~~l~0#@$PAD~RECT~4096.75~3050~3.54~3.74~1~VIN~1~0~~0~p1~0~~Y~0~0~0.2~#@$PAD~RECT~4103.25~3050~3.54~3.74~1~~2~0~~0~p2~0~~Y~0~0~0.2~#@$TEXT~P~4100~3040~0.8~0~~3~~4.5~R1~~~t~~0', 'TRACK~1~10~~4000 3000 4200 3000 4200 3150 4000 3150 4000 3000~e~0'] };
+    await act(async () => { await importProjectFiles([new File([JSON.stringify(sch)], 'Schematic_test.json', { type: 'application/json' }), new File([JSON.stringify(pcb)], 'PCB_test.json', { type: 'application/json' })]); });
+    expect(await screen.findByText('同步到 PCB')).toBeTruthy();
+    const p = useApp.getState().editor!.project;
+    expect(p.schematic.sheets[0].name).toBe('立创测试');
+    expect(p.schematic.sheets[0].components.map((c) => c.ref)).toEqual(['R1']);
+    expect(p.board.footprints[0]).toMatchObject({ ref: 'R1', padNets: { '1': 'VIN', '2': '' } });
+    expect(p.board.footprints[0].componentId).toBe(p.schematic.sheets[0].components[0].id);
   });
 });

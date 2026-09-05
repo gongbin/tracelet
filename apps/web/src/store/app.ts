@@ -182,6 +182,7 @@ export const useApp = create<AppState>((set, get) => ({
   set(key, value) { set({ [key]: value } as Partial<AppState>); },
   patch(p) { set(p); },
   toast(text, kind = 'info') {
+    if (get().toasts.some((t) => t.text === text && t.kind === kind)) return; // 同一提示不重复堆叠
     const id = ++toastSeq;
     set((s) => ({ toasts: [...s.toasts, { id, text, kind }] }));
     setTimeout(() => get().dismissToast(id), 3500);

@@ -3,7 +3,7 @@
  * 自动建通用符号、网格布局、每个已命名引脚接一段短线 + 网络标签，靠标签实现连通性。
  */
 import type { Sheet, SymbolDef, PinDef, SchComponent, Wire, NetLabel } from '../model/schematic.js';
-import { DEFAULT_FRAME } from '../model/schematic.js';
+import { DEFAULT_FRAME, PAPER_SIZES } from '../model/schematic.js';
 import { newId } from '../ids.js';
 import { registerSymbols } from '../library/registry.js';
 import { getSymbol, findSymbol } from '../library/symbols.js';
@@ -77,7 +77,8 @@ export function generateSchematic(spec: ExtractedSchematic, opts: { sheetName?: 
   const usedRefs = new Set<string>();
   const comps = spec.components.filter((c) => c.ref && c.pins?.length);
   // 布局：按元件宽度自适应换行，行内 800mil 间距
-  const COLS_WIDTH = 12000;
+  // 行宽按 A4 内框留出边距；超出时自动选更大的纸张
+  const COLS_WIDTH = 10800;
   let x = 800, y = 800, rowH = 0;
   let labeledPins = 0;
   const nets = new Set<string>();
@@ -113,7 +114,10 @@ export function generateSchematic(spec: ExtractedSchematic, opts: { sheetName?: 
     const b = componentBounds(comp, sym);
     x += w; rowH = Math.max(rowH, b.h + 600);
   }
-  const sheet: Sheet = { id: opts.sheetId ?? newId('sheet'), name: opts.sheetName ?? spec.title ?? 'AI 识别', frame: { ...DEFAULT_FRAME, title: spec.title ?? '' }, components, wires, labels, junctions: [], buses: [], graphics: (spec.notes ?? []).slice(0, 5).map((t, i) => ({ id: newId('g'), kind: 'text' as const, x: 800, y: 400 + i * 0, text: t, size: 100 })).slice(0, 1) };
+  // 选择能容纳内容的最小纸张（右下角标题栏 4400×900 需留空）
+  const extent = components.reduce((m, c) => { const b = componentBounds(c); return { x: Math.max(m.x, b.x + b.w), y: Math.max(m.y, b.y + b.h) }; }, { x: 0, y: 0 });
+  const paper = (['A4', 'A3', 'A2', 'A1'] as const).find((sz) => extent.x + 600 <= PAPER_SIZES[sz].w - 200 && extent.y + 600 <= PAPER_SIZES[sz].h - 200 - 900) ?? 'A1';
+  const sheet: Sheet = { id: opts.sheetId ?? newId('sheet'), name: opts.sheetName ?? spec.title ?? 'AI 识别', frame: { ...DEFAULT_FRAME, size: paper, title: spec.title ?? '' }, components, wires, labels, junctions: [], buses: [], graphics: (spec.notes ?? []).slice(0, 5).map((t, i) => ({ id: newId('g'), kind: 'text' as const, x: 800, y: 400 + i * 0, text: t, size: 100 })).slice(0, 1) };
   return { sheet, symbols, stats: { components: components.length, labeledPins, nets: nets.size } };
 }
 
