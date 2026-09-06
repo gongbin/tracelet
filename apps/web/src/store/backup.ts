@@ -1,4 +1,4 @@
-import { parseProject, serializeProject, zipFiles, unzipFiles, importKicadProject, importEasyEdaProject, looksLikeEasyEda, type Project } from '@tracelet/kernel';
+import { parseProject, serializeProject, zipFiles, unzipFiles, importKicadProject, importKicadPcb, importEasyEdaProject, looksLikeEasyEda, lib, type Project } from '@tracelet/kernel';
 import { useApp } from './app.js';
 
 export function downloadFile(name: string, content: string | Uint8Array, type: string) {
@@ -53,6 +53,22 @@ export async function importProjectFiles(files: File[]): Promise<void> {
   if (kicad.length) {
     const schs = kicad.filter((k) => k.name.toLowerCase().endsWith('.kicad_sch'));
     const pcbFile = kicad.find((k) => k.name.toLowerCase().endsWith('.kicad_pcb'));
+    // 已打开工程时只拖入 .kicad_pcb：可选择只刷新封装库（外框 / 焊盘定义），保留布局与走线
+    const editor = app.editor;
+    if (editor && pcbFile && !schs.length && editor.project.library.footprints.some((f) => f.id.startsWith('fp:kicad:'))) {
+      const inUse = new Set(editor.project.board.footprints.map((f) => f.footprintId));
+      if (confirm(`用「${pcbFile.name}」更新当前工程「${editor.project.name}」的封装库？\n\n只替换同名 KiCad 封装的外框 / 焊盘定义，保留元件位置、走线和铺铜（可 Undo）。\n点「取消」则作为新工程导入。`)) {
+        try {
+          const r = importKicadPcb(pcbFile.text);
+          const known = new Set(editor.project.library.footprints.map((f) => f.id));
+          const defs = r.footprints.filter((f) => known.has(f.id));
+          if (!defs.length) { app.toast('没有找到同名封装，未做修改'); return; }
+          editor.dispatch(lib.addLibraryItems({ footprints: defs }));
+          app.toast(`已更新 ${defs.length} 个封装定义（其中 ${defs.filter((d) => inUse.has(d.id)).length} 个在板上使用），可 Undo`, 'success');
+        } catch (err) { app.toast(`更新封装失败：${(err as Error).message}`, 'error'); }
+        return;
+      }
+    }
     const base = (pcbFile ?? schs[0]).name.replace(/\.kicad_(sch|pcb)$/i, '');
     // 根图纸优先（与 pcb 同名的）
     schs.sort((a, b) => (a.name.startsWith(base) ? -1 : 0) - (b.name.startsWith(base) ? -1 : 0));
