@@ -11,7 +11,13 @@ import { chatWithTools } from '../ai/agent.js';
 import { recognizeSchematic, fileToSource, type RecognizeSource } from '../ai/recognize.js';
 import { searchCatalog, searchReferenceDesigns, type RefDesign } from '../ai/refdesigns.js';
 
-interface Msg { role: 'user' | 'assistant'; text: string; steps?: string[]; suggestions?: ReviewSuggestion[]; error?: boolean }
+interface Msg { role: 'user' | 'assistant'; text: string; steps?: string[]; suggestions?: ReviewSuggestion[]; error?: boolean; files?: string[] }
+interface Attachment { name: string; size: number; src: RecognizeSource }
+const MAX_ATTACH = 32 * 1024 * 1024;
+const blockOf = (a: Attachment, cache: boolean): Anthropic.Beta.BetaContentBlockParam => a.src.kind === 'pdf'
+  ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: a.src.data }, title: a.name, ...(cache ? { cache_control: { type: 'ephemeral' } } : {}) }
+  : a.src.kind === 'image' ? { type: 'image', source: { type: 'base64', media_type: a.src.mediaType, data: a.src.data }, ...(cache ? { cache_control: { type: 'ephemeral' } } : {}) }
+  : { type: 'document', source: { type: 'url', url: a.src.url } };
 interface AiState { msgs: Msg[]; history: Anthropic.Beta.BetaMessageParam[]; busy: boolean; mode: 'chat' | 'ref'; push: (m: Msg) => void; set: (p: Partial<AiState>) => void; clear: () => void }
 const useAi = create<AiState>((set) => ({ msgs: [], history: [], busy: false, mode: 'chat', push: (m) => set((s) => ({ msgs: [...s.msgs, m] })), set: (p) => set(p), clear: () => set({ msgs: [], history: [] }) }));
 
@@ -27,6 +33,9 @@ export function AiPanel() {
   const { cfg, set: setCfg, save } = useAiConfig();
   const [input, setInput] = useState('');
   const [showCfg, setShowCfg] = useState(false);
+  const [files, setFiles] = useState<Attachment[]>([]);
+  const attachRef = useRef<HTMLInputElement>(null);
+  const addFiles = async (list: FileList | File[] | null | undefined) => { if (!list) return; for (const f of Array.from(list)) { if (f.size > MAX_ATTACH) { app.toast(`${f.name} 超过 32MB`, 'error'); continue; } try { const src = await fileToSource(f); setFiles((prev) => [...prev, { name: f.name || (src.kind === 'image' ? '粘贴的图片.png' : '附件'), size: f.size, src }]); } catch (e) { app.toast((e as Error).message, 'error'); } } };
   const configured = isAiConfigured(cfg);
   const selRef = app.screen === 'pcb' ? project.board.footprints.filter((f) => app.pcbSelection.includes(f.id)).map((f) => f.ref).join(', ') : sheet.components.filter((c) => app.selection.includes(c.id)).map((c) => c.ref).join(', ');
 
@@ -57,15 +66,20 @@ export function AiPanel() {
   };
 
   const send = async (raw: string) => {
-    const text = raw.trim(); if (!text || ai.busy) return;
-    ai.push({ role: 'user', text }); setInput('');
-    if (text.startsWith('/') && runLocal(text)) return;
-    if (!configured) { ai.push({ role: 'assistant', text: '还没有配置模型。/ 命令（审查、解释选中、找元件、修复 DRC）不需要模型；配置 API Key 后我可以读取你的图纸回答问题并直接修改电路。' }); setShowCfg(true); return; }
+    const attached = files;
+    const text = raw.trim() || (attached.length ? '请识别这份原理图：抽取元件、引脚和网络，生成为图纸，并指出不确定的地方。' : '');
+    if (!text || ai.busy) return;
+    ai.push({ role: 'user', text, files: attached.map((f) => f.name) }); setInput(''); setFiles([]);
+    if (!attached.length && text.startsWith('/') && runLocal(text)) return;
+    if (!configured) { ai.push({ role: 'assistant', text: '还没有配置模型。/ 命令（审查、解释选中、找元件、修复 DRC）不需要模型；配置 API Key 后我可以读取你的图纸回答问题、识别你上传的原理图并直接修改电路。' }); setShowCfg(true); return; }
     ai.set({ busy: true });
     const liveSteps: string[] = [];
     try {
       const ctxText = `当前：${app.screen === 'pcb' ? 'PCB' : `原理图「${sheet.name}」`}${selRef ? `，选中 ${selRef}` : ''}。`;
-      const history: Anthropic.Beta.BetaMessageParam[] = [...ai.history, { role: 'user', content: `${ctxText}\n${text}` }];
+      const content: Anthropic.Beta.BetaMessageParam['content'] = attached.length
+        ? [...attached.map((f, i) => blockOf(f, i === attached.length - 1)), { type: 'text', text: `${ctxText}\n${text}` }]
+        : `${ctxText}\n${text}`;
+      const history: Anthropic.Beta.BetaMessageParam[] = [...ai.history, { role: 'user', content }];
       const r = await chatWithTools(cfg, history, { editor, log: (s) => liveSteps.push(s) });
       ai.set({ history: r.history });
       ai.push({ role: 'assistant', text: r.reply.text || '（没有文字回复）', steps: r.reply.steps, error: r.reply.refused });
@@ -105,14 +119,14 @@ export function AiPanel() {
           <div className="grow col" style={{ overflow: 'auto', padding: 12, gap: 12 }}>
             {ai.msgs.length === 0 && (
               <div className="col" style={{ gap: 10 }}>
-                <div className="muted">我能读取当前图纸与 PCB，并通过内核命令修改（可撤销）。试试：</div>
+                <div className="muted">我能读取当前图纸与 PCB，并通过内核命令修改（可撤销）；也可以 📎 附上原理图 PDF / 截图让我识别成图纸。试试：</div>
                 <div className="ai-suggest" style={{ cursor: 'pointer' }} onClick={() => send('/审查')}>帮我检查电源部分有没有问题</div>
                 <div className="ai-suggest" style={{ cursor: 'pointer' }} onClick={() => send(configured ? '给 U1 的每个 IO 引脚加一个网络标签，名字用引脚名' : '/找元件 3.3V LDO')}>{configured ? '给 U1 的 IO 引脚都加上网络标签' : '找一个 3.3V 的 LDO'}</div>
                 <div className="ai-suggest" style={{ cursor: 'pointer' }} onClick={() => ai.set({ mode: 'ref' })}>从 ESP32-S3 的官方参考设计生成原理图 →</div>
                 {a.review.length > 0 && <div className="row muted xs"><span style={{ color: 'var(--warning)' }}>⚠</span>审查发现 {a.review.length} 条建议，输入 /审查 查看</div>}
               </div>
             )}
-            {ai.msgs.map((m, i) => m.role === 'user' ? <div key={i} className="ai-msg-user">{m.text}</div> : (
+            {ai.msgs.map((m, i) => m.role === 'user' ? <div key={i} className="ai-msg-user">{m.files?.length ? <div className="row" style={{ gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>{m.files.map((f) => <span key={f} className="chip" style={{ padding: '0 6px' }}>📎 {f}</span>)}</div> : null}{m.text}</div> : (
               <div key={i} className="col" style={{ gap: 8 }}>
                 {m.steps?.map((s, j) => <div key={j} className="row muted xs" style={{ gap: 6 }}><span style={{ color: 'var(--success)' }}>✓</span>{s}</div>)}
                 <div style={{ whiteSpace: 'pre-wrap', color: m.error ? 'var(--error)' : undefined }}>{m.text}</div>
@@ -130,9 +144,12 @@ export function AiPanel() {
             {ai.busy && <div className="row muted xs"><span className="spinner" />模型思考中…</div>}
           </div>
           {ai.msgs.length > 0 && <div className="row" style={{ flex: 'none', borderTop: '1px solid var(--border)', padding: '6px 12px' }}><span className="dim xs">{ai.history.length} 轮上下文</span><button className="btn sm ml-auto" onClick={ai.clear}>清空对话</button></div>}
-          <div className="col" style={{ flex: 'none', borderTop: '1px solid var(--border)', padding: '10px 12px', gap: 8 }}>
-            <div className="field" style={{ height: 32, padding: '0 10px' }}>
-              <input className="grow" style={{ background: 'transparent', border: 0, color: 'var(--text)' }} placeholder={configured ? '问点什么，或让我修改电路…' : '问点什么，或 / 选择动作…'} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') void send(input); }} disabled={ai.busy} />
+          <div className="col" style={{ flex: 'none', borderTop: '1px solid var(--border)', padding: '10px 12px', gap: 8 }} onDragOver={(e) => { e.preventDefault(); }} onDrop={(e) => { e.preventDefault(); void addFiles(e.dataTransfer.files); }}>
+            {files.length > 0 && <div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>{files.map((f, i) => <span key={i} className="chip on" style={{ padding: '0 6px', gap: 4 }}>📎 {f.name} <span className="dim xs">{(f.size / 1024).toFixed(0)}K</span><span style={{ cursor: 'pointer', marginLeft: 4 }} onClick={() => setFiles(files.filter((_, j) => j !== i))}>✕</span></span>)}<span className="dim xs">发送后我会识别附件里的原理图并生成 / 修改图纸</span></div>}
+            <div className="field" style={{ height: 32, padding: '0 6px 0 4px', gap: 4 }}>
+              <button className="btn sm quiet" title="附加原理图 PDF / 图片（也可拖入或粘贴截图）" style={{ padding: '0 6px', flex: 'none' }} onClick={() => attachRef.current?.click()} disabled={ai.busy}>📎</button>
+              <input ref={attachRef} type="file" accept=".pdf,image/png,image/jpeg,image/webp" multiple hidden onChange={(e) => { void addFiles(e.target.files); e.target.value = ''; }} />
+              <input className="grow" style={{ background: 'transparent', border: 0, color: 'var(--text)' }} placeholder={configured ? (files.length ? '对附件的要求（可留空，直接回车识别）…' : '问点什么、让我修改电路，或 📎 附上原理图 PDF / 图片…') : '问点什么，或 / 选择动作…'} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') void send(input); }} onPaste={(e) => { const items = Array.from(e.clipboardData.items).filter((it) => it.kind === 'file'); if (items.length) { e.preventDefault(); void addFiles(items.map((it) => it.getAsFile()!).filter(Boolean)); } }} disabled={ai.busy} />
               <span className="mono dim">⏎</span>
             </div>
             <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>

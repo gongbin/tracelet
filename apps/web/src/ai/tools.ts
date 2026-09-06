@@ -3,7 +3,7 @@
  * 与 CLI / MCP 共用同一套内核命令，这里只是 JSON Schema 描述 + 执行映射。
  */
 import type Anthropic from '@anthropic-ai/sdk';
-import { sch, pcb, searchParts, BUILTIN_PARTS, autoroute, getSymbol, findPin, type Project, type ProjectEditor } from '@tracelet/kernel';
+import { sch, pcb, lib, searchParts, BUILTIN_PARTS, autoroute, getSymbol, findPin, generateSchematic, registeredSymbols, registeredFootprints, footprintFromName, type Project, type ProjectEditor, type ExtractedSchematic } from '@tracelet/kernel';
 import { getAnalysis } from '../store/analysis.js';
 import { useApp } from '../store/app.js';
 import { locateItem } from '../panels/CheckPanel.js';
@@ -28,7 +28,18 @@ export const TOOL_DEFS: Anthropic.Tool[] = [
   T('set_component_value', '修改元件的值。', { ref: { type: 'string' }, value: { type: 'string' } }, ['ref', 'value']),
   T('move_footprint', '移动 PCB 上的封装到指定坐标（mm）。', { ref: { type: 'string' }, x: { type: 'number' }, y: { type: 'number' } }, ['ref', 'x', 'y']),
   T('autoroute', '对未布线连接运行内置自动布线并直接应用（可 Undo）。', { nets: { type: 'array', items: { type: 'string' }, description: '可选，只布这些网络' } }),
-  T('locate', '在界面里高亮并定位某个 ERC/DRC 问题（id 来自 run_erc / run_drc）。', { id: { type: 'string' } }, ['id'])
+  T('locate', '在界面里高亮并定位某个 ERC/DRC 问题（id 来自 run_erc / run_drc）。', { id: { type: 'string' } }, ['id']),
+  T('generate_sheet_from_spec', '把你从用户附件（原理图 PDF / 图片）或描述中抽取出的电路，生成为一张新的原理图图纸（自动生成符号、放置元件、按网络名连线）。用户上传原理图让你"识别 / 导入 / 画出来"时用这个。位号必须唯一；电源网络写 3V3 / 5V / VBUS，地写 GND；没有连接的引脚 net 写空串。当前图纸为空时会直接替换它。',
+    { title: { type: 'string', description: '图纸名 / 电路名' }, components: { type: 'array', items: { type: 'object', properties: { ref: { type: 'string' }, value: { type: 'string' }, kind: { type: 'string', description: 'resistor / capacitor / inductor / diode / led / transistor / ic / module / connector / crystal / switch …' }, footprint: { type: 'string', description: '封装提示，如 0402、SOT-23、LQFP-48，未知写空串' }, pins: { type: 'array', items: { type: 'object', properties: { number: { type: 'string' }, name: { type: 'string' }, net: { type: 'string' } }, required: ['number', 'net'] } } }, required: ['ref', 'pins'] } }, notes: { type: 'array', items: { type: 'string' }, description: '不确定项' } }, ['components']),
+  T('delete_components', '删除当前图纸上的元件（连同其连线端点），可 Undo。', { refs: { type: 'array', items: { type: 'string' } } }, ['refs']),
+  T('move_component', '移动原理图元件到指定位置（mil，100 的倍数）。', { ref: { type: 'string' }, x: { type: 'number' }, y: { type: 'number' } }, ['ref', 'x', 'y']),
+  T('rotate_component', '旋转原理图元件（每次 90°，可指定 times）。', { ref: { type: 'string' }, times: { type: 'number', description: '默认 1' } }, ['ref']),
+  T('set_component_footprint', '修改元件封装。可给 KiCad 风格名（如 R_0603_1608Metric、SOT-23、LQFP-48_7x7mm_P0.5mm）自动生成，或库里已有的封装 id。', { ref: { type: 'string' }, footprint: { type: 'string' } }, ['ref', 'footprint']),
+  T('set_component_ref', '修改元件位号。', { ref: { type: 'string' }, newRef: { type: 'string' } }, ['ref', 'newRef']),
+  T('search_symbols', '搜索已注册的符号（内置 + 本项目导入 / 生成的），用于 place_component 的 symbol 参数。', { query: { type: 'string' } }, ['query']),
+  T('list_sheets', '列出所有图纸及元件数，并告知当前图纸。', {}),
+  T('switch_sheet', '切换当前图纸（按名字或 id）。', { sheet: { type: 'string' } }, ['sheet']),
+  T('add_sheet', '新建一张空图纸并切换过去。', { name: { type: 'string' } }, ['name'])
 ];
 
 function summary(p: Project) {
@@ -112,6 +123,46 @@ export async function runTool(name: string, input: Record<string, unknown>, ctx:
       return J({ routed: r.routed, total: r.total, failed: r.failed, traces: r.traces.length, vias: r.vias.length });
     }
     case 'locate': { const a = getAnalysis(p()); const item = [...a.erc.items, ...a.drc.items].find((i) => i.id === input.id); if (!item) return '没有这个问题 id'; locateItem(item, a.drc.items.includes(item) ? 'pcb' : 'sch'); ctx.log(`定位 ${item.message}`); return '已定位'; }
+    case 'generate_sheet_from_spec': {
+      const spec = input as unknown as ExtractedSchematic;
+      if (!Array.isArray(spec.components) || !spec.components.length) return '没有元件，无法生成';
+      const r = generateSchematic(spec, { sheetName: (spec.title || '识别的原理图').slice(0, 24) });
+      const cur = p().schematic.sheets.find((sh) => sh.id === sheetId);
+      const replaceEmpty = !!cur && cur.components.length === 0 && cur.wires.length === 0;
+      editor.begin(`生成图纸 ${r.sheet.name}`);
+      editor.dispatch(sch.addGeneratedSheet(r.sheet, r.symbols));
+      if (replaceEmpty && p().schematic.sheets.length > 1) editor.dispatch(sch.deleteSheet(cur!.id));
+      editor.commit();
+      useApp.getState().patch({ sheetId: r.sheet.id, selection: [] });
+      if (useApp.getState().screen !== 'sch') useApp.getState().go('sch');
+      ctx.log(`生成图纸「${r.sheet.name}」：${r.stats.components} 元件 · ${r.stats.nets} 网络`);
+      return J({ sheet: r.sheet.name, components: r.stats.components, labeledPins: r.stats.labeledPins, nets: r.stats.nets, replacedEmptySheet: replaceEmpty, hint: '已切换到新图纸；可继续用 run_erc / review_schematic 检查，再用 place_component / connect_pins / set_component_value 修改' });
+    }
+    case 'delete_components': {
+      const refs = Array.isArray(input.refs) ? (input.refs as string[]) : [];
+      const bySheet = new Map<string, string[]>(); const missing: string[] = [];
+      for (const ref of refs) { const f = findComp(p(), ref); if (!f) { missing.push(ref); continue; } if (!bySheet.has(f.sheet.id)) bySheet.set(f.sheet.id, []); bySheet.get(f.sheet.id)!.push(f.c.id); }
+      if (!bySheet.size) return `位号不存在：${missing.join(', ')}`;
+      editor.begin(`删除 ${refs.length} 个元件`);
+      for (const [sid, ids] of bySheet) editor.dispatch(sch.deleteComponents(sid, ids));
+      editor.commit(); ctx.log(`删除 ${refs.join(', ')}`);
+      return `已删除 ${refs.length - missing.length} 个${missing.length ? `；不存在：${missing.join(', ')}` : ''}`;
+    }
+    case 'move_component': { const f = findComp(p(), String(input.ref)); if (!f) return '位号不存在'; const x = Math.round(Number(input.x) / 100) * 100, y = Math.round(Number(input.y) / 100) * 100; editor.dispatch(sch.moveComponent(f.sheet.id, f.c.id, { x, y })); ctx.log(`移动 ${f.c.ref} → (${x}, ${y})`); return '已移动'; }
+    case 'rotate_component': { const f = findComp(p(), String(input.ref)); if (!f) return '位号不存在'; const n = Math.max(1, Math.min(3, Math.round(Number(input.times ?? 1)))); editor.begin(`旋转 ${f.c.ref}`); for (let i = 0; i < n; i++) editor.dispatch(sch.rotateComponent(f.sheet.id, f.c.id)); editor.commit(); ctx.log(`旋转 ${f.c.ref} ${n * 90}°`); return '已旋转'; }
+    case 'set_component_footprint': {
+      const f = findComp(p(), String(input.ref)); if (!f) return '位号不存在';
+      const want = String(input.footprint ?? '').trim(); if (!want) return '封装不能为空';
+      let id = registeredFootprints().find((d) => d.id === want || d.name === want || d.name.toLowerCase() === want.toLowerCase())?.id;
+      if (!id) { const def = footprintFromName(want); if (def) { if (!registeredFootprints().some((d) => d.id === def.id)) editor.dispatch(lib.addLibraryItems({ footprints: [def] })); id = def.id; } }
+      if (!id) return `无法识别封装「${want}」：请用 KiCad 风格名（如 R_0603_1608Metric、SOT-23、SOIC-8_3.9x4.9mm_P1.27mm）或库里的封装 id`;
+      editor.dispatch(sch.setComponentFootprint(f.sheet.id, f.c.id, id)); ctx.log(`${f.c.ref} 封装 → ${id}`); return `已设置封装 ${id}`;
+    }
+    case 'set_component_ref': { const f = findComp(p(), String(input.ref)); if (!f) return '位号不存在'; const nr = String(input.newRef ?? '').trim(); if (!nr) return '新位号不能为空'; if (findComp(p(), nr)) return `位号 ${nr} 已被占用`; editor.dispatch(sch.setComponentRef(f.sheet.id, f.c.id, nr)); ctx.log(`${f.c.ref} → ${nr}`); return '已改名'; }
+    case 'search_symbols': { const q = String(input.query ?? '').toLowerCase(); ctx.log(`搜索符号 ${q}`); return J(registeredSymbols().filter((sy) => !q || sy.id.toLowerCase().includes(q) || sy.name.toLowerCase().includes(q) || (sy.description ?? '').toLowerCase().includes(q)).slice(0, 12).map((sy) => ({ id: sy.id, name: sy.name, pins: sy.pins.length, power: sy.power, description: sy.description }))); }
+    case 'list_sheets': return J({ current: sheetId, sheets: p().schematic.sheets.map((sh) => ({ id: sh.id, name: sh.name, components: sh.components.filter((c) => !getSymbol(c.symbolId).power).length, wires: sh.wires.length })) });
+    case 'switch_sheet': { const key = String(input.sheet ?? ''); const sh = p().schematic.sheets.find((x) => x.id === key || x.name === key); if (!sh) return '没有这张图纸'; useApp.getState().patch({ sheetId: sh.id, selection: [] }); ctx.log(`切换到图纸 ${sh.name}`); return `当前图纸：${sh.name}`; }
+    case 'add_sheet': { const r = sch.addSheet(String(input.name || `图纸 ${p().schematic.sheets.length + 1}`)); editor.dispatch(r.command); useApp.getState().patch({ sheetId: r.id, selection: [] }); ctx.log(`新建图纸 ${input.name}`); return `已新建并切换到图纸 ${r.id}`; }
     default: return `未知工具 ${name}`;
   }
 }
