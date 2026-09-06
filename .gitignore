@@ -18,3 +18,13 @@ ui-demo/
 /deploy/README.md
 /deploy/README.m
 /deploy/.README.md.sw?
+
+# Private collaboration, planning, and deployment documentation
+/AGENTS.md
+**/AGENTS.md
+**/*ROADMAP*.md
+**/*PLAN*.md
+/deploy/*.md
+/deploy/**/*.md
+/internal/
+/notes/
