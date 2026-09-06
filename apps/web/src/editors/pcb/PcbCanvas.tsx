@@ -638,7 +638,7 @@ export function PcbCanvas() {
       {app.placement.status === 'done' && app.placement.result && (() => { const r = app.placement.result!; return (
         <div className="banner" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6, whiteSpace: 'normal', width: 'min(620px, calc(100% - 24px))', borderColor: '#F0A040' }}>
           <div className="row" style={{ gap: 10 }}>
-            <span style={{ flex: 1, minWidth: 0, lineHeight: 1.6 }}>{r.rejected ? '布局优化：新布局没有让布线变好，已放弃' : `布局优化建议：移动 ${r.moves.length} 个器件 · 飞线 ${r.before.hpwl} → ${r.after.hpwl} mm · 去耦距离 ${r.before.decouplingAvg} → ${r.after.decouplingAvg} mm${r.routing ? ` · 试布线 ${r.routing.before.routed}/${r.routing.before.total} → ${r.routing.after.routed}/${r.routing.after.total}，过孔 ${r.routing.before.vias} → ${r.routing.after.vias}` : ''}`}</span>
+            <span style={{ flex: 1, minWidth: 0, lineHeight: 1.6 }}>{r.rejected ? '布局优化：新布局没有让布线变好，已放弃' : `布局优化建议：移动 ${r.moves.length} 个器件${r.legalized ? `（${r.legalized} 个从板外 / 重叠位置摆进板内）` : ''} · 飞线 ${r.before.hpwl} → ${r.after.hpwl} mm${r.before.decouplingAvg || r.after.decouplingAvg ? ` · 去耦距离 ${r.before.decouplingAvg} → ${r.after.decouplingAvg} mm` : ''}${r.routing ? ` · 试布线 ${r.routing.before.routed}/${r.routing.before.total} → ${r.routing.after.routed}/${r.routing.after.total}，过孔 ${r.routing.before.vias} → ${r.routing.after.vias}` : ''}`}</span>
             {!r.rejected && r.moves.length > 0 && <button className="btn sm primary" style={{ flexShrink: 0 }} onClick={acceptPlacement}>接受</button>}
             <button className="btn sm" style={{ flexShrink: 0 }} onClick={cancelPlacement}>{r.rejected || !r.moves.length ? '关闭' : '放弃'}</button>
           </div>
