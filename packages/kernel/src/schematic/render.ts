@@ -37,12 +37,11 @@ export function crossSheetLabelNames(schematic: Schematic): Set<string> {
   return new Set([...count].filter(([, sheets]) => sheets.size > 1).map(([n]) => n));
 }
 /**
- * 网络标签布局：普通标签文字贴在锚点右上；跨页端口在锚点画空心圆，文字放在导线的另一侧
- * （导线从下方接来 → 文字居上；从上方接来 → 居下；水平接来 → 文字在远离导线的一侧）。
+ * 网络标签布局：标准画法是端头一个红色空心小圆点 + 红色文字（同名标签相连，跨页同理）。
+ * 文字放在导线的另一侧：导线从下方接来 → 文字居上；从上方接来 → 居下；水平接来 → 文字在远离导线的一侧。
  */
-export function netLabelLayout(sheet: Sheet, label: NetLabel, crossSheet: Set<string>): { port: boolean; text: { x: number; y: number; anchor: 'start' | 'middle' | 'end' }; r: number } {
-  const port = label.kind === 'port' || (label.kind !== 'net' && crossSheet.has(label.text));
-  if (!port) return { port: false, text: { x: label.x + 30, y: label.y - 40, anchor: 'start' }, r: 0 };
+export function netLabelLayout(sheet: Sheet, label: NetLabel, _crossSheet?: Set<string>): { port: boolean; text: { x: number; y: number; anchor: 'start' | 'middle' | 'end' }; r: number } {
+  void label.kind; void _crossSheet;
   const r = 40;
   let dir: 'up' | 'down' | 'left' | 'right' | null = null;
   for (const w of sheet.wires) {

@@ -88,7 +88,6 @@ export function SchematicCanvas() {
   const analysis = getAnalysis(project);
   const drag = useRef<Drag | null>(null);
   const [labelText, setLabelText] = useState('');
-  const [labelPort, setLabelPort] = useState(false);
   const crossSheet = useMemo(() => crossSheetLabelNames(project.schematic), [project.schematic]);
   const [textPrompt, setTextPrompt] = useState<{ at: Vec; value: string } | null>(null);
   const [marquee, setMarquee] = useState<{ a: Vec; b: Vec } | null>(null);
@@ -411,7 +410,7 @@ export function SchematicCanvas() {
   const cursor = app.placing || app.pasting ? 'copy' : wireMode || tool === 'label' || tool === 'bus' || tool === 'junction' || tool === 'draw' || tool === 'measure' ? 'crosshair' : view.panning ? 'grabbing' : view.spaceDown ? 'grab' : 'default';
   const labelScreen = app.labelPrompt ? view.toScreen(app.labelPrompt) : null;
   const textScreen = textPrompt ? view.toScreen(textPrompt.at) : null;
-  const submitLabel = () => { if (app.labelPrompt && labelText.trim()) editor.dispatch(sch.addLabel(sheet.id, labelText.trim(), app.labelPrompt, labelPort ? 'port' : undefined)); app.patch({ labelPrompt: null }); };
+  const submitLabel = () => { if (app.labelPrompt && labelText.trim()) editor.dispatch(sch.addLabel(sheet.id, labelText.trim(), app.labelPrompt)); app.patch({ labelPrompt: null }); };
   const submitText = () => { if (textPrompt && textPrompt.value.trim()) editor.dispatch(sch.addGraphic(sheet.id, { kind: 'text', x: textPrompt.at.x, y: textPrompt.at.y, text: textPrompt.value.trim(), size: 120 })); setTextPrompt(null); };
   const selWire = app.selection.length === 1 ? sheet.wires.find((w) => w.id === app.selection[0]) : undefined;
   const hs = 8 / vp.k;
@@ -460,13 +459,13 @@ export function SchematicCanvas() {
           {/* 标签 */}
           {sheet.labels.map((l) => (
             <g key={l.id} onPointerDown={onLabelDown(l.id)} style={{ cursor: editable ? 'move' : 'pointer' }}>
-              {/* 标准网络标签：纯文字贴在导线上方，无边框；跨页端口：锚点空心圆 + 文字在导线另一侧 */}
+              {/* 标准网络标签：端头红色空心小圆点 + 红色文字，文字在导线另一侧 */}
               {(() => { const lay = netLabelLayout(sheet, l, crossSheet); const sel = app.selection.includes(l.id); const tw = l.text.length * 62;
                 const hx = lay.text.anchor === 'middle' ? lay.text.x - tw / 2 - 20 : lay.text.anchor === 'end' ? lay.text.x - tw - 20 : lay.text.x - 20;
                 return <>
                   <rect x={Math.min(hx, l.x - 60)} y={Math.min(lay.text.y - 110, l.y - 60)} width={Math.max(hx + tw + 40, l.x + 60) - Math.min(hx, l.x - 60)} height={Math.max(lay.text.y + 40, l.y + 60) - Math.min(lay.text.y - 110, l.y - 60)} rx={20} fill={sel ? 'rgba(255,216,77,.35)' : 'transparent'} stroke={sel ? '#E5B800' : 'none'} strokeWidth={12} />
-                  {lay.port && <circle cx={l.x} cy={l.y} r={lay.r} fill={SCH_COLORS.fill} stroke={SCH_COLORS.wire} strokeWidth={14} />}
-                  <text x={lay.text.x} y={lay.text.y} fontSize={100} fontFamily="'JetBrains Mono',monospace" fill={lay.port ? SCH_COLORS.text : SCH_COLORS.netLabel} textAnchor={lay.text.anchor}>{l.text}</text>
+                  <circle cx={l.x} cy={l.y} r={lay.r} fill={SCH_COLORS.fill} stroke={SCH_COLORS.netLabel} strokeWidth={14} />
+                  <text x={lay.text.x} y={lay.text.y} fontSize={100} fontFamily="'JetBrains Mono',monospace" fill={SCH_COLORS.netLabel} textAnchor={lay.text.anchor}>{l.text}</text>
                 </>; })()}
             </g>
           ))}
@@ -498,7 +497,7 @@ export function SchematicCanvas() {
             <g transform={`translate(${pasteOffset.x} ${pasteOffset.y})`} pointerEvents="none">
               {app.pasting.clip.wires.map((w, i) => <path key={i} d={pathD(w.points)} stroke="#3D8BFF" strokeWidth={16} strokeDasharray="50 40" fill="none" />)}
               {app.pasting.clip.components.map((c) => <SymbolGlyph key={c.id} comp={c} sym={getSymbol(c.symbolId)} ghost />)}
-              {app.pasting.clip.labels.map((l) => <text key={l.id} x={l.x + 30} y={l.y - 40} fontSize={100} fill="#3D8BFF" fontFamily="'JetBrains Mono',monospace">{l.text}</text>)}
+              {app.pasting.clip.labels.map((l) => <g key={l.id}><circle cx={l.x} cy={l.y} r={40} fill="none" stroke="#3D8BFF" strokeWidth={14} /><text x={l.x + 80} y={l.y + 35} fontSize={100} fill="#3D8BFF" fontFamily="'JetBrains Mono',monospace">{l.text}</text></g>)}
             </g>
           )}
         </g>
@@ -507,7 +506,6 @@ export function SchematicCanvas() {
       {labelScreen && app.labelPrompt && (
         <div className="label-prompt" style={{ left: labelScreen.x + 8, top: labelScreen.y - 40 }} onPointerDown={(e) => e.stopPropagation()}>
           <input autoFocus value={labelText} placeholder="网络名，如 SDA" onChange={(e) => setLabelText(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') submitLabel(); if (e.key === 'Escape') app.patch({ labelPrompt: null }); }} />
-          <label className="row xs" style={{ gap: 4, whiteSpace: 'nowrap', cursor: 'pointer' }} title="跨页端口：导线末端空心圆 + 文字，用于连接其他图纸；同名标签出现在多张图纸时会自动按端口显示"><input type="checkbox" checked={labelPort} onChange={(e) => setLabelPort(e.target.checked)} />跨页端口</label>
           <button className="btn sm primary" onClick={submitLabel}>放置</button>
         </div>
       )}

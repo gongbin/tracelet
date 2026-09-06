@@ -123,12 +123,7 @@ export function PropertiesPanel() {
     <div className="panel-pad">
       <div className="row"><span style={{ fontWeight: 500 }}>网络标签</span><span className="ml-auto muted" style={{ cursor: 'pointer' }} onClick={() => { editor.dispatch(sch.deleteLabels(sheet.id, [label.id])); app.patch({ selection: [] }); }}>删除</span></div>
       <div className="kv"><span className="k">名称</span><span className="field mono">{label.text}</span></div>
-      <div className="kv"><span className="k">样式</span>
-        <div className="seg" style={{ width: 200 }}>
-          {([['net', '网络标签'], ['port', '跨页端口']] as const).map(([k, name]) => <span key={k} className={`seg-opt${(label.kind ?? (crossSheetNames.has(label.text) ? 'port' : 'net')) === k ? ' on' : ''}`} onClick={() => editor.dispatch(sch.setLabelKind(sheet.id, label.id, k))}>{name}</span>)}
-        </div>
-      </div>
-      <div className="dim xs">跨页端口在导线末端画空心圆，用于连到其他图纸；同名标签出现在多张图纸时自动按端口显示。</div>
+      <div className="dim xs">同名标签自动相连（含其他图纸）{crossSheetNames.has(label.text) ? ' · 此网络也出现在其他图纸' : ''}。</div>
     </div>
   );
   if (!comp) return (
