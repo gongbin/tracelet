@@ -8,12 +8,28 @@ export function needsModel(f: BoardFootprint): boolean {
   const d = footprintDef(f);
   return !(d.pads.length > 0 && d.pads.every(p => p.npth)) && !(/^TestPoint_Pad_/i.test(d.name.replace(/^.*:/, '')) || (/^TP\d/i.test(f.ref) && d.pads.length === 1 && d.pads[0].drill === 0));
 }
+/** 允许"同系列近似"的封装族（连接器类外形差异可接受；阻容 / IC 尺寸敏感，不做近似）。 */
+const APPROX_FAMILIES = ['USB_C_Receptacle', 'USB_C_Plug', 'USB_Micro-B', 'USB_Mini-B', 'USB_A', 'USB_B', 'microSD', 'SD_', 'RJ45', 'BarrelJack', 'Barrel_Jack', 'JST_', 'Molex_', 'TerminalBlock', 'PinHeader_', 'PinSocket_', 'IDC-Header', 'Screw_Terminal'];
+/** 标准目录里没有精确同名模型时，在同系列里挑共同前缀最长的一个作为近似模型。 */
+export function approximateCatalogKey(key: string): string | undefined {
+  if (!APPROX_FAMILIES.some((f) => key.startsWith(f))) return undefined;
+  const toks = key.split('_');
+  let best: string | undefined, bestN = 0;
+  for (const k of Object.keys(MODEL_CATALOG)) {
+    if (k === key) return k;
+    const t = k.split('_'); let n = 0; while (n < toks.length && n < t.length && toks[n] === t[n]) n++;
+    if (n >= Math.min(3, toks.length) && n > bestN) { bestN = n; best = k; }
+  }
+  return best;
+}
 export function modelFor(f: BoardFootprint, board: Board): Model3d | undefined {
   const override = board.models3d?.[f.footprintId];
   if (override) return override;
   const key = f.footprintId.split(':').pop()!;
-  if (!MODEL_CATALOG[key]) return undefined;
-  return { name: key, source: `catalog:${key}`, scale: 1000, offset: [0, 0, 0], rotation: [0, 0, 0] };
+  if (MODEL_CATALOG[key]) return { name: key, source: `catalog:${key}`, scale: 1000, offset: [0, 0, 0], rotation: [0, 0, 0] };
+  const approx = approximateCatalogKey(key);
+  if (approx) return { name: `${approx}（同系列近似）`, source: `catalog:${approx}`, scale: 1000, offset: [0, 0, 0], rotation: [0, 0, 0] };
+  return undefined;
 }
 /** GLB imports must be self-contained; never fetch external buffers/images from uploaded files. */
 export function validateGlb(buffer: ArrayBuffer) {
