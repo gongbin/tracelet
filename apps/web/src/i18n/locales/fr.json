@@ -110,7 +110,7 @@
   "routing.referenceLayer": "Couche de référence",
   "routing.referenceNet": "Réseau de référence",
   "routing.pairs": "Vérification des paires différentielles",
-  "routing.screening": "Contrôle géométrique préliminaire, sans routage couplé ni validation d’impédance ou du chemin de retour.",
+  "routing.screening": "Les nouvelles paires à deux bornes utilisent une recherche couplée sur une couche et une compensation de longueur plane. Le cuivre existant est conservé : effacez les deux réseaux avant reroutage. Pas de changement de couche couplé ni certification d’impédance. Espacement localement accru possible.",
   "routing.maxSkew": "Écart maximal de longueur totale",
   "routing.gap": "Écart entre bords de cuivre",
   "routing.tolerance": "Tolérance d’écart",
@@ -133,5 +133,18 @@
   "board.layers": "{count} couches",
   "board.reduceLayersHint": "Déplacez ou supprimez les pistes et zones des couches concernées avant de réduire leur nombre.",
   "pcb.alignSnap": "Alignement magnétique",
-  "pcb.alignSnapHint": "Aligner les bords et centres pendant le déplacement ; Alt/Option pour désactiver temporairement"
+  "pcb.alignSnapHint": "Aligner les bords et centres pendant le déplacement ; Alt/Option pour désactiver temporairement",
+  "routing.preferredClearance": "Espacement du cuivre recommandé",
+  "routing.maxParallelLength": "Longueur parallèle proche maximale",
+  "routing.referenceMargin": "Marge au bord du cuivre de référence",
+  "routing.returnViaDistance": "Distance de recherche des vias de retour",
+  "routing.engineeringHint": "Les recommandations facultatives influencent le routage et les alertes. Vide signifie non évalué, sans certification SI.",
+  "power.enable": "Estimation puissance CC / température",
+  "power.currentA": "Courant par réseau (A)",
+  "power.copperThicknessMm": "Épaisseur de cuivre confirmée (mm)",
+  "power.ambientC": "Température ambiante (°C)",
+  "power.thermalResistanceKPerW": "Résistance thermique du trajet entier (K/W)",
+  "power.maxRiseC": "Élévation maximale (°C)",
+  "power.maxDropV": "Chute de tension maximale (V)",
+  "power.hint": "Confirmez les valeurs. Sans résistance thermique, température non évaluée. Modèle concentré, pas IPC-2152 ni simulation thermique de carte."
 }

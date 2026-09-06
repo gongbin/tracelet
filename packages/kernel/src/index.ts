@@ -52,3 +52,8 @@ export { notchOutline } from './board/notch.js';
 export * from './board/via.js';
 export * from './board/impedance.js';
 export * from './board/engineeringReport.js';
+
+export * from './board/engineeringRules.js';
+export * from './board/copperConnectivity.js';
+export * from './board/differentialRoute.js';
+export * from './board/powerThermal.js';

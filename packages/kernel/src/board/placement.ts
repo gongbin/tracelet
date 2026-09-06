@@ -147,7 +147,7 @@ export function checkPlacement(board: Board, rules: RuleSet): PlacementIssue[] {
       else { const g = rectGap(a.r, b.r); if (g < 0.3) out.push({ rule: 'spacing', severity: 'warning', message: `${a.f.ref} 与 ${b.f.ref} 间距 ${g.toFixed(2)}mm，贴片焊接和返修会困难`, refs: [a.f.ref, b.f.ref], location: { x: (a.f.x + b.f.x) / 2, y: (a.f.y + b.f.y) / 2 }, suggestion: '至少留 0.3–0.5mm' }); }
     }
   }
-  for (const { cap, pin, ic } of decouplingPairs(c)) { const p = c.byFp.get(cap.id)!.find((x) => POWER_RE.test(x.net))!; const d = Math.hypot(p.center.x - pin.center.x, p.center.y - pin.center.y); if (d > 4) out.push({ rule: 'decoupling', severity: d > 8 ? 'warning' : 'info', message: `去耦电容 ${cap.ref} 离 ${ic.ref} 电源脚 ${pin.number} 有 ${d.toFixed(1)}mm`, refs: [cap.ref, ic.ref], location: { x: cap.x, y: cap.y }, suggestion: '放到电源脚 2–3mm 内，先接电容再进芯片' }); }
+  for (const { cap, pin, ic } of decouplingPairs(c)) { const p = c.byFp.get(cap.id)!.find((x) => POWER_RE.test(x.net))!; const d = Math.hypot(p.center.x - pin.center.x, p.center.y - pin.center.y); if (d > 4) out.push({ rule: 'decoupling', severity: d > 8 ? 'warning' : 'info', message: `去耦电容 ${cap.ref} 离 ${ic.ref} 电源脚 ${pin.number} 有 ${d.toFixed(1)}mm`, refs: [cap.ref, ic.ref], location: { x: cap.x, y: cap.y }, suggestion: '缩短电源端与接地端的连接路径，结合叠层和芯片建议检查回路' }); }
   for (const { xtal, ic } of crystalPairs(c)) { const d = Math.hypot(xtal.x - ic.x, xtal.y - ic.y); if (d > 10) out.push({ rule: 'crystal', severity: 'warning', message: `晶振 ${xtal.ref} 离 ${ic.ref} ${d.toFixed(1)}mm`, refs: [xtal.ref, ic.ref], location: { x: xtal.x, y: xtal.y }, suggestion: '晶振紧贴 MCU 的 OSC 引脚，走线短且下面不要走其他信号' }); }
   if (board.outline.length >= 3) for (const { f, r } of bodies) if (CONNECTOR_RE.test(f.ref) && !/^(H|MH|TP|FID|SW)\d/i.test(f.ref)) { let d = Infinity; for (let k = 0; k < board.outline.length; k++) { const a = board.outline[k], b = board.outline[(k + 1) % board.outline.length]; d = Math.min(d, segRectGap(a, b, r)); } if (d > 4) out.push({ rule: 'connector-edge', severity: 'info', message: `连接器 ${f.ref} 离板边 ${d.toFixed(1)}mm`, refs: [f.ref], location: { x: f.x, y: f.y }, suggestion: '接插件一般贴板边，方便插拔与外壳开孔' }); }
   // 干扰：晶振 / 模拟器件与开关 / 电机驱动器件靠太近
@@ -400,7 +400,11 @@ export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementO
     const slack = a.weight >= 8 ? 2.0 : a.weight >= 5 ? 3.0 : 4.0;
     return Math.max(0, d - slack) * a.weight;
   };
-  const decCost = (d: { cap: string; ic: string; pin: string }) => { const capPads = padsOf.get(d.cap)!; const cp = capPads.find((q) => POWER_RE.test(q.net)); const pp = padsOf.get(d.ic)!.find((p) => p.number === d.pin && cp && p.net === cp.net); if (!pp || !cp) return 0; return Math.max(0, Math.hypot(pp.x - cp.x, pp.y - cp.y) - 2.5) * 6; };
+  const decCost = (d: { cap: string; ic: string; pin: string }) => { const capPads = padsOf.get(d.cap)!; const cp = capPads.find((q) => POWER_RE.test(q.net)); const pp = padsOf.get(d.ic)!.find((p) => p.number === d.pin && cp && p.net === cp.net); if (!pp || !cp) return 0; const target=fpById.get(d.cap)?.placement?.target?.maxDistance ?? 2.5;
+    const ground=capPads.find(p=>GND_RE.test(p.net));
+    const groundPins=ground?padsOf.get(d.ic)!.filter(p=>p.net===ground.net):[];
+    const groundDistance=ground && groundPins.length?Math.min(...groundPins.map(p=>Math.hypot(p.x-ground.x,p.y-ground.y))):0;
+    return Math.max(0, Math.hypot(pp.x - cp.x, pp.y - cp.y) - target) * 6 + groundDistance * 2; };
   const singleCost = (id: string) => {
     let e = 0; const r = body(id);
     if (board.outline.length >= 3) { const m = edgeMargin; const corners = [{ x: r.x - m, y: r.y - m }, { x: r.x + r.w + m, y: r.y - m }, { x: r.x + r.w + m, y: r.y + r.h + m }, { x: r.x - m, y: r.y + r.h + m }]; for (const p of corners) if (!pointInPolygon(p, board.outline)) e += 400; }

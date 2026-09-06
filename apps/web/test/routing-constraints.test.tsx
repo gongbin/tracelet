@@ -19,3 +19,24 @@ it('persists editable electrical constraints through undo and keeps the last all
  fireEvent.change(screen.getAllByLabelText('Neck-down policy')[0],{target:{value:'off'}});
  expect(editor.project.board.netClasses[0].neckdown?.allowed).toBe(false);
 });
+
+it('preserves engineering recommendations when editing other constraints and supports undo',()=>{
+ render(<RoutingConstraints/>);const editor=useApp.getState().editor!;
+ fireEvent.change(screen.getAllByLabelText('Preferred copper spacing (mm)')[0],{target:{value:'0.8'}});
+ expect(editor.project.board.netClasses[0].engineering?.preferredClearance).toBe(.8);
+ fireEvent.change(screen.getAllByLabelText('Maximum total copper length (mm)')[0],{target:{value:'42'}});
+ expect(editor.project.board.netClasses[0].engineering?.preferredClearance).toBe(.8);
+ fireEvent.change(screen.getAllByLabelText('Preferred copper spacing (mm)')[0],{target:{value:''}});
+ expect(editor.project.board.netClasses[0].engineering?.preferredClearance).toBeUndefined();
+ act(()=>editor.undo());expect(editor.project.board.netClasses[0].engineering?.preferredClearance).toBe(.8);
+});
+it('edits power assumptions without discarding engineering settings and undoes changes',()=>{
+ render(<RoutingConstraints/>);const editor=useApp.getState().editor!;
+ fireEvent.click(screen.getAllByLabelText('DC power / thermal estimate')[0]);
+ expect(editor.project.board.netClasses[0].power?.thermalResistanceKPerW).toBeUndefined();
+ fireEvent.change(screen.getAllByLabelText('Current per net (A)')[0],{target:{value:'2.5'}});
+ fireEvent.change(screen.getAllByLabelText('Whole-path thermal resistance (K/W)')[0],{target:{value:'15'}});
+ expect(editor.project.board.netClasses[0].power?.currentA).toBe(2.5);
+ expect(editor.project.board.netClasses[0].power?.thermalResistanceKPerW).toBe(15);
+ act(()=>editor.undo());expect(editor.project.board.netClasses[0].power?.thermalResistanceKPerW).toBeUndefined();
+});

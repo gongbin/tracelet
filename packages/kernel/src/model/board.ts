@@ -132,6 +132,22 @@ export const NetClassSchema = z.object({
   maxLength: z.number().positive().optional(),
   referenceLayer: CopperLayerSchema.optional(),
   referenceNet: z.string().optional(),
+  /** Engineering recommendations, not fabrication clearance or SI certification. */
+  engineering: z.object({
+    preferredClearance: z.number().finite().positive().optional(),
+    maxParallelLength: z.number().finite().positive().optional(),
+    referenceMargin: z.number().finite().nonnegative().optional(),
+    returnViaDistance: z.number().finite().positive().optional(),
+  }).optional(),
+  /** Per-net, lumped DC conductor model. Thermal resistance must be supplied, never inferred. */
+  power: z.object({
+    currentA: z.number().finite().nonnegative(),
+    copperThicknessMm: z.number().finite().positive(),
+    ambientC: z.number().finite().min(-50).max(200),
+    thermalResistanceKPerW: z.number().finite().positive().optional(),
+    maxRiseC: z.number().finite().positive().optional(),
+    maxDropV: z.number().finite().positive().optional(),
+  }).optional(),
   neckdown: z.object({ allowed: z.boolean(), minWidth: z.number().positive(), maxLength: z.number().nonnegative() }).optional()
 
 });

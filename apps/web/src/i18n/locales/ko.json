@@ -110,7 +110,7 @@
   "routing.referenceLayer": "참조 레이어",
   "routing.referenceNet": "참조 네트",
   "routing.pairs": "차동 쌍 검사",
-  "routing.screening": "기하학적 선별 검사입니다. 결합 배선, 임피던스 및 귀환 경로 연속성을 보장하지 않습니다.",
+  "routing.screening": "새 2단자 쌍은 동일 레이어에서 쌍 검색과 평면 길이 보정을 사용합니다. 기존 배선은 보존되며 재배선 전 두 네트를 비워야 합니다. 쌍 레이어 전환이나 임피던스 인증은 지원하지 않습니다. 보정 구간 간격이 커질 수 있습니다.",
   "routing.maxSkew": "총길이 차이 제한",
   "routing.gap": "구리 가장자리 간격",
   "routing.tolerance": "간격 허용 오차",
@@ -133,5 +133,18 @@
   "board.layers": "{count}층",
   "board.reduceLayersHint": "층 수를 줄이기 전에 해당 층의 배선과 영역을 이동하거나 삭제하세요.",
   "pcb.alignSnap": "정렬 스냅",
-  "pcb.alignSnapHint": "드래그 시 부품 가장자리와 중심 정렬; Alt/Option으로 일시 해제"
+  "pcb.alignSnapHint": "드래그 시 부품 가장자리와 중심 정렬; Alt/Option으로 일시 해제",
+  "routing.preferredClearance": "권장 구리 간격",
+  "routing.maxParallelLength": "인접 평행 배선 총 길이 한도",
+  "routing.referenceMargin": "참조 구리 가장자리 여유",
+  "routing.returnViaDistance": "리턴 비아 검색 거리",
+  "routing.engineeringHint": "선택 권장값은 배선 및 경고에 적용됩니다. 빈 항목은 미평가이며 신호 무결성을 인증하지 않습니다.",
+  "power.enable": "직류 전력 / 온도 상승 추정",
+  "power.currentA": "네트별 전류 (A)",
+  "power.copperThicknessMm": "확인된 구리 두께 (mm)",
+  "power.ambientC": "주변 온도 (°C)",
+  "power.thermalResistanceKPerW": "전체 도체 경로 열저항 (K/W)",
+  "power.maxRiseC": "최대 온도 상승 (°C)",
+  "power.maxDropV": "최대 전압 강하 (V)",
+  "power.hint": "입력을 확인하세요. 열저항이 없으면 온도는 미평가입니다. 집중 모델이며 IPC-2152 또는 보드 열 시뮬레이션이 아닙니다."
 }

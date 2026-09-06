@@ -12,9 +12,15 @@ import {
   PROJECT_TEMPLATES, createFromTemplate, exportSchematicPdf, exportAssemblyPdf, importLibraryFile, footprintFromName, generateFootprint, importEasyEdaProject, checkPlacement, optimizePlacement, type FootprintSpec
 } from '@tracelet/kernel';
 import { basename } from 'node:path';
+import { verifyKicad } from './kicadVerify.js';
 
 const program = new Command();
 program.name('tracelet').description('Tracelet —— 开源在线 PCB 设计工具的命令行').version('0.1.0');
+program.command('verify-kicad <file>').description('验证指定 KiCad PCB（重新铺铜、DRC；不修改原文件）').option('--kicad <path>', 'KiCad CLI executable').option('--parity', '检查同目录原理图一致性').action((file,o)=>{
+  try{const result=verifyKicad(file,o.kicad,!!o.parity);console.log(JSON.stringify(result,null,2));if(!result.passed)process.exitCode=1;}
+  catch(e){console.error(e instanceof Error?e.message:String(e));process.exitCode=2;}
+});
+
 
 function load(file: string): Project {
   return parseProject(readFileSync(resolve(file), 'utf8'));

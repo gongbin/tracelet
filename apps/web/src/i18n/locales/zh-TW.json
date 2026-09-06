@@ -110,7 +110,7 @@
   "routing.referenceLayer": "參考銅層",
   "routing.referenceNet": "參考網路",
   "routing.pairs": "差分對檢查",
-  "routing.screening": "幾何篩查，不是耦合佈線或阻抗驗證；參考平面取樣不能證明回流連續。",
+  "routing.screening": "雙端新佈線使用同層成對搜尋與平面長度補償。保留已有銅線，重佈前需清空兩網。不支援成對換層，非阻抗認證；補償區間距可能增大。",
   "routing.maxSkew": "總銅長差上限",
   "routing.gap": "銅邊間距",
   "routing.tolerance": "間距容差",
@@ -133,5 +133,18 @@
   "board.layers": "{count} 層",
   "board.reduceLayersHint": "請先處理待移除層上的走線和鋪銅，再減少層數。",
   "pcb.alignSnap": "對齊吸附",
-  "pcb.alignSnapHint": "拖動元件時對齊邊緣及中心；按住 Alt/Option 暫時略過"
+  "pcb.alignSnapHint": "拖動元件時對齊邊緣及中心；按住 Alt/Option 暫時略過",
+  "routing.preferredClearance": "建議銅邊間距",
+  "routing.maxParallelLength": "近鄰平行銅線總長度上限",
+  "routing.referenceMargin": "參考銅邊緣裕量",
+  "routing.returnViaDistance": "回流導通孔搜尋距離",
+  "routing.engineeringHint": "可選建議參與佈線最佳化與警告；留空不評估，不代表訊號完整性認證。",
+  "power.enable": "直流電源 / 溫升估算",
+  "power.currentA": "每個網路的電流 (A)",
+  "power.copperThicknessMm": "確認的銅厚 (mm)",
+  "power.ambientC": "環境溫度 (°C)",
+  "power.thermalResistanceKPerW": "整體導體路徑熱阻 (K/W)",
+  "power.maxRiseC": "允許溫升 (°C)",
+  "power.maxDropV": "允許壓降 (V)",
+  "power.hint": "請確認輸入。熱阻留空不評估溫度。採用導體集中參數模型，非 IPC-2152 或整板熱模擬。"
 }

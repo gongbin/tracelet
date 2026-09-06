@@ -1,3 +1,4 @@
+import { copperShorts } from './copperConnectivity.js';
 import type { Board, Trace, Via } from '../model/board.js';
 import type { RuleSet } from '../model/project.js';
 import { runDrc } from './drc.js';
@@ -14,12 +15,15 @@ export function validateRoutingProposal(board: Board, rules: RuleSet, traces: Om
   // Removing copper can expose constraints checked by extensions; reach a fixed point.
   for (;;) {
     let changed = false;
-    for (const item of runDrc(materialize(rejected),rules).items) {
+    for (const item of [...runDrc(materialize(rejected),rules).items,...copperShorts(materialize(rejected),rules)]) {
       if (item.severity !== 'error' || item.rule === 'unrouted') continue;
       for (const id of item.objectIds ?? []) {
         const net = owners.get(id);
         if (net !== undefined && !rejected.has(net)) { rejected.add(net); errors.add(`${net}: ${item.rule}`); changed = true; }
       }
+    }
+    for(const pair of board.differentialPairs??[])if(rejected.has(pair.positive)||rejected.has(pair.negative)){
+      for(const net of [pair.positive,pair.negative])if(!rejected.has(net)){rejected.add(net);errors.add(`${net}: differential pair rejected atomically`);changed=true;}
     }
     if (!changed) break;
   }

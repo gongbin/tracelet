@@ -110,7 +110,7 @@
   "routing.referenceLayer": "Referenzlage",
   "routing.referenceNet": "Referenznetz",
   "routing.pairs": "Differenzpaarprüfung",
-  "routing.screening": "Geometrische Vorprüfung, keine gekoppelte Führung oder Impedanzprüfung. Stichproben beweisen keinen durchgehenden Rückstrompfad.",
+  "routing.screening": "Neue Zweipunktpaare werden gemeinsam auf einer Lage mit planarem Längenausgleich geroutet. Bestehendes Kupfer bleibt erhalten. Vor Neurouting beide Netze leeren. Keine gekoppelten Lagenwechsel oder Impedanzzertifizierung; lokal größerer Abstand beim Ausgleich möglich.",
   "routing.maxSkew": "Maximale Gesamtlängendifferenz",
   "routing.gap": "Kupferkantenabstand",
   "routing.tolerance": "Abstandstoleranz",
@@ -133,5 +133,18 @@
   "board.layers": "{count} Lagen",
   "board.reduceLayersHint": "Vor dem Reduzieren Leiterbahnen und Zonen auf den betroffenen Lagen verschieben oder entfernen.",
   "pcb.alignSnap": "Ausrichtung einrasten",
-  "pcb.alignSnapHint": "Bauteilkanten und Mittelpunkte beim Ziehen ausrichten; Alt/Option zum Aussetzen"
+  "pcb.alignSnapHint": "Bauteilkanten und Mittelpunkte beim Ziehen ausrichten; Alt/Option zum Aussetzen",
+  "routing.preferredClearance": "Empfohlener Kupferabstand",
+  "routing.maxParallelLength": "Maximale nahe parallele Gesamtlänge",
+  "routing.referenceMargin": "Randabstand der Referenzfläche",
+  "routing.returnViaDistance": "Suchabstand für Rückstromvias",
+  "routing.engineeringHint": "Optionale Empfehlungen beeinflussen Routing und Warnungen. Leer bedeutet nicht bewertet, keine SI-Zertifizierung.",
+  "power.enable": "DC-Leistung / Temperaturabschätzung",
+  "power.currentA": "Strom pro Netz (A)",
+  "power.copperThicknessMm": "Bestätigte Kupferdicke (mm)",
+  "power.ambientC": "Umgebungstemperatur (°C)",
+  "power.thermalResistanceKPerW": "Wärmewiderstand des gesamten Pfads (K/W)",
+  "power.maxRiseC": "Maximaler Temperaturanstieg (°C)",
+  "power.maxDropV": "Maximaler Spannungsabfall (V)",
+  "power.hint": "Eingaben bestätigen. Ohne Wärmewiderstand keine Temperaturbewertung. Konzentriertes Modell, keine IPC-2152- oder Platinen-Thermosimulation."
 }

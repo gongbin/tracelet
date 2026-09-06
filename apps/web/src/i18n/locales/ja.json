@@ -110,7 +110,7 @@
   "routing.referenceLayer": "参照層",
   "routing.referenceNet": "参照ネット",
   "routing.pairs": "差動ペア検査",
-  "routing.screening": "形状の予備検査です。結合配線、インピーダンス、帰還経路の連続性は保証しません。",
+  "routing.screening": "新規の2端子ペアは同一層のペア探索と平面長補償を使用します。既存配線は保持され、再配線前に両ネットの削除が必要です。ペアの層変更やインピーダンス認証は非対応。補償部では間隔が広がる場合があります。",
   "routing.maxSkew": "総配線長差の上限",
   "routing.gap": "銅端間隔",
   "routing.tolerance": "間隔許容差",
@@ -133,5 +133,18 @@
   "board.layers": "{count} 層",
   "board.reduceLayersHint": "層数を減らす前に、削除対象層の配線とゾーンを移動または削除してください。",
   "pcb.alignSnap": "整列スナップ",
-  "pcb.alignSnapHint": "ドラッグ中に部品の端と中心を整列。Alt/Option で一時解除"
+  "pcb.alignSnapHint": "ドラッグ中に部品の端と中心を整列。Alt/Option で一時解除",
+  "routing.preferredClearance": "推奨銅箔間隔",
+  "routing.maxParallelLength": "近接並行配線の合計長上限",
+  "routing.referenceMargin": "参照銅箔の端部余裕",
+  "routing.returnViaDistance": "リターンビアの検索距離",
+  "routing.engineeringHint": "任意の推奨値は配線と警告に使用します。空欄は未評価で、信号品質の認証ではありません。",
+  "power.enable": "直流電力・温度上昇の推定",
+  "power.currentA": "ネットごとの電流 (A)",
+  "power.copperThicknessMm": "確認済み銅厚 (mm)",
+  "power.ambientC": "周囲温度 (°C)",
+  "power.thermalResistanceKPerW": "導体経路全体の熱抵抗 (K/W)",
+  "power.maxRiseC": "最大温度上昇 (°C)",
+  "power.maxDropV": "最大電圧降下 (V)",
+  "power.hint": "入力を確認してください。熱抵抗が空欄の場合、温度は未評価です。集中定数モデルであり、IPC-2152 や基板熱解析ではありません。"
 }

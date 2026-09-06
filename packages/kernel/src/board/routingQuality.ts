@@ -1,3 +1,5 @@
+import { referenceSupports } from './engineeringRules.js';
+import { engineeringChecks } from './engineeringChecks.js';
 import type { Board, Trace } from '../model/board.js';
 import type { RuleSet } from '../model/project.js';
 import type { CheckItem } from '../schematic/erc.js';
@@ -53,13 +55,9 @@ export function electricalChecks(board: Board, rules?: RuleSet): Omit<CheckItem,
     if(!traces.length)continue;
     const fills=rules?zoneFills(board,rules).filter(f=>f.zone.layer===nc.referenceLayer && f.zone.net===nc.referenceNet):[];
     const layers=copperLayers(board.copperCount);
-    const missing=traces.filter(t=>!nc.referenceLayer || !layers.includes(nc.referenceLayer) || Math.abs(layers.indexOf(t.layer)-layers.indexOf(nc.referenceLayer))!==1 || !fills.length || t.points.slice(1).some((end,i)=>{
-      const a=t.points[i],n=Math.min(2000,Math.max(1,Math.ceil(Math.hypot(end.x-a.x,end.y-a.y)/.5)));
-      for(let j=0;j<=n;j++)if(!fills.some(fill=>pointInFill(fill,{x:a.x+(end.x-a.x)*j/n,y:a.y+(end.y-a.y)*j/n})))return true;
-      return false;
-    }));
+    const missing=traces.filter(t=>t.points.slice(1).some((end,i)=>!referenceSupports(board,fills,t.net,t.layer,t.points[i],end,t.width/2)));
     if(missing.length)out.push({rule:'reference-plane',severity:'warning',message:'参考铜层 / 参考网络：不满足约束',why:'几何筛查，不是耦合布线或阻抗验证；参考平面采样不能证明回流连续。',refs:[nc.name,nc.referenceNet??''],objectIds:missing.map(t=>t.id)});
   }
-  return out;
+  return [...out,...engineeringChecks(board,rules)];
 }
 

@@ -5,7 +5,7 @@ import { useT } from '../i18n/index.js';
 export function RoutingConstraints() {
   const editor=useEditor(), {board}=useProject(), t=useT();
   return <div data-no-translate>{board.netClasses.map((nc,index)=>{
-    const update=(patch:Partial<NetClass>)=>editor.dispatch(pcb.setNetClassConstraints(index,{allowedLayers:nc.allowedLayers,maxLength:nc.maxLength,neckdown:nc.neckdown,referenceLayer:nc.referenceLayer,referenceNet:nc.referenceNet,...patch}));
+    const update=(patch:Partial<NetClass>)=>editor.dispatch(pcb.setNetClassConstraints(index,{allowedLayers:nc.allowedLayers,maxLength:nc.maxLength,neckdown:nc.neckdown,referenceLayer:nc.referenceLayer,referenceNet:nc.referenceNet,engineering:nc.engineering,power:nc.power,...patch}));
     const neck=nc.neckdown;
     return <details key={index} style={{marginBottom:8}}><summary>{nc.name} · {nc.traceWidth} mm</summary>
       <div className="col" style={{gap:8,paddingTop:8}}>
@@ -22,6 +22,17 @@ export function RoutingConstraints() {
         <label>{t('routing.narrowLength')} <input className="input" type="number" min="0" step="0.1" value={neck.maxLength} onChange={e=>{const n=Number(e.target.value);if(Number.isFinite(n)&&n>=0)update({neckdown:{...neck,maxLength:n}});}}/></label></>}
         <label>{t('routing.referenceLayer')} <select className="input" value={nc.referenceLayer??''} onChange={e=>update({referenceLayer:(e.target.value||undefined) as CopperLayer|undefined})}><option value="">—</option>{copperLayers(board.copperCount).map(l=><option key={l}>{l}</option>)}</select></label>
         <label>{t('routing.referenceNet')} <input className="input" value={nc.referenceNet??''} onChange={e=>update({referenceNet:e.target.value||undefined})}/></label>
+        {(['preferredClearance','maxParallelLength','referenceMargin','returnViaDistance'] as const).map(field=><label key={field}>{t(`routing.${field}`)} (mm)<input className="input" type="number" min={field==='referenceMargin'?0:0.01} step="0.1" placeholder="—" value={nc.engineering?.[field]??''} onChange={e=>{const value=e.target.value,n=Number(value);if(!value || Number.isFinite(n)&&(field==='referenceMargin'?n>=0:n>0))update({engineering:{...nc.engineering,[field]:value?n:undefined}});}}/></label>)}
+        <span className="dim">{t('routing.engineeringHint')}</span>
+        <label><input type="checkbox" checked={!!nc.power} onChange={e=>update({power:e.target.checked?{currentA:1,copperThicknessMm:.035,ambientC:25}:undefined})}/>{t('power.enable')}</label>
+        {nc.power && <>
+          {(['currentA','copperThicknessMm','ambientC','thermalResistanceKPerW','maxRiseC','maxDropV'] as const).map(field=><label key={field}>{t(`power.${field}`)}<input className="input" type="number" step="any" value={nc.power![field]??''} placeholder="—" onChange={e=>{
+            const value=e.target.value,n=Number(value),optional=['thermalResistanceKPerW','maxRiseC','maxDropV'].includes(field);
+            if((!value&&optional)||(value&&Number.isFinite(n)&&(field==='ambientC'?n>=-50&&n<=200:field==='currentA'?n>=0:n>0)))update({power:{...nc.power!,[field]:value?n:undefined}});
+          }}/></label>)}
+          <span className="dim">{t('power.hint')}</span>
+        </>}
+
         <span className="dim">{t('routing.lengthHint')}</span>
       </div>
     </details>;

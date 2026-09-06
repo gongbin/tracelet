@@ -110,7 +110,7 @@
   "routing.referenceLayer": "Camada de referência",
   "routing.referenceNet": "Rede de referência",
   "routing.pairs": "Verificação de pares diferenciais",
-  "routing.screening": "Triagem geométrica; não verifica roteamento acoplado, impedância ou continuidade do retorno.",
+  "routing.screening": "Novos pares de dois terminais usam busca acoplada em uma camada e compensação de comprimento plano. O cobre existente é preservado; limpe ambas as redes para rotear novamente. Sem transições acopladas ou certificação de impedância. A compensação pode ampliar o espaçamento local.",
   "routing.maxSkew": "Diferença máxima de comprimento total",
   "routing.gap": "Distância entre bordas de cobre",
   "routing.tolerance": "Tolerância da distância",
@@ -133,5 +133,18 @@
   "board.layers": "{count} camadas",
   "board.reduceLayersHint": "Mova ou remova trilhas e zonas das camadas afetadas antes de reduzir a quantidade.",
   "pcb.alignSnap": "Ajuste de alinhamento",
-  "pcb.alignSnapHint": "Alinhar bordas e centros ao arrastar; segure Alt/Option para ignorar"
+  "pcb.alignSnapHint": "Alinhar bordas e centros ao arrastar; segure Alt/Option para ignorar",
+  "routing.preferredClearance": "Espaçamento de cobre recomendado",
+  "routing.maxParallelLength": "Comprimento paralelo próximo máximo",
+  "routing.referenceMargin": "Margem do cobre de referência",
+  "routing.returnViaDistance": "Distância de busca de vias de retorno",
+  "routing.engineeringHint": "Recomendações opcionais afetam o roteamento e os avisos. Em branco significa não avaliado, sem certificação SI.",
+  "power.enable": "Estimativa de potência CC / temperatura",
+  "power.currentA": "Corrente por rede (A)",
+  "power.copperThicknessMm": "Espessura de cobre confirmada (mm)",
+  "power.ambientC": "Temperatura ambiente (°C)",
+  "power.thermalResistanceKPerW": "Resistência térmica do trajeto inteiro (K/W)",
+  "power.maxRiseC": "Elevação máxima de temperatura (°C)",
+  "power.maxDropV": "Queda máxima de tensão (V)",
+  "power.hint": "Confirme as entradas. Sem resistência térmica, a temperatura não é avaliada. Modelo concentrado, não IPC-2152 nem simulação térmica da placa."
 }

@@ -1,3 +1,5 @@
+import { routeDifferentialPair } from './differentialRoute.js';
+import { engineeringRules, neighborCost, referenceSupports } from './engineeringRules.js';
 import { viaLayers, backdrillLayers } from './via.js';
 /**
  * 内置自动布线器：网格 A*（状态 x, y, 层；困难重试保留到达方向）+ 拆线重布。
@@ -112,7 +114,34 @@ class MinHeap {
   clear() { this.n = 0; }
 }
 
+/** Explicit differential pairs are routed atomically before ordinary nets. */
 export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: AutorouteOptions = {}): AutorouteResult {
+  const pairs=board.differentialPairs??[];
+  if(!pairs.length)return autorouteSingle(board,rules,opts);
+  const started=Date.now(),deadline=started+(opts.timeBudgetMs??90000);
+  const selected=(net:string)=>!opts.nets?.length||opts.nets.includes(net);
+  const initial=computeRatsnest(board,rules).lines.filter(l=>selected(l.net));
+  const active=pairs.filter(p=>initial.some(l=>l.net===p.positive||l.net===p.negative));
+  if(!active.length)return autorouteSingle(board,rules,opts);
+  let work=board;const paired:Omit<Trace,'id'>[]=[],failures:{net:string;reason:string}[]=[],excluded=new Set<string>();
+  for(const pair of active){
+    excluded.add(pair.positive);excluded.add(pair.negative);
+    const outcome=selected(pair.positive)&&selected(pair.negative)?routeDifferentialPair(work,rules,pair,{grid:opts.grid,deadline,maxNodes:opts.maxNodes}):{traces:[],reason:'Select both differential nets for coupled routing'};
+    if(!outcome.traces.length){for(const net of [pair.positive,pair.negative])if(initial.some(l=>l.net===net))failures.push({net,reason:outcome.reason??'Coupled routing failed'});continue;}
+    paired.push(...outcome.traces);
+    const used=new Set(work.traces.map(t=>t.id));
+    work={...work,traces:[...work.traces,...outcome.traces.map((t,i)=>{let id=`__pair_${paired.length}_${i}`;while(used.has(id))id+='_';used.add(id);return {...t,id};})]};
+  }
+  const remainingNets=[...new Set(initial.map(l=>l.net))].filter(n=>!excluded.has(n));
+  const ordinary=remainingNets.length&&Date.now()<deadline?autorouteSingle(work,rules,{...opts,nets:remainingNets,allowComponentMoves:false,timeBudgetMs:Math.max(1,deadline-Date.now())}):{traces:[],vias:[],routed:0,total:0,failed:remainingNets.map(net=>({net,reason:'Routing time budget exhausted'})),ms:0};
+  const verified=validateRoutingProposal(board,rules,[...paired,...ordinary.traces],ordinary.vias);
+  const finalMissing=verified.remaining.filter(l=>selected(l.net));
+  const rejected=verified.rejectedNets.map(net=>({net,reason:'Final routing validation rejected copper'}));
+  opts.onProgress?.(initial.length-finalMissing.length,initial.length,'');
+  return {...ordinary,traces:verified.traces,vias:verified.vias,total:initial.length,routed:Math.max(0,initial.length-finalMissing.length),failed:[...failures,...ordinary.failed,...rejected],validation:{rejectedNets:verified.rejectedNets,errors:verified.errors},ms:Date.now()-started};
+}
+
+function autorouteSingle(board: Board, rules: RuleSet = RULE_SETS[0], opts: AutorouteOptions = {}): AutorouteResult {
   const t0 = Date.now();
   const fills = zoneFills(board, rules);
   const netFilter = (l: RatsnestLine) => !opts.nets?.length || opts.nets.includes(l.net);
@@ -374,6 +403,17 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     // No heading or rip-up strategy can reach a target with no statically legal cell.
     if (![...goal].some(i => staticFree((i % N) % W, Math.floor((i % N) / W), Math.floor(i / N))))
       return { reason: `${pb?.ref ?? '终点'} 焊盘周围没有走线空间` };
+    const engineering = engineeringRules(board, net);
+    const engineeringActive = !!engineering.preferredClearance || board.netClasses.some(n=>n.engineering?.preferredClearance) || !!(engineering.referenceLayer && engineering.referenceNet);
+    const engineeringCopper = engineeringActive ? currentBoard().traces : [];
+    const engineeringCache = new Map<number, number>();
+    const engineeringCost = (x:number,y:number,l:number) => {
+      if(!engineeringActive)return 0;
+      const key=idx(x,y,l),cached=engineeringCache.get(key);if(cached!==undefined)return cached;
+      const p=toWorld(x,y);
+      const cost=neighborCost(board,net,layers[l],p,hw*2,engineeringCopper)+(engineering.referenceLayer && engineering.referenceNet && !referenceSupports(board,fills,net,layers[l],p,p,hw)?4:0);
+      engineeringCache.set(key,cost);return cost;
+    };
     const { viaDrill, viaSize } = netRules(board, rules, net);
     const viaFree = (x: number, y: number): boolean => {
       const i = y * W + x;
@@ -437,7 +477,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
         const turn = directional ? (state % 9 !== 8 && state % 9 !== heading ? 0.8 : 0) : prev >= 0 && (x - px !== dx || y - py !== dy) ? 0.8 : 0;
         const own = (occ[ni] === nid || ownOnlyAt(ni, nid)) && !goal.has(ni) ? 0.6 : 0;
         const congestion = mode === 'negotiate' && conflictAt(ni, nid, hw, net) === 1 ? pf * (1 + hist[ni]) : 0;
-        const ng = gi + c + turn + own + dirPen(l, dx, dy) + congestion + softCost(nx, ny, l) + (corridor && !inCorridor(nx, ny, l) ? OUTSIDE : 0);
+        const ng = gi + c + turn + own + engineeringCost(nx,ny,l) + dirPen(l, dx, dy) + congestion + softCost(nx, ny, l) + (corridor && !inCorridor(nx, ny, l) ? OUTSIDE : 0);
         const ns = stateOf(ni, heading);
         if (ng < score(ns)) { visit(ns, ng, state); heap.push(ng + h(nx, ny), ns); }
       }

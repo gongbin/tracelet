@@ -261,7 +261,7 @@ export function setPlacementConstraints(id: string, placement: import('../model/
   })));
 }
 
-export function setNetClassConstraints(index: number, constraints: Pick<import('../model/board.js').NetClass, 'allowedLayers' | 'maxLength' | 'neckdown' | 'referenceLayer' | 'referenceNet'>): Command {
+export function setNetClassConstraints(index: number, constraints: Pick<import('../model/board.js').NetClass, 'allowedLayers' | 'maxLength' | 'neckdown' | 'referenceLayer' | 'referenceNet' | 'engineering' | 'power'>): Command {
   return command('Routing constraints', proj => updateBoard(proj,b=>({...b,netClasses:b.netClasses.map((nc,i)=>i===index?{...nc,...constraints}:nc)})));
 }
 
