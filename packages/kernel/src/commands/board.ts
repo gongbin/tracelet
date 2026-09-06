@@ -1,6 +1,6 @@
 import type { Project } from '../model/project.js';
 import type { Board, BoardText, CopperLayer, Layer, Trace, Via, Zone, Stackup } from '../model/board.js';
-import { DEFAULT_STACKUP } from '../model/board.js';
+import { DEFAULT_STACKUP, copperLayers } from '../model/board.js';
 import { findFootprint, BUILTIN_FOOTPRINTS } from '../library/footprints.js';
 import { registeredFootprint } from '../library/registry.js';
 import { ensureFootprintDef } from '../board/footprintResolve.js';
@@ -70,7 +70,7 @@ export function setTraceProps(id: string, props: Partial<Pick<Trace, 'width' | '
   return command('修改走线', (proj) => updateBoard(proj, (b) => ({ ...b, traces: b.traces.map((t) => (t.id === id ? { ...t, ...props } : t)) })));
 }
 
-export function setViaProps(id: string, props: Partial<Pick<Via, 'x' | 'y' | 'size' | 'drill' | 'net'>>): Command {
+export function setViaProps(id: string, props: Partial<Pick<Via, 'x' | 'y' | 'size' | 'drill' | 'net' | 'startLayer' | 'endLayer' | 'backdrill'>>): Command {
   return command('修改过孔', (proj) => updateBoard(proj, (b) => ({ ...b, vias: b.vias.map((v) => (v.id === id ? { ...v, ...props } : v)) })));
 }
 
@@ -173,10 +173,13 @@ export function normalizeBoardOrigin(): Command {
   return command('板框归零', (proj) => { const bb = boardBounds(proj.board); return bb.x === 0 && bb.y === 0 ? proj : translateBoard(-bb.x, -bb.y).apply(proj); });
 }
 
-export function setCopperCount(count: 2 | 4): Command {
-  return command(count === 4 ? '改为 4 层' : '改为 2 层', (proj) => updateBoard(proj, (b) => {
-    const inner: CopperLayer[] = ['In1.Cu', 'In2.Cu'];
-    return { ...b, copperCount: count, traces: count === 2 ? b.traces.filter((t) => !inner.includes(t.layer)) : b.traces, zones: count === 2 ? b.zones.filter((z) => !inner.includes(z.layer)) : b.zones };
+export function setCopperCount(count: 2 | 4 | 6): Command {
+  return command(`改为 ${count} 层`, (proj) => updateBoard(proj, (b) => {
+    const allowed = copperLayers(count);
+    if (b.vias.some(v => (v.startLayer && !allowed.includes(v.startLayer)) || (v.endLayer && !allowed.includes(v.endLayer)) || (v.backdrill && count!==b.copperCount)) || b.traces.some(t => !allowed.includes(t.layer)) || b.zones.some(z => !allowed.includes(z.layer))) {
+      throw new Error('Cannot remove layers containing traces or zones');
+    }
+    return { ...b, copperCount: count, stackup: b.stackup && count!==b.copperCount ? {...b.stackup,copperDepths:undefined} : b.stackup, hiddenLayers: b.hiddenLayers.filter(l => !l.endsWith('.Cu') || allowed.includes(l as CopperLayer)) };
   }));
 }
 
@@ -247,6 +250,21 @@ export function deleteFootprints(ids: string[]): Command {
 }
 
 /** 应用布局优化建议（可撤销）。 */
-export function applyPlacementMoves(moves: { id: string; x: number; y: number; rotation?: number }[]): Command {
-  return command(`布局优化（${moves.length} 个器件）`, (proj) => updateBoard(proj, (b) => ({ ...b, footprints: b.footprints.map((f) => { const m = moves.find((x) => x.id === f.id); return m && !f.locked ? { ...f, x: m.x, y: m.y, rotation: m.rotation ?? f.rotation } : f; }) })));
+export function applyPlacementMoves(moves: { id: string; x: number; y: number; rotation?: number }[], outline?: import('../geometry.js').Vec[]): Command {
+  return command(`布局优化（${moves.length} 个器件）`, (proj) => updateBoard(proj, (b) => ({ ...b, outline: outline ?? b.outline, outlineRadius: outline ? undefined : b.outlineRadius, footprints: b.footprints.map((f) => { const m = moves.find((x) => x.id === f.id); return m && !f.locked && !f.placement?.fixed && f.placement?.role !== 'mechanical' ? { ...f, x: m.x, y: m.y, rotation: m.rotation ?? f.rotation } : f; }) })));
+}
+
+/** Persist editable placement intent through the normal undo/redo history. */
+export function setPlacementConstraints(id: string, placement: import('../model/board.js').BoardFootprint['placement']): Command {
+  return command('Placement constraints', proj => updateBoard(proj, b => ({ ...b,
+    footprints: b.footprints.map(f => f.id === id ? { ...f, placement } : f)
+  })));
+}
+
+export function setNetClassConstraints(index: number, constraints: Pick<import('../model/board.js').NetClass, 'allowedLayers' | 'maxLength' | 'neckdown' | 'referenceLayer' | 'referenceNet'>): Command {
+  return command('Routing constraints', proj => updateBoard(proj,b=>({...b,netClasses:b.netClasses.map((nc,i)=>i===index?{...nc,...constraints}:nc)})));
+}
+
+export function setDifferentialPairs(pairs: Board['differentialPairs']): Command {
+  return command('Differential pair constraints',proj=>updateBoard(proj,b=>({...b,differentialPairs:pairs})));
 }

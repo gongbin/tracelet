@@ -1,3 +1,5 @@
+import { EngineeringReport } from '../components/EngineeringReport.js';
+import { LayerCountSelect } from '../components/LayerCountSelect.js';
 import { useState } from 'react';
 import { pcb, command, RULE_SETS, exportFabZip, boardBounds, DEFAULT_STACKUP } from '@tracelet/kernel';
 import { StackupDialog } from '../components/StackupDialog.js';
@@ -57,6 +59,7 @@ export function FabPage() {
     <div className="page">
       <div className="page-inner">
         <h1>{t('fab.title')}</h1>
+        <EngineeringReport />
         <section className="col" style={{ gap: 10 }}>
           <h3>{t('fab.precheck')}</h3>
           <div className="check-list">
@@ -74,7 +77,7 @@ export function FabPage() {
             <select className="input" style={{ width: 'auto' }} value={project.settings.ruleSetId} onChange={(e) => setSetting({ ruleSetId: e.target.value, fab: RULE_SETS.find((r) => r.id === e.target.value)?.name })}>{RULE_SETS.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
           </div>
           <div className="row mono small muted" style={{ gap: 20 }}>
-            <span>层数 <select className="input" style={{ width: 'auto', display: 'inline-block', height: 24 }} value={b.copperCount} onChange={(e) => editor.dispatch(pcb.setCopperCount(Number(e.target.value) as 2 | 4))}><option value={2}>2</option><option value={4}>4</option></select></span>
+            <span>层数 <LayerCountSelect /></span>
             <span>板厚 <b style={{ color: 'var(--text)', fontWeight: 500 }}>{b.thickness}</b></span>
             <span>工艺 <b style={{ color: 'var(--text)', fontWeight: 500 }}>{st.copperWeight}oz · {st.finish} · {st.maskColor}阻焊/{st.silkColor}丝印</b> <button className="btn sm" onClick={() => setStackup(true)}>层叠…</button></span>
             <span className="row" style={{ gap: 4 }}>尺寸 <input className="input mono" style={{ width: 60, height: 24 }} value={w} onChange={(e) => setW(e.target.value)} onBlur={() => editor.dispatch(pcb.setOutlineRect(Number(w) || bb.w, Number(h) || bb.h))} />×<input className="input mono" style={{ width: 60, height: 24 }} value={h} onChange={(e) => setH(e.target.value)} onBlur={() => editor.dispatch(pcb.setOutlineRect(Number(w) || bb.w, Number(h) || bb.h))} /> mm</span>

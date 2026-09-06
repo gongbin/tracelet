@@ -1,5 +1,6 @@
+import { viaLayers, backdrillLayers } from './via.js';
 /**
- * 内置自动布线器：网格 A*（状态 x, y, 层）+ 拆线重布。
+ * 内置自动布线器：网格 A*（状态 x, y, 层；困难重试保留到达方向）+ 拆线重布。
  * - 第 1 阶段：全部飞线按"全局最短优先"交替严格布线（每条布完只重算该网络连通性）
  * - 第 2 阶段：失败网络与其附近挡路网络一起拆掉，失败网络优先重布、挡路网络补回；没有变好就回滚并扩大范围
  * - 冲突图按真实铜边距离判定（每格记录最近两个新走线网络的边距），支持"软冲突"协商模式供后续扩展
@@ -19,6 +20,7 @@ import { suggestRoutingMoves, type RoutingMove } from './routingPlacement.js';
 import { RoutingSpace } from './routingSpace.js';
 import { zoneFills, traceTouchesPolygon } from './zones.js';
 import { globalRoute } from './globalRoute.js';
+import { validateRoutingProposal } from './routingValidation.js';
 import { netRules } from './routingModel.js';
 
 export interface AutorouteOptions {
@@ -28,16 +30,20 @@ export interface AutorouteOptions {
   /** 过孔代价（以格为单位；12 格 ≈ 3mm 走线） */
   viaCost?: number;
   maxNodes?: number;
+  /** Keep arrival heading in A* state. Defaults to enabled for later congestion probes and the finest retries. */
+  directionalSearch?: boolean;
   /** 只布这些网络（空 = 全部未布线） */
   nets?: string[];
   onProgress?: (done: number, total: number, net: string) => void;
   /** 优先布这些网络 */
   priorityNets?: string[];
+  /** Opt-in priority for recognizable clock and USB data nets (not differential-pair routing). */
+  automaticPriority?: boolean;
   /** 内部：禁止元件微调递归 */
   noRetry?: boolean;
   /** 协商轮数上限（默认 10） */
   maxRounds?: number;
-  /** 时间预算（毫秒，默认 90 s）：超时后停止协商，进入严格模式收尾 */
+  /** 搜索时间预算（毫秒，默认 90 s）：校验 / 汇总开销另计；子搜索共享剩余预算 */
   timeBudgetMs?: number;
   /** 诊断回调 */
   debug?: (info: Record<string, unknown>) => void;
@@ -59,6 +65,7 @@ export interface AutorouteOptions {
 }
 
 export interface AutorouteResult {
+  validation?: { rejectedNets: string[]; errors: string[] };
   moves?: RoutingMove[];
   traces: Omit<Trace, 'id'>[];
   vias: Omit<Via, 'id'>[];
@@ -134,7 +141,8 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   // ---------- 静态障碍：已有铜、板边 ----------
   const occ = new Int32Array(N * L); // 值 = 网络 id（0 空，-1 硬障碍 / 无网络铜）—— 只用于"沿自家已有铜"的代价
   const space = new RoutingSpace(board, rules);
-  space.reserveEscapes();
+  // Completed nets already have real copper: do not add phantom fanout corridors for them.
+  space.reserveEscapes(new Set(initial.lines.map(line => line.net)));
   // 新走线的精确几何索引（严格模式的硬障碍；按网络增删）
   const dyn = new RoutingSpace({ ...board, footprints: [], traces: [], vias: [], zones: [] }, rules);
   const edgeDistance = new Float32Array(N);
@@ -167,7 +175,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   }
   for (const p of pads) markRect(p.rect.x, p.rect.y, p.rect.x + p.rect.w, p.rect.y + p.rect.h, p.layers, p.def.npth ? -1 : netId(p.net) || -1);
   for (const t of board.traces) for (let i = 0; i < t.points.length - 1; i++) markSeg(t.points[i], t.points[i + 1], t.width / 2, [t.layer], netId(t.net) || -1);
-  for (const v of board.vias) markSeg(v, v, v.size / 2, layers, netId(v.net) || -1);
+  for (const v of board.vias) { markSeg(v, v, v.size / 2, viaLayers(board,v), netId(v.net) || -1); if(v.backdrill)markSeg(v,v,v.backdrill.diameter/2,backdrillLayers(board,v),-1); }
   for (const f of fills) {
     const li = layerIdx(f.zone.layer); if (li < 0) continue;
     const v = netId(f.zone.net) || -1;
@@ -302,16 +310,19 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   /** 布一条飞线。mode=negotiate：与其他新走线冲突只加代价；strict：视为硬障碍。 */
   let corridorInfo: { CW: number; CH: number; f: number } | null = null;
   const routeLine = (line: RatsnestLine, mode: 'negotiate' | 'strict' | 'soft', pf: number, connectivity: ReturnType<typeof computeRatsnest>, corridor?: Uint8Array, banned?: Set<number>): { route?: Route; reason?: string; crossed?: string[]; badCells?: number[] } => {
+    if (Date.now() >= deadline) return { reason: '布线时间预算已用完' };
     generation++;
     const net = line.net, nid = netId(net), nr = netOf(net);
     const preferredWidth = widthOf(net), clearance = clearanceOf(net);
     const pa = padAt(line.a), pb = padAt(line.b);
     const padWidth = Math.min(...[pa, pb].filter((p): p is WorldPad => !!p).map((p) => Math.min(p.rect.w, p.rect.h)));
-    const width = Math.max(rules.minTraceWidth, Math.min(preferredWidth, padWidth));
+    const constraint = netClassFor(board, net);
+    const permitted = (l: number) => l >= 0 && l < L && (!constraint?.allowedLayers || constraint.allowedLayers.includes(layers[l]));
+    const width = constraint?.neckdown?.allowed === false ? preferredWidth : Math.max(rules.minTraceWidth, constraint?.neckdown?.minWidth ?? 0, Math.min(preferredWidth, padWidth));
     const outside = [line.a, line.b].filter((q) => !pointInPolygon(q, board.outline));
     if (outside.length) return { reason: `${pa?.ref ?? ''}${pb ? (pa ? '/' : '') + pb.ref : ''} 焊盘在板框外，请先把元件拖进板框` };
-    const startLayers = pa ? pa.layers.map(layerIdx).filter((i) => i >= 0) : layers.map((_, i) => i);
-    const goalLayers = new Set(pb ? pb.layers.map(layerIdx).filter((i) => i >= 0) : layers.map((_, i) => i));
+    const startLayers = pa ? pa.layers.map(layerIdx).filter(permitted) : layers.map((_, i) => i).filter(permitted);
+    const goalLayers = new Set(pb ? pb.layers.map(layerIdx).filter(permitted) : layers.map((_, i) => i).filter(permitted));
     const s = toCell(line.a), t = toCell(line.b);
     if (opts.window && [s, t].some((c) => c.x < 0 || c.y < 0 || c.x >= W || c.y >= H)) return { reason: '端点在局部窗口外' };
     const componentAt = (p: Vec) => connectivity.components?.find((c) => c.net === net && c.pads.some((q) => Math.hypot(q.x - p.x, q.y - p.y) < 1e-6));
@@ -322,10 +333,10 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     if (pb) { const sh = width / 2; const cx1 = Math.ceil((pb.rect.x + sh - bb.x) / g), cx2 = Math.floor((pb.rect.x + pb.rect.w - sh - bb.x) / g), cy1 = Math.ceil((pb.rect.y + sh - bb.y) / g), cy2 = Math.floor((pb.rect.y + pb.rect.h - sh - bb.y) / g); for (let y = cy1; y <= cy2; y++) for (let x = cx1; x <= cx2; x++) for (const l of goalLayers) goal.add(idx(x, y, l)); }
     for (const l of goalLayers) goal.add(idx(t.x, t.y, l));
     for (const i of goal) goalPoints.set(i, line.b);
-    for (const anchor of goalAnchors) { const p = toCell(anchor.point); if (p.x < 0 || p.y < 0 || p.x >= W || p.y >= H) continue; for (const layer of anchor.layers) { const i = idx(p.x, p.y, layerIdx(layer)); goal.add(i); goalPoints.set(i, anchor.point); } }
+    for (const anchor of goalAnchors) { const p = toCell(anchor.point); if (p.x < 0 || p.y < 0 || p.x >= W || p.y >= H) continue; for (const layer of anchor.layers) { if (!permitted(layerIdx(layer))) continue; const i = idx(p.x, p.y, layerIdx(layer)); goal.add(i); goalPoints.set(i, anchor.point); } }
 
     const staticFree = (x: number, y: number, l: number): boolean => {
-      if (x < 0 || y < 0 || x >= W || y >= H) return false;
+      if (x < 0 || y < 0 || x >= W || y >= H || !permitted(l)) return false;
       const i = idx(x, y, l);
       if (freeStamp[i] === generation) return freeVal[i] === 1;
       freeStamp[i] = generation; freeVal[i] = -1;
@@ -360,6 +371,9 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       if (mode === 'soft') return true; // 与其他新走线的冲突只加代价（探测挡路网络）
       const c = conflictAt(idx(x, y, l), nid, hw, net); return c === 0 || c === 1;
     };
+    // No heading or rip-up strategy can reach a target with no statically legal cell.
+    if (![...goal].some(i => staticFree((i % N) % W, Math.floor((i % N) / W), Math.floor(i / N))))
+      return { reason: `${pb?.ref ?? '终点'} 焊盘周围没有走线空间` };
     const { viaDrill, viaSize } = netRules(board, rules, net);
     const viaFree = (x: number, y: number): boolean => {
       const i = y * W + x;
@@ -376,51 +390,76 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     // 层方向偏好：偶数层偏水平、奇数层偏垂直（2 层板：顶层水平、底层垂直）
     const dirPen = (l: number, dx: number, dy: number) => (L < 2 ? 0 : (l % 2 === 0 ? (dy !== 0 ? (dx !== 0 ? 0.12 : 0.25) : 0) : (dx !== 0 ? (dy !== 0 ? 0.12 : 0.25) : 0)));
 
-    gScore.fill(Infinity); came.fill(-1); heap.clear();
-    const h = (x: number, y: number) => 1.15 * Math.hypot(x - t.x, y - t.y);
+    // Turning cost depends on arrival heading. Preserve competing headings in hard searches.
+    // Sparse maps avoid multiplying the full-board work arrays by nine.
+    const directional = opts.directionalSearch ?? (mode === 'soft' && sweep > 0);
+    const scores = new Map<number, number>(), parents = new Map<number, number>();
+    const cellOf = (state: number) => directional ? Math.floor(state / 9) : state;
+    const stateOf = (cell: number, heading = 8) => directional ? cell * 9 + heading : cell;
+    const score = (state: number) => directional ? scores.get(state) ?? Infinity : gScore[state];
+    const parent = (state: number) => directional ? parents.get(state) ?? -1 : came[state];
+    const visit = (state: number, cost: number, prev: number) => {
+      if (directional) { scores.set(state, cost); parents.set(state, prev); }
+      else { gScore[state] = cost; came[state] = prev; }
+    };
+    if (!directional) { gScore.fill(Infinity); came.fill(-1); }
+    heap.clear();
+    // A connected target may have many anchors. Aim at its bounds, not only line.b.
+    const goalCells = [...goal].map(i => ({ x:(i % N) % W, y:Math.floor((i % N) / W) }));
+    const gx0 = Math.min(...goalCells.map(p=>p.x)), gx1 = Math.max(...goalCells.map(p=>p.x));
+    const gy0 = Math.min(...goalCells.map(p=>p.y)), gy1 = Math.max(...goalCells.map(p=>p.y));
+    const h = (x: number, y: number) => {
+      const dx=Math.max(gx0-x,0,x-gx1), dy=Math.max(gy0-y,0,y-gy1);
+      return 1.15 * (directional && goalAnchors.length > 1 ? Math.hypot(dx,dy) : Math.hypot(x-t.x,y-t.y));
+    };
     for (const anchor of startAnchors) {
       const p = toCell(anchor.point); if (p.x < 0 || p.y < 0 || p.x >= W || p.y >= H) continue;
-      for (const layer of anchor.layers) { const l = layerIdx(layer); if (!free(p.x, p.y, l)) continue; const i = idx(p.x, p.y, l); gScore[i] = 0; heap.push(h(p.x, p.y), i); startPoints.set(i, anchor.point); }
+      for (const layer of anchor.layers) { const l = layerIdx(layer); if (!free(p.x, p.y, l)) continue; const i = idx(p.x, p.y, l); visit(stateOf(i), 0, -1); heap.push(h(p.x, p.y), stateOf(i)); startPoints.set(i, anchor.point); }
     }
-    let found = -1, expanded = 0;
+    let found = -1, expanded = 0, timedOut = false;
     while (heap.size) {
-      const { i, f } = heap.pop();
+      const { i: state, f } = heap.pop();
+      const i = cellOf(state);
       const cellX = (i % N) % W, cellY = Math.floor((i % N) / W);
-      if (f > gScore[i] + h(cellX, cellY) + 1e-9) continue;
-      if (goal.has(i)) { found = i; break; }
+      if (f > score(state) + h(cellX, cellY) + 1e-9) continue;
+      if (goal.has(i)) { found = state; break; }
       if (++expanded > maxNodes) break;
+      if ((expanded & 2047) === 0 && Date.now() >= deadline) { timedOut = true; break; }
       const l = Math.floor(i / N), rem = i % N, y = Math.floor(rem / W), x = rem % W;
-      const gi = gScore[i];
-      const prev = came[i];
+      const gi = score(state);
+      const prev = parent(state) >= 0 ? cellOf(parent(state)) : -1;
       const px = prev >= 0 ? (prev % N) % W : -1, py = prev >= 0 ? Math.floor((prev % N) / W) : -1;
-      for (const [dx, dy, c] of DIRS) {
+      for (const [heading, [dx, dy, c]] of DIRS.entries()) {
         const nx = x + dx, ny = y + dy;
         if (!free(nx, ny, l)) continue;
         if (dx && dy && (!free(x + dx, y, l) || !free(x, y + dy, l))) continue;
         const ni = idx(nx, ny, l);
-        const turn = prev >= 0 && (x - px !== dx || y - py !== dy) ? 0.8 : 0;
+        const turn = directional ? (state % 9 !== 8 && state % 9 !== heading ? 0.8 : 0) : prev >= 0 && (x - px !== dx || y - py !== dy) ? 0.8 : 0;
         const own = (occ[ni] === nid || ownOnlyAt(ni, nid)) && !goal.has(ni) ? 0.6 : 0;
         const congestion = mode === 'negotiate' && conflictAt(ni, nid, hw, net) === 1 ? pf * (1 + hist[ni]) : 0;
         const ng = gi + c + turn + own + dirPen(l, dx, dy) + congestion + softCost(nx, ny, l) + (corridor && !inCorridor(nx, ny, l) ? OUTSIDE : 0);
-        if (ng < gScore[ni]) { gScore[ni] = ng; came[ni] = i; heap.push(ng + h(nx, ny), ni); }
+        const ns = stateOf(ni, heading);
+        if (ng < score(ns)) { visit(ns, ng, state); heap.push(ng + h(nx, ny), ns); }
       }
       if (L > 1 && viaFree(x, y)) {
         const vc = mode === 'strict' ? (layers.every((layer) => dyn.free(toWorld(x, y), viaSize / 2, layer, net, clearance)) ? 0 : -1) : mode === 'soft' ? layers.filter((layer) => !dyn.free(toWorld(x, y), viaSize / 2, layer, net, clearance)).length : viaConflict(x, y);
         if (vc >= 0 && !(mode === 'strict' && vc)) for (let nl = 0; nl < L; nl++) {
           if (nl === l) continue;
           const ni = idx(x, y, nl); const ng = gi + viaCost() + (vc ? (mode === 'soft' ? pf * vc * 3 : pf * vc * (1 + hist[ni])) : 0) + (corridor && !inCorridor(x, y, nl) ? viaCost() : 0);
-          if (ng < gScore[ni]) { gScore[ni] = ng; came[ni] = i; heap.push(ng + h(x, y), ni); }
+          const ns = stateOf(ni);
+          if (ng < score(ns)) { visit(ns, ng, state); heap.push(ng + h(x, y), ns); }
         }
       }
     }
+    opts.debug?.({ search: net, directional, expanded, states: directional ? scores.size : undefined, timedOut, found: found >= 0 });
     if (found < 0) {
       const startBlocked = !startLayers.some((l) => DIRS.some(([dx, dy]) => staticFree(s.x + dx, s.y + dy, l)));
       const goalBlocked = ![...goalLayers].some((l) => DIRS.some(([dx, dy]) => staticFree(t.x + dx, t.y + dy, l)));
-      return { reason: expanded > maxNodes ? '搜索空间过大（板子太大或栅格太细）' : startBlocked ? `${pa?.ref ?? '起点'} 焊盘周围没有走线空间（与其他焊盘/走线太近，或板边留白不够）` : goalBlocked ? `${pb?.ref ?? '终点'} 焊盘周围没有走线空间` : `没有找到不违反间距的路径（可尝试移动元件、${board.copperCount === 2 ? '改 4 层或' : ''}减小线宽）` };
+      return { reason: timedOut ? '布线时间预算已用完' : expanded > maxNodes ? '搜索空间过大（板子太大或栅格太细）' : startBlocked ? `${pa?.ref ?? '起点'} 焊盘周围没有走线空间（与其他焊盘/走线太近，或板边留白不够）` : goalBlocked ? `${pb?.ref ?? '终点'} 焊盘周围没有走线空间` : `没有找到不违反间距的路径（可尝试移动元件、${board.copperCount === 2 ? '改 4 层或' : ''}减小线宽）` };
     }
     // 回溯路径，按层切段，层变化处放过孔
     const path: { x: number; y: number; l: number }[] = [];
-    for (let i = found; i >= 0; i = came[i]) path.push({ l: Math.floor(i / N), y: Math.floor((i % N) / W), x: (i % N) % W });
+    for (let state = found; state >= 0; state = parent(state)) { const i = cellOf(state); path.push({ l: Math.floor(i / N), y: Math.floor((i % N) / W), x: (i % N) % W }); }
     path.reverse();
     const crossedSet = new Set<string>();
     if (mode === 'soft') {
@@ -432,7 +471,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       crossedSet.delete('');
     }
     const sourcePoint = startPoints.get(idx(path[0].x, path[0].y, path[0].l)) ?? line.a;
-    const targetPoint = goalPoints.get(found) ?? line.b;
+    const targetPoint = goalPoints.get(cellOf(found)) ?? line.b;
     const traces: TraceOut[] = [], vias: ViaOut[] = [];
     const buildGeometry = (viaInPadEnd: boolean, viaInPadStart: boolean): { traces: TraceOut[]; vias: ViaOut[] } => {
       const tr: TraceOut[] = [], vs: ViaOut[] = [];
@@ -548,11 +587,13 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
 
   // ---------- 主流程 ----------
   const priority = new Map((opts.priorityNets ?? []).map((n, i) => [n, i]));
+  const rank = (net: string) => priority.get(net) ?? (opts.automaticPriority === true && /(?:^|[_/])(USB_D[+-]|OSC(?:_IN|_OUT)?|XTAL\d*|CLK|CLOCK)(?:$|[_/])/i.test(net) ? priority.size : 100000);
+
   const netLength = new Map<string, number>();
   for (const l of initialLines) netLength.set(l.net, (netLength.get(l.net) ?? 0) + Math.hypot(l.a.x - l.b.x, l.a.y - l.b.y));
-  const order = [...netNames].sort((a, b) => (priority.get(a) ?? 1e9) - (priority.get(b) ?? 1e9) || netLength.get(a)! - netLength.get(b)!);
+  const order = [...netNames].sort((a, b) => rank(a) - rank(b) || netLength.get(a)! - netLength.get(b)!);
   const retryable = (nr: NetRoutes) => [...nr.failures.values()].some((r) => !/板框外/.test(r));
-  const sortNets = (list: NetRoutes[]) => list.sort((a, b) => (priority.get(a.net) ?? 1e9) - (priority.get(b.net) ?? 1e9) || netLength.get(a.net)! - netLength.get(b.net)!);
+  const sortNets = (list: NetRoutes[]) => list.sort((a, b) => rank(a.net) - rank(b.net) || netLength.get(a.net)! - netLength.get(b.net)!);
   /** 与某网络实际冲突的其他网络 id 集合。 */
   const partnersOf = (nr: NetRoutes): Set<number> => {
     const out = new Set<number>(); if (!nr.cells) return out;
@@ -571,7 +612,12 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     const len = (l: RatsnestLine) => Math.hypot(l.a.x - l.b.x, l.a.y - l.b.y);
     for (let guard = 0; guard < 5000; guard++) {
       let best: RatsnestLine | null = null, bestScore = Infinity;
-      for (const [net, ls] of pending) for (const l of ls) { const sc = (first.has(net) ? 0 : 1e6) + (priority.has(net) ? -5e5 : 0) + len(l); if (sc < bestScore) { bestScore = sc; best = l; } }
+      for (const [net, ls] of pending) for (const l of ls) {
+        const tier = first.has(net) ? 0 : 1, bestTier = best && first.has(best.net) ? 0 : 1;
+        if (!best || tier < bestTier || (tier === bestTier && (rank(net) < rank(best.net) || (rank(net) === rank(best.net) && len(l) < bestScore)))) {
+          bestScore = len(l); best = l;
+        }
+      }
       if (!best) break;
       const net = best.net, nr = netOf(net), key = keyOf(best); tried.add(key);
       unmarkNet(nr);
@@ -609,6 +655,9 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     const originals = new Map<Route, { traces: TraceOut[]; vias: ViaOut[] }>();
     const movedTrace = new Set<string>(), movedVia = new Set<string>();
     const affected = new Set<NetRoutes>();
+    const beforeConnectivity = remainingLines();
+    let accepted = false, inserted = false;
+    try {
     const routeOwner = new Map<Route, NetRoutes>(); for (const x of nets.values()) for (const r of x.routes) routeOwner.set(r, x);
     const perp = (c: Vec, d: Vec, from: Vec): Vec => { const len = Math.hypot(d.x - c.x, d.y - c.y) || 1; let n = { x: -(d.y - c.y) / len, y: (d.x - c.x) / len }; const fm = { x: (c.x + d.x) / 2, y: (c.y + d.y) / 2 }; if (n.x * (fm.x - from.x) + n.y * (fm.y - from.y) < 0) n = { x: -n.x, y: -n.y }; return n; };
     const keep = (r: Route) => { if (!originals.has(r)) originals.set(r, { traces: r.traces, vias: r.vias }); affected.add(routeOwner.get(r)!); };
@@ -676,15 +725,29 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     if (ok) { const safeMe = makeSafe(nr.net, clearanceOf(nr.net)); ok = cand.traces.every((tr) => tr.points.slice(1).every((b, i) => safeMe(tr.points[i], b, tr.width / 2, [tr.layer], [], [], true))) && cand.vias.every((v) => safeMe(v, v, v.size / 2, layers, [], [], true)); }
     if (!ok) { for (const [r, o] of originals) { r.traces = o.traces; r.vias = o.vias; } for (const x of affected) markNet(x); return shoveFail('invalid-after'); }
     if (!originals.size) return shoveFail('no-conf');
-    unmarkNet(nr); nr.routes.push(cand); nr.failures.delete(cand.key); markNet(nr); routedLines++;
+    unmarkNet(nr); nr.routes.push(cand); inserted = true; markNet(nr);
+    const afterConnectivity = remainingLines();
+    const missing = (lines: RatsnestLine[], net: string) => lines.filter(l => l.net === net).length;
+    if (missing(afterConnectivity, nr.net) >= missing(beforeConnectivity, nr.net) ||
+        [...affected].some(n => missing(afterConnectivity, n.net) > missing(beforeConnectivity, n.net)))
+      return shoveFail('connectivity');
+    nr.failures.delete(cand.key); routedLines++; accepted = true;
     return true;
+    } finally {
+      // Includes early exits during later cascade levels, not just final geometry failures.
+      if (!accepted) {
+        if (inserted) { nr.routes = nr.routes.filter(r => r !== cand); markNet(nr); }
+        for (const [r, original] of originals) { r.traces = original.traces; r.vias = original.vias; }
+        for (const n of affected) markNet(n);
+      }
+    }
   };
   /** 调试：全板新走线几何自检。 */
   const auditAll = (label: string) => { if (!opts.debug || !(typeof process !== 'undefined' && process.env?.TRACELET_OPT_CHECK)) return; const bad: string[] = []; for (const y of nets.values()) { const sf = makeSafe(y.net, clearanceOf(y.net)); for (const rr of y.routes) for (const tr of rr.traces) for (let i = 1; i < tr.points.length; i++) if (!sf(tr.points[i - 1], tr.points[i], tr.width / 2, [tr.layer], [], [], true)) { const nd = dyn.nearest(tr.points[i - 1], tr.points[i], tr.layer, y.net); bad.push(`${y.net} vs ${nd?.net} d=${nd?.d.toFixed(3)}`); } } opts.debug({ audit: label, bad: bad.slice(0, 4), count: bad.length }); };
   // 第 0 阶段：全局路由——粗网格协商拥塞，得到每个网络的走廊（含层分配）；细节布线先在走廊内搜索
   let corridors: Map<string, Uint8Array> | undefined;
   // 目前实测（door 板）走廊约束不优于直接细节布线，默认关闭；保留为实验开关，供后续换成按轨道数计容量 + 走廊内协商细节布线
-  if (opts.globalRoute === true && initialLines.length >= 8) {
+  if (opts.globalRoute === true && initialLines.length >= 8 && Date.now() < deadline) {
     const f = Math.max(4, Math.round(1.5 / g));
     const widthDefault = netRules(board, rules, '').width, clDefault = netRules(board, rules, '').clearance, viaDefault = netRules(board, rules, '').viaSize;
     generation++;
@@ -714,12 +777,12 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   // 只拆这些网络，先布失败线再补回它们；没有变好就回滚。比按距离猜挡路者精准得多。
   const attempted = new Set<string>();
   let sweep = 0;
-  const ripUpSweep = () => { for (let iter = 0; iter < 90 && Date.now() < deadline; iter++) {
+  const ripUpSweep = () => { for (let iter = 0; iter < Math.min(90, Math.max(0, maxRounds) * 9) && Date.now() < deadline; iter++) {
     let remaining = remainingLines().filter((l) => !attempted.has(keyOf(l)) && !/板框外/.test(netOf(l.net).failures.get(keyOf(l)) ?? ''));
     // 一轮扫完还有剩余：板子已经变了，再扫一轮（最多 3 轮）
-    if (!remaining.length && sweep < 2 && remainingLines().some((l) => !/板框外/.test(netOf(l.net).failures.get(keyOf(l)) ?? ''))) { sweep++; attempted.clear(); remaining = remainingLines().filter((l) => !/板框外/.test(netOf(l.net).failures.get(keyOf(l)) ?? '')); }
+    if (!remaining.length && sweep < Math.min(2, maxRounds - 1) && remainingLines().some((l) => !/板框外/.test(netOf(l.net).failures.get(keyOf(l)) ?? ''))) { sweep++; attempted.clear(); remaining = remainingLines().filter((l) => !/板框外/.test(netOf(l.net).failures.get(keyOf(l)) ?? '')); }
     if (!remaining.length) break;
-    remaining.sort((x, y) => Math.hypot(x.a.x - x.b.x, x.a.y - x.b.y) - Math.hypot(y.a.x - y.b.x, y.a.y - y.b.y));
+    remaining.sort((x, y) => rank(x.net) - rank(y.net) || Math.hypot(x.a.x - x.b.x, x.a.y - x.b.y) - Math.hypot(y.a.x - y.b.x, y.a.y - y.b.y));
     const line = remaining[0]; attempted.add(keyOf(line));
     const nr = netOf(line.net);
     const probe = routeLine(line, 'soft', 12, computeRatsnest(netBoard(line.net), rules, fillsOf(line.net)));
@@ -733,13 +796,17 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     opts.debug?.({ pass: iter, t: Date.now() - t0, line: `${line.net} ${Math.hypot(line.a.x - line.b.x, line.a.y - line.b.y).toFixed(1)}mm`, blockers: blockers.map((b) => b.net) });
     const before = remainingLines().length;
     const subset = [nr, ...blockers];
+    const protectedNets = subset.filter(n => rank(n.net) < 100000 && !remainingLines().some(l => l.net === n.net)).map(n => n.net);
+    const routeQuality = () => subset.reduce((sum,n) => sum + n.routes.reduce((s,r) => s + r.vias.length * 3 + r.traces.reduce((v,t) => v + t.points.slice(1).reduce((d,p,i) => d+Math.hypot(p.x-t.points[i].x,p.y-t.points[i].y),0),0),0),0);
+    const qualityBefore = routeQuality();
     const snapshot = new Map(subset.map((x) => [x, { routes: [...x.routes], failures: new Map(x.failures) }]));
     for (const x of blockers) ripNet(x);
     unmarkNet(nr);
     routeGroup(subset, 'strict', 0, new Set([nr.net]));
     const after = remainingLines().length;
     opts.debug?.({ result: line.net, before, after, stillFailing: subset.filter(retryable).map((x) => `${x.net}:${[...x.failures.values()][0]?.slice(0, 12)}`) });
-    if (after >= before) for (const [x, snap] of snapshot) { ripNet(x); x.routes = snap.routes; x.failures = snap.failures; markNet(x); }
+    const regressedCritical = remainingLines().some(l => protectedNets.includes(l.net));
+    if (after > before || regressedCritical || (after === before && routeQuality() >= qualityBefore - 1e-6)) for (const [x, snap] of snapshot) { ripNet(x); x.routes = snap.routes; x.failures = snap.failures; markNet(x); }
     auditAll(`pass${iter} ${line.net}`);
   } };
   ripUpSweep();
@@ -754,11 +821,12 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     opts.debug?.({ full: attempt, t: Date.now() - t0, failed: failedNets.map((n) => n.net) });
     const before = remainingLines().length;
     const all = [...nets.values()];
+    const protectedBefore = all.filter(n => rank(n.net) < 100000 && !remainingLines().some(l => l.net === n.net)).map(n => n.net);
     const snapshot = new Map(all.map((nr) => [nr, { routes: [...nr.routes], failures: new Map(nr.failures) }]));
     for (const nr of all) ripNet(nr);
     routeGroup(all, 'strict', 0, new Set(failedNets.map((n) => n.net)));
     const after = remainingLines().length;
-    if (after >= before) { for (const [nr, snap] of snapshot) { ripNet(nr); nr.routes = snap.routes; nr.failures = snap.failures; markNet(nr); } break; }
+    if (after >= before || remainingLines().some(l => protectedBefore.includes(l.net))) { for (const [nr, snap] of snapshot) { ripNet(nr); nr.routes = snap.routes; nr.failures = snap.failures; markNet(nr); } break; }
   }
   let stuck: NetRoutes[] = [];
   // 第 4 阶段：局部细网格重试——剩余失败线大多是焊盘旁过孔位被邻网合法占住、粗网格落不到缝隙里；
@@ -782,7 +850,7 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       let sub: AutorouteResult | null = null;
       for (const gg of [...new Set([Math.max(fineG, Math.min(0.1, g / 1.25)), fineG])]) {
         if ((window.w / gg + 1) * (window.h / gg + 1) * L > 2.5e6 || Date.now() > deadline) continue;
-        sub = autoroute(currentBoard(), rules, { nets: [line.net], grid: gg, window, timeBudgetMs: Math.max(1000, Math.min(6000, deadline - Date.now())), optimize: false, shove: 0, fineRetry: false, allowComponentMoves: false, noRetry: true, globalRoute: false, maxNodes: 1.5e6, debug: opts.debug ? (info) => opts.debug!({ fine: line.net, ...info }) : undefined });
+        sub = autoroute(currentBoard(), rules, { nets: [line.net], grid: gg, window, directionalSearch: opts.directionalSearch ?? (gg === fineG), timeBudgetMs: Math.max(1, Math.min(6000, deadline - Date.now())), optimize: false, shove: 0, fineRetry: false, allowComponentMoves: false, noRetry: true, globalRoute: false, maxNodes: 1.5e6, debug: opts.debug ? (info) => opts.debug!({ fine: line.net, ...info }) : undefined });
         if (sub.traces.length || sub.vias.length) break;
       }
       // 只接收真正把这条飞线连上的结果：合并后按本网络连通性确认
@@ -858,6 +926,16 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
     }
   }
   stuck = conflictNets();
+  // Keep cleanup transactional: a shorter corner must not disconnect a branch or a zone.
+  const beforeCleanup = computeRatsnest(currentBoard(), rules).lines.filter(netFilter);
+  const cleanupCounts = (lines: RatsnestLine[]) => {
+    const counts = new Map<string, number>();
+    for (const line of lines) counts.set(line.net, (counts.get(line.net) ?? 0) + 1);
+    return counts;
+  };
+  const beforeCounts = cleanupCounts(beforeCleanup);
+  const originalPoints = new Map<TraceOut, Vec[]>();
+  for (const nr of nets.values()) for (const r of nr.routes) for (const tr of r.traces) originalPoints.set(tr, tr.points);
   // 45° 倒角：直角拐点改成斜切（校验通过才替换）
   for (const nr of nets.values()) {
     const safe = makeSafe(nr.net, clearanceOf(nr.net));
@@ -882,28 +960,39 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
       out.push(pts[pts.length - 1]);
       tr.points = simplify(out);
     }
+    markNet(nr);
+  }
+  let verifiedRemaining = computeRatsnest(currentBoard(), rules).lines.filter(netFilter);
+  if ([...cleanupCounts(verifiedRemaining)].some(([net, count]) => count > (beforeCounts.get(net) ?? 0))) {
+    for (const [tr, points] of originalPoints) tr.points = points;
+    for (const nr of nets.values()) markNet(nr);
+    verifiedRemaining = beforeCleanup;
+    opts.debug?.({ cleanupRolledBack: true });
   }
   opts.debug?.({ afterChamfer: true, remaining: remainingLines().length });
   // ---------- 汇总 ----------
   for (const nr of nets.values()) for (const r of nr.routes) { result.traces.push(...r.traces); result.vias.push(...r.vias); }
   // 同一网络的多条路线可能在同一点各放一个过孔：去重（孔到孔 DRC 会把重叠过孔报成孔边距 0）
   result.vias = result.vias.filter((v, i, arr) => arr.findIndex((w) => w.net === v.net && Math.abs(w.x - v.x) < 1e-6 && Math.abs(w.y - v.y) < 1e-6) === i);
-  const remaining = remainingLines();
+  const validation = validateRoutingProposal(board, rules, result.traces, result.vias);
+  result.traces = validation.traces; result.vias = validation.vias;
+  result.validation = { rejectedNets: validation.rejectedNets, errors: validation.errors };
+  const remaining = validation.remaining.filter(netFilter);
   const unresolved = new Set(remaining.map((l) => l.net));
   for (const nr of nets.values()) {
     if (!unresolved.has(nr.net)) continue;
     const reasons = [...nr.failures.values()];
-    result.failed.push({ net: nr.net, reason: reasons[reasons.length - 1] ?? (stuck.some((s) => s.net === nr.net) ? '与其他网络冲突且无法绕开（可尝试移动元件或改 4 层）' : '没有找到不违反间距的路径') });
+    result.failed.push({ net: nr.net, reason: validation.rejectedNets.includes(nr.net) ? '最终 DRC 未通过，请检查布线约束' : reasons[reasons.length - 1] ?? (stuck.some((s) => s.net === nr.net) ? '与其他网络冲突且无法绕开（可尝试移动元件或改 4 层）' : '没有找到不违反间距的路径') });
   }
   result.routed = Math.max(0, result.total - remaining.length);
   result.rounds = rounds;
   opts.debug?.({ shoveStats });
   result.ms = Date.now() - t0;
-  if (opts.allowComponentMoves && result.routed < result.total) {
+  if (opts.allowComponentMoves && result.routed < result.total && Date.now() < deadline) {
     const moves = suggestRoutingMoves(board, rules, result.failed.map((f) => f.net));
     if (moves.length) {
       const relocated: Board = { ...board, footprints: board.footprints.map((fp) => { const m = moves.find((mm) => mm.id === fp.id); return m ? { ...fp, x: m.x, y: m.y } : fp; }) };
-      const candidate = autoroute(relocated, rules, { ...opts, allowComponentMoves: false, noRetry: true });
+      const candidate = autoroute(relocated, rules, { ...opts, timeBudgetMs: Math.max(1, deadline - Date.now()), allowComponentMoves: false, noRetry: true });
       if (candidate.total - candidate.routed < result.total - result.routed) {
         candidate.moves = moves; candidate.total = result.total;
         candidate.routed = result.total - computeRatsnest({ ...relocated, traces: [...relocated.traces, ...candidate.traces.map((t, i) => ({ ...t, id: `test-t${i}` }))], vias: [...relocated.vias, ...candidate.vias.map((v, i) => ({ ...v, id: `test-v${i}` }))] }, rules).lines.filter(netFilter).length;

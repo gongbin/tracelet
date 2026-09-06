@@ -1,10 +1,11 @@
+import { normalizeStorageToken, storageBaseUrl, storageHttpError } from './remoteStorage.js';
 import { type Project, parseProject, serializeProject, createDemoProject } from '@tracelet/kernel';
 
 export interface ProjectMeta {
   id: string;
   name: string;
   updatedAt: string;
-  copperCount: 2 | 4;
+  copperCount: 2 | 4 | 6;
   componentCount: number;
 }
 
@@ -79,8 +80,8 @@ export class RemoteProjectStore implements ProjectStore {
   readonly kind = 'remote' as const;
   constructor(private base: string, private token?: string) {}
   private async req<T>(path: string, init?: RequestInit): Promise<T> {
-    const res = await fetch(`${this.base.replace(/\/$/, '')}${path}`, { ...init, headers: { 'content-type': 'application/json', ...(this.token ? { authorization: `Bearer ${this.token}` } : {}), ...(init?.headers ?? {}) } });
-    if (!res.ok) throw new Error(`远程存储错误 ${res.status}`);
+    const res = await fetch(`${storageBaseUrl(this.base)}${path}`, { ...init, headers: { 'content-type': 'application/json', ...(normalizeStorageToken(this.token) ? { authorization: `Bearer ${normalizeStorageToken(this.token)}` } : {}), ...(init?.headers ?? {}) } });
+    if (!res.ok) throw new Error(storageHttpError(res.status));
     return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
   }
   list() { return this.req<ProjectMeta[]>('/api/projects'); }

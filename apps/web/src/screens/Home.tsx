@@ -1,3 +1,6 @@
+import { templateName } from '../i18n/templates.js';
+import { relativeTime } from '../i18n/format.js';
+import { AppearanceControls } from '../components/AppearanceControls.js';
 import { useRef, useState } from 'react';
 import { PROJECT_TEMPLATES, createDemoProject } from '@tracelet/kernel';
 import { importProjectFiles, backupAllProjects } from '../store/backup.js';
@@ -8,17 +11,9 @@ import { BrandMark } from '../components/BrandMark.js';
 import { Pager } from '../components/Pager.js';
 
 export const REPO_URL = 'https://github.com/gongbin/tracelet';
-import { useT } from '../i18n/index.js';
+import { useT, usePrefs } from '../i18n/index.js';
 import { PrefsMenu } from '../components/PrefsMenu.js';
 
-function timeAgo(iso: string) {
-  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return '刚刚';
-  if (s < 3600) return `${Math.floor(s / 60)} 分钟前`;
-  if (s < 86400) return `${Math.floor(s / 3600)} 小时前`;
-  if (s < 86400 * 7) return `${Math.floor(s / 86400)} 天前`;
-  return new Date(iso).toLocaleDateString();
-}
 
 const SAMPLES = [
   ...PROJECT_TEMPLATES.filter((t) => t.id !== 'blank').map((t) => ({ id: t.id, name: t.name, meta: t.description, create: () => t.create() })),
@@ -30,6 +25,7 @@ export function Home() {
   const [page, setPage] = useState(0); const PAGE = 24; const pageCount = Math.max(1, Math.ceil(projects.length / PAGE)); const shown = projects.slice(page * PAGE, page * PAGE + PAGE);
   const fileRef = useRef<HTMLInputElement>(null);
   const t = useT();
+  const locale = usePrefs((s) => s.locale);
 
   const onImport = async (files: File[]) => { await importProjectFiles(files); };
 
@@ -41,14 +37,14 @@ export function Home() {
           <BrandMark size={28} />
           <span>Tracelet</span>
         </div>
-        <div className="row" style={{ gap: 20 }}>
+        <div className="row home-nav-links" style={{ gap: 20 }}>
           <a className="home-link on" href="#projects" onClick={(e) => { e.preventDefault(); document.getElementById('projects')?.scrollIntoView({ behavior: 'smooth' }); }}>{t('nav.projects')}</a>
           <a className="home-link" href="#library" title={t('nav.library.tip')} onClick={(e) => { e.preventDefault(); void openLibrary(); }}>{t('nav.library')}</a>
           <a className="home-link" href={`${REPO_URL}/discussions`} target="_blank" rel="noreferrer">{t('nav.community')}</a>
           <a className="home-link" href={`${REPO_URL}#readme`} target="_blank" rel="noreferrer">{t('nav.docs')}</a>
         </div>
         <div className="search-box ml-auto" style={{ flexBasis: 260 }} onClick={() => set('paletteOpen', true)}><Icon d={I.search} size={14} stroke={2} /><span>{t('home.search')}</span><span className="ml-auto mono xs">⌘K</span></div>
-        <a className="iconbtn" href={REPO_URL} target="_blank" rel="noreferrer" title="GitHub · gongbin/tracelet" aria-label="GitHub"><Icon d={I.github} size={18} stroke={0} fill /></a>
+        <div className="header-preferences"><a className="iconbtn" href={REPO_URL} target="_blank" rel="noreferrer" title="GitHub · gongbin/tracelet" aria-label="GitHub"><Icon d={I.github} size={18} stroke={0} fill /></a><AppearanceControls /></div>
         <span className="xs muted mono" title="存储模式">{store.kind === 'local' ? t('home.storage.local') : t('home.storage.remote')}</span>
         <PrefsMenu large />
       </div>
@@ -88,7 +84,7 @@ export function Home() {
                 </div>
                 <div className="col" style={{ padding: '10px 12px', gap: 2 }}>
                   <div style={{ fontWeight: 500 }} data-no-translate>{p.name}</div>
-                  <div className="small muted">{timeAgo(p.updatedAt)} · {p.copperCount} 层 · {p.componentCount} 元件</div>
+                  <div className="small muted">{relativeTime(new Date(p.updatedAt).getTime(), locale)} · {p.copperCount} 层 · {p.componentCount} 元件</div>
                 </div>
                 <button className="btn sm ghost del" onClick={(e) => { e.stopPropagation(); if (confirm(`删除项目「${p.name}」？此操作不可撤销。`)) void deleteProject(p.id); }}>删除</button>
               </div>
@@ -102,8 +98,8 @@ export function Home() {
             {SAMPLES.map((c) => (
               <div key={c.id} className="card row" style={{ gap: 12, padding: 12 }}>
                 <div style={{ width: 56, height: 40, borderRadius: 4, background: 'var(--bg-canvas)', border: '1px solid var(--border)', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon d={I.file} size={16} stroke={2} color="var(--text-3)" /></div>
-                <div className="col" style={{ gap: 2, minWidth: 0 }}><div className="nowrap" style={{ fontWeight: 500 }}>{c.name}</div><div className="small muted" title={c.meta} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.meta}</div></div>
-                <button className="btn ml-auto" style={{ flex: 'none' }} onClick={() => { openProjectObject(c.create()); toast(`已从「${c.name}」创建项目`, 'success'); }}>创建</button>
+                <div className="col" style={{ gap: 2, minWidth: 0 }}><div className="nowrap" style={{ fontWeight: 500 }} data-no-translate>{templateName(c.id, locale, c.name)}</div><div className="small muted" title={c.meta} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.meta}</div></div>
+                <button className="btn ml-auto" style={{ flex: 'none' }} onClick={() => { const name = templateName(c.id, locale, c.name); openProjectObject({ ...c.create(), name }); toast(`已从「${name}」创建项目`, 'success'); }}>创建</button>
               </div>
             ))}
           </div>

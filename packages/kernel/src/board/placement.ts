@@ -1,3 +1,4 @@
+import { withUsbEdgeConstraints } from './usbPlacement.js';
 /**
  * 布局检查与优化：在自动布线之前，按"连接关系、远近、信号干扰、空间均衡、最小间距、对齐"给出问题清单，
  * 并用模拟退火给出可预览的移动建议（不改动锁定件、连接器、安装孔与已有走线的器件）。
@@ -6,14 +7,16 @@
  */
 import type { Board, BoardFootprint } from '../model/board.js';
 import type { RuleSet } from '../model/project.js';
-import { allPads, footprintBody, boardBounds, type WorldPad } from './geometry.js';
-import { pointInPolygon, type Rect, type Vec } from '../geometry.js';
+import { allPads, footprintPads, footprintBody, boardBounds, type WorldPad } from './geometry.js';
+import { pointInPolygon, segRectDist, type Rect, type Vec } from '../geometry.js';
+import { bodyInsideOutline, edgePlacementFits, placementConstraintErrors, placementCopperClear } from './placementConstraints.js';
+import { antennaGeometry, placementBodyInside, antennaAreasClear } from './antennaPlacement.js';
 import { autoroute } from './autoroute.js';
 
 export interface PlacementIssue { rule: 'overlap' | 'outside' | 'spacing' | 'decoupling' | 'crystal' | 'connector-edge' | 'connector-facing' | 'noise' | 'long-net' | 'alignment' | 'affinity' | 'grouping' | 'antenna'; severity: 'error' | 'warning' | 'info'; message: string; refs: string[]; location?: Vec; suggestion?: string }
 export interface PlacementMetrics { hpwl: number; overlaps: number; outside: number; decouplingAvg: number; issues: number }
-export interface PlacementResult { moves: { id: string; ref: string; x: number; y: number; rotation?: number; from: { x: number; y: number; rotation: number } }[]; before: PlacementMetrics; after: PlacementMetrics; iterations: number; ms: number; /** 用自动布线验证前后（verifyRouting） */ routing?: { before: { routed: number; total: number; vias: number; length: number }; after: { routed: number; total: number; vias: number; length: number } }; /** 布线验证变差，建议已丢弃 */ rejected?: string; /** 完整建议布线变差时回退为保守子集 */ fallback?: boolean; /** 第 0 步从板外 / 重叠状态摆进板内的器件数 */ legalized?: number }
-export interface PlacementOptions { timeBudgetMs?: number; /** 固定迭代次数（给定 seed 时结果可复现；默认按时间预算） */ iterations?: number; seed?: number; moveConnectors?: boolean; grid?: number; keepRotation?: boolean; /** 单个器件最大位移（mm，默认 8） */ maxMove?: number; /** 用自动布线对比前后，变差则丢弃建议（默认开） */ verifyRouting?: boolean; routeBudgetMs?: number; onProgress?: (stage: string) => void }
+export interface PlacementResult { outline?: Vec[]; moves: { id: string; ref: string; x: number; y: number; rotation?: number; from: { x: number; y: number; rotation: number } }[]; before: PlacementMetrics; after: PlacementMetrics; iterations: number; ms: number; /** 用自动布线验证前后（verifyRouting） */ routing?: { before: { routed: number; total: number; vias: number; length: number }; after: { routed: number; total: number; vias: number; length: number } }; /** 布线验证变差，建议已丢弃 */ rejected?: string; /** 完整建议布线变差时回退为保守子集 */ fallback?: boolean; /** 第 0 步从板外 / 重叠状态摆进板内的器件数 */ legalized?: number }
+export interface PlacementOptions { mode?: 'initial' | 'incremental'; /** Explicit opt-in: use an estimated rectangular outline. */ estimateOutline?: boolean; timeBudgetMs?: number; /** 固定迭代次数（给定 seed 时结果可复现；默认按时间预算） */ iterations?: number; seed?: number; moveConnectors?: boolean; grid?: number; keepRotation?: boolean; /** 单个器件最大位移（mm，默认 8） */ maxMove?: number; /** 用自动布线对比前后，变差则丢弃建议（默认开） */ verifyRouting?: boolean; routeBudgetMs?: number; onProgress?: (stage: string) => void }
 
 const POWER_RE = /^(\+|vcc|vdd|v[0-9]|3v3|5v|vbus|vin|avdd|dvdd|vbat)/i;
 const GND_RE = /^(gnd|vss|agnd|dgnd|pgnd)/i;
@@ -32,7 +35,7 @@ function ctxOf(board: Board): Ctx {
 const hpwl = (ps: Vec[]) => { if (ps.length < 2) return 0; let x1 = Infinity, x2 = -Infinity, y1 = Infinity, y2 = -Infinity; for (const p of ps) { if (p.x < x1) x1 = p.x; if (p.x > x2) x2 = p.x; if (p.y < y1) y1 = p.y; if (p.y > y2) y2 = p.y; } return x2 - x1 + (y2 - y1); };
 const rectGap = (a: Rect, b: Rect) => Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w), 0, b.y - (a.y + a.h), a.y - (b.y + b.h));
 const overlapArea = (a: Rect, b: Rect) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
-const isIc = (f: BoardFootprint, byFp: Map<string, WorldPad[]>) => (byFp.get(f.id)?.length ?? 0) >= 4 && /^(U|IC|Q)\d/i.test(f.ref);
+const isIc = (f: BoardFootprint, byFp: Map<string, WorldPad[]>) => (f.placement?.role === 'ic' || ((byFp.get(f.id)?.length ?? 0) >= 4 && /^(U|IC|Q)\d/i.test(f.ref)));
 const isCap = (f: BoardFootprint, byFp: Map<string, WorldPad[]>) => /^C\d/i.test(f.ref) && (byFp.get(f.id)?.length ?? 0) === 2;
 const isCrystal = (f: BoardFootprint) => /^(Y|X)\d/i.test(f.ref) || /(mhz|khz|crystal|xtal|resonator)/i.test(f.value);
 
@@ -40,9 +43,16 @@ const isCrystal = (f: BoardFootprint) => /^(Y|X)\d/i.test(f.ref) || /(mhz|khz|cr
 function decouplingPairs(c: Ctx): { cap: BoardFootprint; pin: WorldPad; ic: BoardFootprint }[] {
   const out: { cap: BoardFootprint; pin: WorldPad; ic: BoardFootprint }[] = [];
   for (const f of c.board.footprints) {
+    if (f.placement?.role && !['auto', 'decoupling'].includes(f.placement.role)) continue;
     if (!isCap(f, c.byFp)) continue;
     const ps = c.byFp.get(f.id)!; const power = ps.find((p) => POWER_RE.test(p.net)), gnd = ps.find((p) => GND_RE.test(p.net));
     if (!power || !gnd) continue;
+    if (f.placement?.target) {
+      const t = f.placement.target, ic = c.board.footprints.find(x => x.id === t.footprintId);
+      const pin = c.byFp.get(t.footprintId)?.find(p => p.number === t.pad && p.net === power.net);
+      if (ic && pin) out.push({ cap: f, pin, ic });
+      continue;
+    }
     let best: { pin: WorldPad; ic: BoardFootprint; d: number } | null = null;
     for (const p of c.nets.get(power.net) ?? []) { const ic = c.board.footprints.find((x) => x.id === p.footprintId); if (!ic || !isIc(ic, c.byFp)) continue; const d = Math.hypot(p.center.x - power.center.x, p.center.y - power.center.y); if (!best || d < best.d) best = { pin: p, ic, d }; }
     if (best) out.push({ cap: f, pin: best.pin, ic: best.ic });
@@ -65,7 +75,7 @@ function crystalPairs(c: Ctx): { xtal: BoardFootprint; ic: BoardFootprint }[] {
 const PASSIVE_RE = /^(R|C|L|D|FB|Z|ZD|LED)\d/i;
 const isPassive = (f: BoardFootprint, byFp: Map<string, WorldPad[]>) => PASSIVE_RE.test(f.ref) && (byFp.get(f.id)?.length ?? 0) <= 3;
 const typeOf = (f: BoardFootprint) => (/^C\d/i.test(f.ref) ? 'C' : /^R\d/i.test(f.ref) ? 'R' : /^L\d/i.test(f.ref) ? 'L' : /^(D|LED)\d/i.test(f.ref) ? 'D' : '');
-const isPlugConnector = (f: BoardFootprint) => /^(J|P|CN|USB|X)\d/i.test(f.ref);
+const isPlugConnector = (f: BoardFootprint) => f.placement?.role === 'connector' || /^(J|P|CN|USB|X)\d/i.test(f.ref);
 const ANTENNA_RE = /(ant|antenna|wroom|wrover|esp32|esp8266|esp-|wifi|ble|nrf|rf|lora|zigbee|gnss|gps|module)/i;
 
 /**
@@ -85,8 +95,10 @@ function affinityPairs(c: Ctx): { part: BoardFootprint; ic: BoardFootprint; nets
       if (!shared.length) continue;
       const signal = shared.filter((n) => !GND_RE.test(n)).length;
       if (!signal) continue; // 只共地不算
-      const score = shared.length * 2 + signal;
-      if (!best || score > best.score) best = { ic, nets: shared, score };
+      const meaningful = shared.filter(n=>!POWER_RE.test(n)&&!GND_RE.test(n));
+      if (!meaningful.length) continue; // Global supplies do not identify a functional owner.
+      const score = meaningful.length * 5 + signal;
+      if (!best || score > best.score || (score === best.score && Math.hypot(f.x-ic.x,f.y-ic.y)<Math.hypot(f.x-best.ic.x,f.y-best.ic.y))) best = { ic, nets: shared, score };
     }
     if (!best) continue;
     const t = typeOf(f);
@@ -128,7 +140,7 @@ export function checkPlacement(board: Board, rules: RuleSet): PlacementIssue[] {
   for (let i = 0; i < bodies.length; i++) {
     const a = bodies[i];
     const corners = [{ x: a.r.x, y: a.r.y }, { x: a.r.x + a.r.w, y: a.r.y }, { x: a.r.x + a.r.w, y: a.r.y + a.r.h }, { x: a.r.x, y: a.r.y + a.r.h }];
-    if (board.outline.length >= 3 && !corners.every((p) => pointInPolygon(p, board.outline))) out.push({ rule: 'outside', severity: 'error', message: `${a.f.ref} 超出板框`, refs: [a.f.ref], location: { x: a.f.x, y: a.f.y }, suggestion: '拖进板内或用「板框适配内容」' });
+    if (board.outline.length >= 3 && !placementBodyInside(a.f,board)) out.push({ rule: 'outside', severity: 'error', message: `${a.f.ref} 超出板框`, refs: [a.f.ref], location: { x: a.f.x, y: a.f.y }, suggestion: '拖进板内或用「板框适配内容」' });
     for (let j = i + 1; j < bodies.length; j++) {
       const b = bodies[j]; if (a.f.side !== b.f.side) continue;
       if (overlapArea(a.r, b.r) > 0) out.push({ rule: 'overlap', severity: 'error', message: `${a.f.ref} 与 ${b.f.ref} 重叠`, refs: [a.f.ref, b.f.ref], location: { x: (a.f.x + b.f.x) / 2, y: (a.f.y + b.f.y) / 2 } });
@@ -177,17 +189,12 @@ export function checkPlacement(board: Board, rules: RuleSet): PlacementIssue[] {
   for (const a of small) for (const b of small) { if (a === b) continue; const key = [a.f.ref, b.f.ref].sort().join('|'); if (seen.has(key)) continue; const dx = Math.abs(a.f.x - b.f.x), dy = Math.abs(a.f.y - b.f.y); if ((dx > 0.05 && dx < 0.6 && dy > 2 && dy < 12) || (dy > 0.05 && dy < 0.6 && dx > 2 && dx < 12)) { seen.add(key); out.push({ rule: 'alignment', severity: 'info', message: `${a.f.ref} 与 ${b.f.ref} 差 ${Math.min(dx > 0.05 && dx < 0.6 ? dx : 9, dy > 0.05 && dy < 0.6 ? dy : 9).toFixed(2)}mm 没对齐`, refs: [a.f.ref, b.f.ref], suggestion: '框选后用对齐工具' }); } }
   return out;
 }
-function segRectGap(a: Vec, b: Vec, r: Rect): number {
-  const cx = Math.max(r.x, Math.min((a.x + b.x) / 2, r.x + r.w)), cy = Math.max(r.y, Math.min((a.y + b.y) / 2, r.y + r.h));
-  const l2 = (b.x - a.x) ** 2 + (b.y - a.y) ** 2; const t = l2 ? Math.max(0, Math.min(1, ((cx - a.x) * (b.x - a.x) + (cy - a.y) * (b.y - a.y)) / l2)) : 0;
-  const q = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-  return Math.hypot(Math.max(r.x - q.x, 0, q.x - (r.x + r.w)), Math.max(r.y - q.y, 0, q.y - (r.y + r.h)));
-}
+const segRectGap = segRectDist;
 
 export function placementMetrics(board: Board, rules: RuleSet): PlacementMetrics {
   const c = ctxOf(board); let hp = 0; for (const [, ps] of c.nets) hp += hpwl(ps.map((p) => p.center));
   const issues = checkPlacement(board, rules);
-  const dp = decouplingPairs(c); const dAvg = dp.length ? dp.reduce((n, { cap, pin }) => n + Math.hypot(cap.x - pin.center.x, cap.y - pin.center.y), 0) / dp.length : 0;
+  const dp = decouplingPairs(c); const dAvg = dp.length ? dp.reduce((n, { cap, pin }) => { const power = c.byFp.get(cap.id)!.find((p) => p.net === pin.net)!; return n + Math.hypot(power.center.x - pin.center.x, power.center.y - pin.center.y); }, 0) / dp.length : 0;
   return { hpwl: Math.round(hp), overlaps: issues.filter((i) => i.rule === 'overlap').length, outside: issues.filter((i) => i.rule === 'outside').length, decouplingAvg: Math.round(dAvg * 10) / 10, issues: issues.length };
 }
 
@@ -197,11 +204,11 @@ export function placementMetrics(board: Board, rules: RuleSet): PlacementMetrics
  * 最近的空位（螺旋搜索，本体之间留通道、离板边留余量），并在 0/90/180/270° 里选飞线最短的朝向。
  * 返回被移动器件的新位置（原位置已合法且不重叠的器件保持不动）。
  */
-function legalize(board: Board, c: Ctx, movable: BoardFootprint[], rules: RuleSet, G: number, keepRotation: boolean): Map<string, { x: number; y: number; rotation: number }> {
+function legalize(board: Board, c: Ctx, movable: BoardFootprint[], rules: RuleSet, G: number, keepRotation: boolean, initial = false): Map<string, { x: number; y: number; rotation: number }> {
   const out = new Map<string, { x: number; y: number; rotation: number }>();
   const margin = (rules.copperToEdge ?? 0.3) + 0.3;
   const bb = boardBounds(board);
-  const insideBody = (r: Rect) => [{ x: r.x - margin, y: r.y - margin }, { x: r.x + r.w + margin, y: r.y - margin }, { x: r.x + r.w + margin, y: r.y + r.h + margin }, { x: r.x - margin, y: r.y + r.h + margin }].every((q) => pointInPolygon(q, board.outline));
+  const insideBody = (r: Rect) => bodyInsideOutline({x:r.x-margin,y:r.y-margin,w:r.w+2*margin,h:r.h+2*margin},board.outline);
   const fpById = new Map(board.footprints.map((f) => [f.id, f]));
   const at = (f: BoardFootprint, q: { x: number; y: number; rotation: number }): BoardFootprint => ({ ...f, x: q.x, y: q.y, rotation: q.rotation });
   const padsAt = (f: BoardFootprint, q: { x: number; y: number; rotation: number }) => allPads({ ...board, footprints: [at(f, q)] }).filter((p) => !p.def.npth);
@@ -213,30 +220,59 @@ function legalize(board: Board, c: Ctx, movable: BoardFootprint[], rules: RuleSe
   for (const f of board.footprints) if (!movableSet.has(f.id)) placed.set(f.id, { x: f.x, y: f.y, rotation: f.rotation });
   // 原位置已合法且与固定件不冲突的可动器件也先保留原位（避免无谓大搬家）
   const pending = new Set<string>();
-  for (const f of movable) { if (legalNow(f)) placed.set(f.id, { x: f.x, y: f.y, rotation: f.rotation }); else pending.add(f.id); }
+  for (const f of movable) { if ((!initial || (isPlugConnector(f) && Math.min(...board.outline.map((a,i)=>segRectGap(a,board.outline[(i+1)%board.outline.length],footprintBody(f))))<=4)) && legalNow(f) && edgePlacementFits(f, board)) placed.set(f.id, { x: f.x, y: f.y, rotation: f.rotation }); else pending.add(f.id); }
   const padCount = (id: string) => (c.byFp.get(id) ?? []).length;
   const netW = (n: string) => (GND_RE.test(n) ? 0.2 : POWER_RE.test(n) ? 0.5 : 1);
   const netsOf = (id: string) => [...new Set((c.byFp.get(id) ?? []).map((p) => p.net).filter(Boolean))];
   const conn = (a: string, b: string) => { const nb = new Set(netsOf(b)); let w = 0; for (const n of netsOf(a)) if (nb.has(n)) w += netW(n); return w; };
-  const dps = decouplingPairs(c); const decIc = new Map(dps.map((d) => [d.cap.id, d.ic.id]));
+  const dps = decouplingPairs(c); const decTarget = new Map(dps.map(d => [d.cap.id, {footprintId:d.ic.id, pad:d.pin.number}])); const decIc = new Map(dps.map((d) => [d.cap.id, d.ic.id]));
   const gapWant = (a: string, b: string) => { const ra = bodyAt(fpById.get(a)!, placed.get(a)!), rb = bodyAt(fpById.get(b)!, placed.get(b)!); void ra; void rb; return decIc.get(a) === b || decIc.get(b) === a ? 0.5 : 1.0; };
   const bigGap = (r: Rect) => (r.w * r.h > 20 ? 1.5 : 1.0);
+  const antennaAreas = board.footprints.flatMap(f=>{const a=antennaGeometry(f,board);return a?[a.area]:[];});
   const fits = (f: BoardFootprint, q: { x: number; y: number; rotation: number }) => {
-    const r = bodyAt(f, q); if (!insideBody(r)) return false;
+    const r = bodyAt(f, q); if (!insideBody(r) || !edgePlacementFits({ ...f, ...q }, board)) return false;
+    if(antennaAreas.some(a=>overlapArea(r,a)>1e-6))return false;
     for (const [id, pq] of placed) { const o = fpById.get(id)!; if (o.side !== f.side) continue; const ro = bodyAt(o, pq); const want = Math.max(decIc.get(f.id) === id || decIc.get(id) === f.id ? 0.5 : Math.min(bigGap(r), bigGap(ro)), 0.5); if (rectGap(r, ro) < want) return false; }
-    return true;
+    return placementCopperClear({ ...board, footprints: [{ ...f, ...q }, ...[...placed].filter(([id]) => id !== f.id).map(([id, pq]) => ({ ...fpById.get(id)!, ...pq }))] }, rules);
   };
   // 放置顺序：先没放的 IC（引脚最多），再按与已放器件连接强度递减
   const order: string[] = [];
   while (pending.size) {
     let best: string | null = null, bestScore = -Infinity;
-    for (const id of pending) { let sc = 0; for (const pid of placed.keys()) sc += conn(id, pid); sc = sc * 10 + padCount(id) * 0.1 + (/^(U|IC)\d/i.test(fpById.get(id)!.ref) ? 5 : 0) - (/^(TP|FID)\d/i.test(fpById.get(id)!.ref) ? 3 : 0); if (sc > bestScore) { bestScore = sc; best = id; } }
+    for (const id of pending) { let sc = 0; for (const pid of placed.keys()) sc += conn(id, pid); sc += [...placed.keys()].filter(pid => fpById.get(pid)!.placement?.group && fpById.get(pid)!.placement?.group === fpById.get(id)!.placement?.group).length * 2; sc = (fpById.get(id)!.placement?.edge ? 10000 : initial && isPlugConnector(fpById.get(id)!) ? 1000 : 0) + sc * 10 + padCount(id) * 0.1 + (/^(U|IC)\d/i.test(fpById.get(id)!.ref) ? 5 : 0) - (/^(TP|FID)\d/i.test(fpById.get(id)!.ref) ? 3 : 0); const targetId = fpById.get(id)!.placement?.target?.footprintId ?? decIc.get(id); if (targetId && !placed.has(targetId)) sc -= 100000; else if (targetId) sc += 500; if (sc > bestScore) { bestScore = sc; best = id; } }
     const id = best!; pending.delete(id); order.push(id);
     const f = fpById.get(id)!;
     // 理想点：所连已放引脚的加权重心；没有就板中心（第一个器件）或已放器件的空白侧
     let sx = 0, sy = 0, wsum = 0;
     for (const n of netsOf(id)) { if (GND_RE.test(n)) continue; for (const p of c.nets.get(n) ?? []) if (placed.has(p.footprintId) && p.footprintId !== id) { const pq = placed.get(p.footprintId)!; const o = fpById.get(p.footprintId)!; const pp = padsAt(o, pq).find((x) => x.number === p.number); if (pp) { const w = netW(n); sx += pp.center.x * w; sy += pp.center.y * w; wsum += w; } } }
-    const ideal = wsum ? { x: sx / wsum, y: sy / wsum } : { x: bb.x + bb.w / 2, y: bb.y + bb.h / 2 };
+    let ideal = wsum ? { x: sx / wsum, y: sy / wsum } : { x: bb.x + bb.w / 2, y: bb.y + bb.h / 2 };
+    // A valid imported IC location is a useful functional seed. Staged ICs still use connectivity.
+    if(initial && isIc(f,c.byFp) && insideBody(footprintBody(f))) ideal={x:f.x,y:f.y};
+    const target = f.placement?.target ?? decTarget.get(f.id);
+    if (target && placed.has(target.footprintId)) {
+      const pin = padsAt(fpById.get(target.footprintId)!, placed.get(target.footprintId)!).find(p => p.number === target.pad);
+      if (pin) ideal = pin.center;
+    }
+    const inferredEdge = initial && !f.placement?.edge && (isPlugConnector(f) || !!antennaZone(f,c.byFp,`${f.footprintId} ${f.value}`));
+    if (inferredEdge) {
+      // Project the electrical centroid onto the nearest actual outline segment.
+      // Retain useful mechanical side intent when the imported part is already inside the board.
+      // For staged parts use connectivity instead of their arbitrary staging coordinates.
+      const r0=footprintBody(f);
+      if(insideBody(r0)) ideal={x:f.x,y:f.y};
+      let closest = Infinity, point = ideal;
+      for (let i=0;i<board.outline.length;i++) {
+        const a=board.outline[i], b=board.outline[(i+1)%board.outline.length];
+        const dx=b.x-a.x,dy=b.y-a.y, t=Math.max(0,Math.min(1,((ideal.x-a.x)*dx+(ideal.y-a.y)*dy)/(dx*dx+dy*dy || 1)));
+        const q={x:a.x+t*dx,y:a.y+t*dy}, d=Math.hypot(q.x-ideal.x,q.y-ideal.y);
+        if(d<closest){closest=d;point=q;}
+      }
+      ideal=point;
+    }
+    if (f.placement?.edge) {
+      const i = f.placement.edge.index, a = board.outline[i], b = board.outline[(i+1)%board.outline.length];
+      if (a && b) ideal = { x:(a.x+b.x)/2, y:(a.y+b.y)/2 };
+    }
     const rots = keepRotation ? [f.rotation] : [f.rotation, (f.rotation + 90) % 360, (f.rotation + 180) % 360, (f.rotation + 270) % 360];
     // 螺旋搜索：按离理想点由近到远，收集前若干个可行位置，按飞线长度 + 偏离距离选最好的
     const snap = (v: number) => Math.round(v / G) * G;
@@ -244,7 +280,15 @@ function legalize(board: Board, c: Ctx, movable: BoardFootprint[], rules: RuleSe
     const maxR = Math.hypot(bb.w, bb.h);
     const netPads = new Map<string, Vec[]>();
     for (const n of netsOf(id)) { if (GND_RE.test(n)) continue; const ps: Vec[] = []; for (const p of c.nets.get(n) ?? []) if (placed.has(p.footprintId) && p.footprintId !== id) { const pq = placed.get(p.footprintId)!; const pp = padsAt(fpById.get(p.footprintId)!, pq).find((x) => x.number === p.number); if (pp) ps.push(pp.center); } if (ps.length) netPads.set(n, ps); }
-    const costAt = (q: { x: number; y: number; rotation: number }) => { let e = Math.hypot(q.x - ideal.x, q.y - ideal.y) * 0.3; const mine = padsAt(f, q); for (const [n, ps] of netPads) { const own = mine.filter((p) => p.net === n).map((p) => p.center); e += hpwl([...ps, ...own]) * netW(n); } return e; };
+    const costAt = (q: { x: number; y: number; rotation: number }) => { let e = Math.hypot(q.x - ideal.x, q.y - ideal.y) * 0.3; const mine = padsAt(f, q);
+      if(inferredEdge){
+        const candidate={...f,...q}, body=footprintBody(candidate);
+        const edgeGap=Math.min(...board.outline.map((a,i)=>segRectGap(a,board.outline[(i+1)%board.outline.length],body)));
+        e+=edgeGap*25;
+        const facing=connectorFacing(candidate,new Map([[f.id,mine]]),board.outline);
+        if(facing!==null)e+=(1-facing)*40;
+      }
+      if (target && placed.has(target.footprintId)) { const pin = padsAt(fpById.get(target.footprintId)!, placed.get(target.footprintId)!).find(p => p.number === target.pad); if (pin) { const related = mine.filter(p => p.net && p.net === pin.net); if (related.length) e += Math.min(...related.map(p => Math.hypot(p.center.x-pin.center.x, p.center.y-pin.center.y))) * 30; } } for (const [n, ps] of netPads) { const own = mine.filter((p) => p.net === n).map((p) => p.center); e += hpwl([...ps, ...own]) * netW(n); } return e; };
     outer: for (let ring = 0; ring * G <= maxR; ring++) {
       const step = ring === 0 ? [0] : [-ring, ring];
       const pts: Vec[] = [];
@@ -267,24 +311,49 @@ function legalize(board: Board, c: Ctx, movable: BoardFootprint[], rules: RuleSe
   return out;
 }
 
+/** Capacity estimate only: inflated bodies plus routing space; mechanical requirements take precedence. */
+export function estimateBoardSize(board: Board, rules: RuleSet) {
+  const margin = Math.max(2, rules.copperToEdge + 1);
+  const bodies = board.footprints.map(footprintBody);
+  const area = bodies.reduce((n,r)=>n+(r.w+1.5)*(r.h+1.5),0) / 0.55;
+  const bb = boardBounds(board), ratio = Math.max(0.75,Math.min(1.5,bb.w/Math.max(bb.h,1)));
+  const width = Math.ceil(Math.max(Math.sqrt(area*ratio),...bodies.map(r=>r.w+2*margin),10)/5)*5;
+  const height = Math.ceil(Math.max(area/width,...bodies.map(r=>r.h+2*margin),10)/5)*5;
+  // Resizing is unsafe with existing routing, copper zones, explicit edge intent or mechanical anchors.
+  const rectangular = board.outline.length === 4 && board.outline.every((p,i)=>{const q=board.outline[(i+1)%4];return p.x===q.x || p.y===q.y;});
+  const canResize = !board.footprints.some(f=>antennaGeometry(f,board)) && rectangular && !board.traces.length && !board.vias.length && !board.zones.length && !board.footprints.some(f=>f.locked || f.placement?.fixed || f.placement?.edge || f.placement?.role==='mechanical' || /^(H|MH|FID)\d/i.test(f.ref));
+  return {width,height,canResize,outline:[{x:bb.x,y:bb.y},{x:bb.x+width,y:bb.y},{x:bb.x+width,y:bb.y+height},{x:bb.x,y:bb.y+height}]};
+}
+
 /** 模拟退火布局优化：返回移动建议（不修改输入）。 */
 export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementOptions = {}): PlacementResult {
+  board = withUsbEdgeConstraints(board);
+  if (opts.mode === 'initial' && opts.estimateOutline) {
+    const size = estimateBoardSize(board,rules);
+    if (size.canResize) {
+      const result = optimizePlacement({...board,outline:size.outline,outlineRadius:undefined},rules,{...opts,estimateOutline:false});
+      result.before = placementMetrics(board,rules);
+      if (!result.rejected) result.outline = size.outline;
+      return result;
+    }
+  }
   const t0 = Date.now(); const budget = opts.timeBudgetMs ?? 1500; const G = opts.grid ?? 0.5;
   const c = ctxOf(board);
+  const initial = opts.mode === 'initial';
   const wired = new Set<string>();
   for (const p of c.pads) if (board.traces.some((t) => p.layers.includes(t.layer) && t.points.slice(1).some((b, i) => segRectGap(t.points[i], b, p.rect) <= t.width / 2 + 1e-6))) wired.add(p.footprintId);
   const inside0 = (f: BoardFootprint) => { if (board.outline.length < 3) return true; const r = footprintBody(f); return [{ x: r.x, y: r.y }, { x: r.x + r.w, y: r.y }, { x: r.x + r.w, y: r.y + r.h }, { x: r.x, y: r.y + r.h }].every((q) => pointInPolygon(q, board.outline)); };
   const FIXED_RE = /^(J|P|CN|USB|X|BT|H|MH|FID|SW)\d/i; // 连接器 / 安装孔 / 按键默认不动；测试点可动
-  const movable = board.footprints.filter((f) => !f.locked && !wired.has(f.id) && (opts.moveConnectors || !FIXED_RE.test(f.ref) || !inside0(f)) && !(c.byFp.get(f.id) ?? []).every((p) => p.def.npth));
+  const movable = board.footprints.filter((f) => !antennaGeometry(f,board) && !f.locked && !f.placement?.fixed && f.placement?.role !== 'mechanical' && !wired.has(f.id) && (f.placement?.edge || opts.moveConnectors || (initial && isPlugConnector(f) && !/^(H|MH|FID|SW)\d/i.test(f.ref)) || (!FIXED_RE.test(f.ref) && f.placement?.role !== 'connector') || !inside0(f)) && !(c.byFp.get(f.id) ?? []).every((p) => p.def.npth));
   const before = placementMetrics(board, rules);
-  if (movable.length < 2) return { moves: [], before, after: before, iterations: 0, ms: Date.now() - t0 };
+  if (movable.length === 0) return { moves: [], before, after: before, iterations: 0, ms: Date.now() - t0, ...(before.overlaps || before.outside || placementConstraintErrors(board).length ? { rejected: 'No movable components: resolve overlaps or outside components by adjusting fixed parts.' } : {}) };
   // ---- 第 0 步：合法化。有器件在板外 / 重叠时，先按连接关系从核心器件开始"构造式"摆进板内（不重叠、留通道），再退火细调 ----
   const relocated = new Set<string>();
   const start = new Map(board.footprints.map((f) => [f.id, { x: f.x, y: f.y, rotation: f.rotation }]));
-  const needsLegalize = before.outside > 0 || before.overlaps > 0;
+  const needsLegalize = initial || before.outside > 0 || before.overlaps > 0 || placementConstraintErrors(board).length > 0;
   if (needsLegalize && board.outline.length >= 3) {
     opts.onProgress?.('整理：把板外 / 重叠的器件摆进板内');
-    const res = legalize(board, c, movable, rules, G, !!opts.keepRotation);
+    const res = legalize(board, c, movable, rules, G, !!opts.keepRotation, initial);
     for (const [id, q] of res) { start.set(id, q); relocated.add(id); }
   }
   // 工作副本
@@ -294,17 +363,14 @@ export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementO
   const maxMove = opts.maxMove ?? 8;
   const edgeMargin = (rules.copperToEdge ?? 0.3) + 0.3;
   const fpById = new Map(board.footprints.map((f) => [f.id, f]));
-  const padLocal = new Map<string, { dx: number; dy: number; net: string; number: string }[]>();
-  for (const f of board.footprints) { const ps = c.byFp.get(f.id) ?? []; padLocal.set(f.id, ps.map((p) => { const dx = p.center.x - f.x, dy = p.center.y - f.y; const r = (-f.rotation * Math.PI) / 180; return { dx: dx * Math.cos(r) - dy * Math.sin(r), dy: dx * Math.sin(r) + dy * Math.cos(r), net: p.net, number: p.number }; })); }
-  const padWorld = (id: string) => { const q = pos.get(id)!; const r = (q.rotation * Math.PI) / 180, cs = Math.cos(r), sn = Math.sin(r); return padLocal.get(id)!.map((p) => ({ x: q.x + p.dx * cs - p.dy * sn, y: q.y + p.dx * sn + p.dy * cs, net: p.net })); };
   const bodyOf = (id: string) => { const f = fpById.get(id)!; const q = pos.get(id)!; return footprintBody({ ...f, x: q.x, y: q.y, rotation: q.rotation }); };
   const dps = decouplingPairs(c).map((d) => ({ cap: d.cap.id, ic: d.ic.id, pin: d.pin.number }));
-  const affs = affinityPairs(c).map((a) => ({ part: a.part.id, ic: a.ic.id, nets: a.nets, weight: a.weight }));
+  const affs = affinityPairs(c).filter(a => !dps.some(d=>d.cap===a.part.id)).map((a) => ({ part: a.part.id, ic: a.ic.id, nets: a.nets, weight: a.weight }));
   const affByPart = new Map(affs.map((a) => [a.part, a])), affByIc = new Map<string, typeof affs>(); for (const a of affs) { if (!affByIc.has(a.ic)) affByIc.set(a.ic, []); affByIc.get(a.ic)!.push(a); }
   const fpName = (id: string) => { const f = fpById.get(id)!; return `${f.footprintId} ${f.value}`; };
   const antennaIds = board.footprints.filter((f) => antennaZone(f, c.byFp, fpName(f.id))).map((f) => f.id);
   const antennaSet = new Set(antennaIds);
-  const antennaRect = (id: string) => { const f = fpById.get(id)!; const q = pos.get(id)!; return antennaZone({ ...f, x: q.x, y: q.y, rotation: q.rotation }, c.byFp, fpName(id)); };
+  const antennaRect = (id: string) => { const f = fpById.get(id)!; const q = pos.get(id)!; return antennaZone({ ...f, x: q.x, y: q.y, rotation: q.rotation }, currentPads, fpName(id)); };
   const typeCache = new Map(board.footprints.map((f) => [f.id, typeOf(f)]));
   const smallPassive = new Set(board.footprints.filter((f) => isPassive(f, c.byFp) && footprintBody(f).w * footprintBody(f).h < 12).map((f) => f.id));
   const plugs = new Set(board.footprints.filter(isPlugConnector).map((f) => f.id));
@@ -312,9 +378,13 @@ export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementO
   const sensitive = board.footprints.filter((f) => isCrystal(f) || (c.byFp.get(f.id) ?? []).some((p) => classOf(p.net) === 'analog')).map((f) => f.id);
   const noisy = board.footprints.filter((f) => (c.byFp.get(f.id) ?? []).some((p) => classOf(p.net) === 'switch') && !sensitive.includes(f.id)).map((f) => f.id);
   const ids = board.footprints.map((f) => f.id);
-  const padsOf = new Map<string, { x: number; y: number; net: string; w: number; h: number }[]>();
-  const padWorldR = (id: string) => { const q = pos.get(id)!; const r = (q.rotation * Math.PI) / 180, cs = Math.cos(r), sn = Math.sin(r); const f = fpById.get(id)!; const src = c.byFp.get(id) ?? []; return padLocal.get(id)!.map((p, i) => { const rot90 = ((q.rotation - f.rotation) % 180 + 180) % 180 === 90; const pw = src[i]?.rect.w ?? 0.5, ph = src[i]?.rect.h ?? 0.5; return { x: q.x + p.dx * cs - p.dy * sn, y: q.y + p.dx * sn + p.dy * cs, net: p.net, w: rot90 ? ph : pw, h: rot90 ? pw : ph }; }); };
-  const refreshPads = (id: string) => padsOf.set(id, padWorldR(id));
+  const currentPads = new Map<string, WorldPad[]>();
+  const padsOf = new Map<string, { x: number; y: number; number: string; net: string; w: number; h: number }[]>();
+  const refreshPads = (id: string) => {
+    const ps = footprintPads({ ...fpById.get(id)!, ...pos.get(id)! }, board).filter((p) => !p.def.npth);
+    currentPads.set(id, ps);
+    padsOf.set(id, ps.map((p) => ({ ...p.center, number: p.number, net: p.net, w: p.rect.w, h: p.rect.h })));
+  };
   for (const id of ids) refreshPads(id);
   const netsOfFp = new Map<string, string[]>(); for (const id of ids) netsOfFp.set(id, [...new Set((c.byFp.get(id) ?? []).map((p) => p.net).filter(Boolean))]);
   const fpsOfNet = new Map<string, string[]>(); for (const [id, ns] of netsOfFp) for (const n of ns) { if (!fpsOfNet.has(n)) fpsOfNet.set(n, []); fpsOfNet.get(n)!.push(id); }
@@ -330,18 +400,25 @@ export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementO
     const slack = a.weight >= 8 ? 2.0 : a.weight >= 5 ? 3.0 : 4.0;
     return Math.max(0, d - slack) * a.weight;
   };
-  const decCost = (d: { cap: string; ic: string }) => { const capPads = padsOf.get(d.cap)!; const cp = capPads.find((q) => POWER_RE.test(q.net)); const pp = padsOf.get(d.ic)!.find((p) => p.net && cp && p.net === cp.net); if (!pp || !cp) return 0; return Math.max(0, Math.hypot(pp.x - cp.x, pp.y - cp.y) - 2.5) * 6; };
+  const decCost = (d: { cap: string; ic: string; pin: string }) => { const capPads = padsOf.get(d.cap)!; const cp = capPads.find((q) => POWER_RE.test(q.net)); const pp = padsOf.get(d.ic)!.find((p) => p.number === d.pin && cp && p.net === cp.net); if (!pp || !cp) return 0; return Math.max(0, Math.hypot(pp.x - cp.x, pp.y - cp.y) - 2.5) * 6; };
   const singleCost = (id: string) => {
     let e = 0; const r = body(id);
     if (board.outline.length >= 3) { const m = edgeMargin; const corners = [{ x: r.x - m, y: r.y - m }, { x: r.x + r.w + m, y: r.y - m }, { x: r.x + r.w + m, y: r.y + r.h + m }, { x: r.x - m, y: r.y + r.h + m }]; for (const p of corners) if (!pointInPolygon(p, board.outline)) e += 400; }
     if (orig.has(id) && movableIds.includes(id) && !relocated.has(id)) { const q = pos.get(id)!, o = orig.get(id)!; const d = Math.hypot(q.x - o.x, q.y - o.y); e += d > maxMove ? (d - maxMove) * 50 + maxMove * 0.15 : d * 0.15; }
     e += pullCost(id);
+    const intent = fpById.get(id)!.placement;
+    if (intent?.edge && !edgePlacementFits({ ...fpById.get(id)!, ...pos.get(id)! }, board)) e += 2000;
+    if (intent?.target) {
+      const pin = padsOf.get(intent.target.footprintId)?.find(p => p.number === intent.target!.pad);
+      const mine = padsOf.get(id)!.filter(p => pin?.net && p.net === pin.net);
+      if (pin && mine.length) e += Math.max(0, Math.min(...mine.map(p => Math.hypot(p.x-pin.x,p.y-pin.y))) - intent.target.maxDistance) * 200;
+    }
     const dc = decByCap.get(id); if (dc) e += decCost(dc);
     for (const d of decByIc.get(id) ?? []) e += decCost(d);
     const af = affByPart.get(id); if (af) e += affCost(af);
     for (const a of affByIc.get(id) ?? []) e += affCost(a);
     // 连接器接口朝板外
-    if (plugs.has(id) && movableIds.includes(id)) { const f = fpById.get(id)!; const q = pos.get(id)!; const facing = connectorFacing({ ...f, x: q.x, y: q.y, rotation: q.rotation }, c.byFp, board.outline); if (facing !== null) e += (1 - facing) * 20; }
+    if (plugs.has(id) && movableIds.includes(id)) { const f = fpById.get(id)!; const q = pos.get(id)!; const facing = connectorFacing({ ...f, x: q.x, y: q.y, rotation: q.rotation }, currentPads, board.outline); if (facing !== null) e += (1 - facing) * 20; }
     // 天线区靠板边
     if (antennaSet.has(id) && board.outline.length >= 3) { const az = antennaRect(id); if (az) { let dmin = Infinity; for (let k = 0; k < board.outline.length; k++) dmin = Math.min(dmin, segRectGap(board.outline[k], board.outline[(k + 1) % board.outline.length], az)); e += Math.max(0, dmin - 1) * 6; } }
     const ic = xtalOf.get(id); if (ic) { const a2 = pos.get(id)!, b2 = pos.get(ic)!; e += Math.max(0, Math.hypot(a2.x - b2.x, a2.y - b2.y) - 6) * 4; }
@@ -353,6 +430,8 @@ export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementO
     const ra = body(a), rb = body(b);
     const ov = overlapArea(ra, rb); if (ov > 0) return 300 + ov * 200;
     let e = 0;
+    const ga = fpById.get(a)!.placement?.group, gb = fpById.get(b)!.placement?.group;
+    if (ga && ga === gb) e += Math.hypot(pos.get(a)!.x-pos.get(b)!.x, pos.get(a)!.y-pos.get(b)!.y) * 0.8;
     const g = rectGap(ra, rb);
     if (g < 2.5) {
       const big = (r: Rect) => r.w * r.h > 20;
@@ -392,7 +471,16 @@ export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementO
   const setPos = (id: string, q: { x: number; y: number; rotation: number }) => { pos.set(id, q); bodyCache.delete(id); refreshPads(id); };
   let seed = opts.seed ?? 12345; const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
   const snap = (v: number) => Math.round(v / G) * G;
-  let cur = fullCost(), best = cur; const bestPos = new Map([...pos].map(([k, v]) => [k, { ...v }]));
+  const legalPosition = () => {
+    for (let i = 0; i < ids.length; i++) {
+      const r = body(ids[i]);
+      if (!placementBodyInside({...fpById.get(ids[i])!,...pos.get(ids[i])!},board)) return false;
+      for (let j = 0; j < i; j++) if (fpById.get(ids[i])!.side === fpById.get(ids[j])!.side && overlapArea(r, body(ids[j])) > 0) return false;
+    }
+    const candidate = { ...board, footprints: board.footprints.map(f => ({ ...f, ...pos.get(f.id)! })) };
+    return antennaAreasClear(candidate) && candidate.footprints.every(f=>placementBodyInside(f,candidate)) && placementConstraintErrors(candidate).length === 0 && placementCopperClear(candidate, rules);
+  };
+  let cur = fullCost(), best = legalPosition() ? cur : Infinity; const bestPos = new Map([...pos].map(([k, v]) => [k, { ...v }]));
   const deltas: number[] = [];
   for (let k = 0; k < 40; k++) { const f = movable[Math.floor(rnd() * movable.length)]; const old = { ...pos.get(f.id)! }; const b0 = deltaTerms([f.id]); setPos(f.id, { ...old, x: snap(old.x + (rnd() - 0.5) * 4), y: snap(old.y + (rnd() - 0.5) * 4) }); deltas.push(Math.abs(deltaTerms([f.id]) - b0)); setPos(f.id, old); }
   deltas.sort((a2, b2) => a2 - b2);
@@ -414,7 +502,7 @@ export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementO
       const b0 = deltaTerms(all);
       for (const id of all) { const q = pos.get(id)!; setPos(id, { ...q, x: snap(q.x + dx), y: snap(q.y + dy) }); }
       const d = deltaTerms(all) - b0;
-      if (d <= 0 || rnd() < Math.exp(-d / T)) { cur += d; if (cur < best - 1e-9) { best = cur; for (const [k, v] of pos) bestPos.set(k, { ...v }); } }
+      if (d <= 0 || rnd() < Math.exp(-d / T)) { cur += d; if (cur < best - 1e-9 && legalPosition()) { best = cur; for (const [k, v] of pos) bestPos.set(k, { ...v }); } }
       else for (const [k, v] of snapshotAll) setPos(k, v);
       T = Math.max(0.05, T0 * (1 - (maxIter === Infinity ? (Date.now() - t0) / budget : iter / maxIter)));
       continue;
@@ -432,7 +520,7 @@ export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementO
     else if (kind < 0.85) { if (opts.keepRotation) continue; setPos(f.id, { ...old, rotation: (old.rotation + 90) % 360 }); }
     else { const o2 = { ...pos.get(g2!.id)! }; setPos(f.id, { ...old, x: o2.x, y: o2.y }); setPos(g2!.id, { ...o2, x: old.x, y: old.y }); }
     const d = deltaTerms(moved) - before;
-    if (d <= 0 || rnd() < Math.exp(-d / T)) { cur += d; if (cur < best - 1e-9) { best = cur; for (const [k, v] of pos) bestPos.set(k, { ...v }); } }
+    if (d <= 0 || rnd() < Math.exp(-d / T)) { cur += d; if (cur < best - 1e-9 && legalPosition()) { best = cur; for (const [k, v] of pos) bestPos.set(k, { ...v }); } }
     else for (const [k, v] of undo) setPos(k, v);
     T = Math.max(0.05, T0 * (1 - (maxIter === Infinity ? (Date.now() - t0) / budget : iter / maxIter)));
   }
@@ -440,6 +528,13 @@ export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementO
   for (const f of movable) { const q = bestPos.get(f.id)!; if (Math.abs(q.x - f.x) > 1e-6 || Math.abs(q.y - f.y) > 1e-6 || q.rotation !== f.rotation) moves.push({ id: f.id, ref: f.ref, x: q.x, y: q.y, rotation: q.rotation !== f.rotation ? q.rotation : undefined, from: { x: f.x, y: f.y, rotation: f.rotation } }); }
   const after = placementMetrics(applyPlacement(board, moves), rules);
   const result: PlacementResult = { moves, before, after, iterations: iter, ms: Date.now() - t0 };
+  // A lower weighted cost must never turn an illegal placement into an accepted suggestion.
+  if (!antennaAreasClear(applyPlacement(board,moves)) || after.overlaps || after.outside || !placementCopperClear(applyPlacement(board, moves), rules) || placementConstraintErrors(applyPlacement(board, moves)).length) {
+    result.rejected = 'No legal placement found. ' + (placementConstraintErrors(applyPlacement(board, moves)).slice(0, 3).join('; ') || 'Components overlap, extend outside the board, or violate pad clearance.') + ' Adjust fixed components, board dimensions, or placement constraints.';
+    result.moves = [];
+    result.after = before;
+    return result;
+  }
   if (opts.verifyRouting !== false && moves.length && !needsLegalize) {
     const rb = opts.routeBudgetMs ?? 20000;
     const stat = (r: ReturnType<typeof autoroute>) => ({ routed: r.routed, total: r.total, vias: r.vias.length, length: Math.round(r.traces.reduce((n, t) => { for (let i = 1; i < t.points.length; i++) n += Math.hypot(t.points[i].x - t.points[i - 1].x, t.points[i].y - t.points[i - 1].y); return n; }, 0)) });
@@ -449,11 +544,11 @@ export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementO
     const worse = (r1: ReturnType<typeof stat>) => r1.routed - (r1.total - r0.total) < r0.routed || (r1.routed === r0.routed && r1.length > r0.length * 1.15 && r1.vias >= r0.vias);
     let r1 = stat(autoroute(applyPlacement(board, moves), rules, { timeBudgetMs: rb, optimize: false }));
     result.routing = { before: r0, after: r1 };
-    if (worse(r1) && moves.length > 1) {
+    for (let count = Math.ceil(moves.length / 2); worse(r1) && moves.length > 1 && count >= 1; count = Math.floor(count / 2)) {
       // 回退：只保留位移最小的一半（多为去耦 / 晶振靠近这类小调整），不重叠再验证一次
-      const conservative = [...moves].sort((a, b) => Math.hypot(a.x - a.from.x, a.y - a.from.y) - Math.hypot(b.x - b.from.x, b.y - b.from.y)).slice(0, Math.ceil(moves.length / 2));
+      const conservative = [...moves].sort((a, b) => Math.hypot(a.x - a.from.x, a.y - a.from.y) - Math.hypot(b.x - b.from.x, b.y - b.from.y)).slice(0, count);
       const m2 = placementMetrics(applyPlacement(board, conservative), rules);
-      if (m2.overlaps === 0 && m2.outside === 0 && m2.hpwl <= before.hpwl) {
+      if (antennaAreasClear(applyPlacement(board,conservative)) && m2.overlaps === 0 && m2.outside === 0 && m2.hpwl <= before.hpwl && !placementConstraintErrors(applyPlacement(board, conservative)).length && placementCopperClear(applyPlacement(board, conservative), rules)) {
         opts.onProgress?.('验证：布线保守方案');
         const r2 = stat(autoroute(applyPlacement(board, conservative), rules, { timeBudgetMs: rb, optimize: false }));
         if (!worse(r2)) { result.moves = conservative; result.after = m2; result.fallback = true; r1 = r2; result.routing = { before: r0, after: r2 }; }

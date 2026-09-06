@@ -37,6 +37,12 @@ describe('MCP server', () => {
     await client.callTool({ name: 'set_board_outline', arguments: { width: 30, height: 20 } });
     await client.callTool({ name: 'move_footprint', arguments: { ref: 'R1', x: 10, y: 10 } });
     await client.callTool({ name: 'move_footprint', arguments: { ref: 'C1', x: 20, y: 10 } });
+    const six = JSON.parse(textOf(await client.callTool({ name: 'set_copper_count', arguments: { count: 6 } })));
+    expect(six.pcb.copperCount).toBe(6);
+    const depths = await client.callTool({name:'set_copper_depths',arguments:{depths:[0,.2,.5,1,1.3,1.6]}});
+    expect(depths.isError).not.toBe(true);
+    const impedance = JSON.parse(textOf(await client.callTool({name:'estimate_impedance',arguments:{kind:'microstrip',width:.2,height:.15,thickness:.035,er:4.2}})));
+    expect(impedance.ohms).toBeGreaterThan(50); expect(impedance.ohms).toBeLessThan(60);
     const ar = JSON.parse(textOf(await client.callTool({ name: 'autoroute', arguments: {} })));
     expect(ar.routed).toBe(ar.total);
     const ex = JSON.parse(textOf(await client.callTool({ name: 'export_fab', arguments: { dir: join(dir, 'fab') } })));

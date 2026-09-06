@@ -1,10 +1,15 @@
+import { PcbRulers } from './PcbRulers.js';
+import { alignDrag, type AlignmentGuide } from './alignment.js';
+import { viaLayers, backdrillLayers } from '@tracelet/kernel';
 import React, { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from 'react';
-import { pcb, holeFootprint, SCREW_HOLES, LAYER_COLORS, copperLayers, footprintPads, footprintBody, boardBounds, netClassFor, snapTo, PCB_GRID, dist, segRectDist, segSegDist, pointSegDist, pointInPolygon, rectsOverlap, alignFootprints, autoroute, type Vec, type Rect, type CopperLayer, type Layer, type WorldPad, type AlignMode } from '@tracelet/kernel';
+import { estimateBoardSize, pcb, holeFootprint, SCREW_HOLES, LAYER_COLORS, copperLayers, footprintPads, footprintBody, boardBounds, netClassFor, snapTo, PCB_GRID, dist, segRectDist, segSegDist, pointSegDist, pointInPolygon, rectsOverlap, alignFootprints, autoroute, type Vec, type Rect, type CopperLayer, type Layer, type WorldPad, type AlignMode } from '@tracelet/kernel';
 import { useApp, useEditor, useProject } from '../../store/app.js';
 import { lib } from '@tracelet/kernel';
 import { getAnalysis } from '../../store/analysis.js';
 import { useViewport, gridStep } from '../../hooks/useViewport.js';
+import { useT } from '../../i18n/index.js';
 import { Hint } from '../../components/Hint.js';
+import { OutlineNotch } from '../../panels/OutlineNotch.js';
 
 /** 45° 约束：把 p 吸附到从 a 出发的 H/V/45° 方向上。 */
 function snap45(a: Vec, p: Vec): Vec {
@@ -42,12 +47,17 @@ type Drag =
 const ALIGN: [AlignMode, string][] = [['left', '左对齐'], ['hcenter', '水平居中'], ['right', '右对齐'], ['top', '上对齐'], ['vcenter', '垂直居中'], ['bottom', '下对齐'], ['hdist', '水平等距'], ['vdist', '垂直等距']];
 
 export function PcbCanvas() {
+  const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuide[]>([]);
+  const [alignmentEnabled, setAlignmentEnabled] = useState(true);
+  const [notchOpen, setNotchOpen] = useState(false);
+  const [notchEdge, setNotchEdge] = useState(0);
+  const [notchPreview, setNotchPreview] = useState<Vec[] | null>(null);
   const project = useProject();
   const editor = useEditor();
   const app = useApp();
   const board = project.board;
   const svgRef = useRef<SVGSVGElement>(null);
-  const view = useViewport(svgRef, { initial: { x: 40, y: 40, k: 12 }, minK: 2, maxK: 200 });
+  const view = useViewport(svgRef, { initial: { x: 40, y: 40, k: 12 }, minK: 2, maxK: 200, onTouchCancel: () => { setAlignmentGuides([]); if (drag.current) editor.rollback(); drag.current = null; setMarquee(null); } });
   const { vp } = view;
   const analysis = getAnalysis(project);
   const drag = useRef<Drag | null>(null);
@@ -98,7 +108,7 @@ export function PcbCanvas() {
     const c = analysis.rules.minClearance;
     for (const pd of flatPads) { if (!pd.layers.includes(layer) || (pd.net && pd.net === net)) continue; if (segRectDist(a, b, pd.rect) - width / 2 < c - 1e-6) return true; }
     for (const t of board.traces) { if (t.layer !== layer || (t.net && t.net === net)) continue; for (let i = 0; i < t.points.length - 1; i++) if (segSegDist(a, b, t.points[i], t.points[i + 1]) - (width + t.width) / 2 < c - 1e-6) return true; }
-    for (const v of board.vias) { if (v.net && v.net === net) continue; if (pointSegDist(v, a, b) - width / 2 - v.size / 2 < c - 1e-6) return true; }
+    for (const v of board.vias) { if (backdrillLayers(board,v).includes(app.activeLayer as CopperLayer) && pointSegDist(v,a,b)-width/2-v.backdrill!.diameter/2<c) return true; if(!viaLayers(board,v).includes(app.activeLayer as CopperLayer))continue; if (v.net && v.net === net) continue; if (pointSegDist(v, a, b) - width / 2 - v.size / 2 < c - 1e-6) return true; }
     return false;
   };
 
@@ -157,6 +167,7 @@ export function PcbCanvas() {
       return;
     }
     if (tool === 'edge') {
+      if (notchOpen) return;
       const d = app.outlineDraft ?? [];
       if (dbl && d.length >= 3) { editor.dispatch(pcb.setOutline(d)); app.patch({ outlineDraft: null }); app.toast('板框已更新', 'success'); return; }
       if (dbl) return;
@@ -203,7 +214,16 @@ export function PcbCanvas() {
     }
     const p = { x: sg(raw.x), y: sg(raw.y) };
     if (d.kind === 'marquee') { setMarquee({ a: d.start, b: raw }); return; }
-    if (d.kind === 'fp') editor.dispatch(pcb.moveFootprint(d.id, { x: sg(raw.x - d.dx), y: sg(raw.y - d.dy) }));
+    if (d.kind === 'fp') {
+      const f=editor.project.board.footprints.find(f=>f.id===d.id);
+      if(!f)return;
+      const desired={x:raw.x-d.dx,y:raw.y-d.dy};
+      const local=footprintBody({...f,x:0,y:0});
+      const targets=editor.project.board.footprints.filter(other=>other.id!==d.id&&other.side===f.side&&!hidden.has(other.id)).map(other=>footprintBody(other));
+      const result=alignmentEnabled&&!e.altKey?alignDrag(desired,local,targets,Math.min(1,6/vp.k),PCB_SNAP):{position:{x:sg(desired.x),y:sg(desired.y)},guides:[]};
+      setAlignmentGuides(result.guides);
+      editor.dispatch(pcb.moveFootprint(d.id,result.position));
+    }
     else if (d.kind === 'via') editor.dispatch(pcb.setViaProps(d.id, { x: sg(raw.x - d.dx), y: sg(raw.y - d.dy) }));
     else if (d.kind === 'text') editor.dispatch(pcb.setTextProps(d.id, { x: sg(raw.x - d.dx), y: sg(raw.y - d.dy) }));
     else if (d.kind === 'tracePt') { const t = editor.project.board.traces.find((x) => x.id === d.id); if (t) { const pts = [...t.points]; pts[d.index] = p; editor.dispatch(pcb.setTracePoints(d.id, pts)); } }
@@ -234,6 +254,7 @@ export function PcbCanvas() {
   };
 
   const onUp = (e: RPE<SVGSVGElement>) => {
+    setAlignmentGuides([]);
     if (view.panEnd(e)) return;
     const d = drag.current;
     drag.current = null;
@@ -334,10 +355,13 @@ export function PcbCanvas() {
     useApp.getState().patch({ autoroute: { status: 'idle', result: null } });
   };
   // ---- 布局优化（Worker）----
+  const placementT = useT();
+  const [placementChooser, setPlacementChooser] = useState(false);
   const placementWorker = useRef<Worker | null>(null);
   const placementBoardRef = useRef<typeof board | null>(null);
   const cancelPlacement = () => { placementWorker.current?.terminate(); placementWorker.current = null; placementBoardRef.current = null; useApp.getState().patch({ placement: { status: 'idle', result: null } }); };
-  const runPlacement = () => {
+  const runPlacement = (mode: 'initial' | 'incremental', estimateOutline = false) => {
+    setPlacementChooser(false);
     cancelPlacement();
     const snapshot = editor.project; placementBoardRef.current = snapshot.board;
     app.patch({ placement: { status: 'running', result: null, stage: '整理布局中…' } });
@@ -352,18 +376,23 @@ export function PcbCanvas() {
         else if (m.type === 'error') { app.toast(`布局优化失败：${m.message}`, 'error'); cancelPlacement(); }
       };
       w.onerror = () => { app.toast('布局优化失败（Worker）', 'error'); cancelPlacement(); };
-      w.postMessage({ kind: 'placement', board: snapshot.board, rules: analysis.rules, library: snapshot.library, placementOpts: { timeBudgetMs: 3000, routeBudgetMs: 20000 } });
+      w.postMessage({ kind: 'placement', board: snapshot.board, rules: analysis.rules, library: snapshot.library, placementOpts: { mode, estimateOutline, ...(mode === 'initial' ? { iterations: 10000, seed: 1 } : {}), timeBudgetMs: 3000, routeBudgetMs: 20000 } });
     } catch { app.toast('浏览器不支持 Worker，无法运行布局优化', 'error'); cancelPlacement(); }
   };
   const acceptPlacement = () => {
-    const r = app.placement.result; if (!r || !r.moves.length) return;
+    const r = app.placement.result; if (!r || r.rejected || (!r.moves.length && !r.outline)) return;
     if (placementBoardRef.current !== editor.project.board) { cancelPlacement(); app.toast('板子已修改，请重新优化布局'); return; }
-    editor.dispatch(pcb.applyPlacementMoves(r.moves));
+    editor.dispatch(pcb.applyPlacementMoves(r.moves, r.outline));
     app.patch({ placement: { status: 'idle', result: null } });
     app.toast(`已应用布局优化：移动 ${r.moves.length} 个器件（可 Undo）· 接下来可以自动布线`, 'success');
   };
-  useEffect(() => { if (app.placementSeq > 0) runPlacement(); return () => { placementWorker.current?.terminate(); }; // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (app.placementSeq > 0) {
+    // Consume the one-shot request, including requests made before this canvas mounts.
+    useApp.getState().set('placementSeq', 0);
+    cancelPlacement(); setPlacementChooser(true);
+  } // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app.placementSeq]);
+  useEffect(() => () => { placementWorker.current?.terminate(); }, []);
   // Board edits (including layer changes and Undo) invalidate the proposed geometry.
   useEffect(() => {
     if (sourceBoardRef.current && sourceBoardRef.current !== board) cancelAutoroute();
@@ -439,18 +468,19 @@ export function PcbCanvas() {
   const cursor = tool === 'route' || tool === 'zone' || tool === 'measure' || tool === 'via' || tool === 'edge' || tool === 'hole' ? 'crosshair' : view.panning ? 'grabbing' : view.spaceDown ? 'grab' : 'default';
   const hlItem = app.checkHighlight ? analysis.drc.items.find((i) => i.id === app.checkHighlight) : null;
   const selTrace = app.pcbSelection.length === 1 ? board.traces.find((t) => t.id === app.pcbSelection[0]) : undefined;
-  const showOutlineHandles = tool === 'edge' && !app.outlineDraft && !(board.outlineRadius && board.outlineRadius > 0);
+  const showOutlineHandles = tool === 'edge' && !notchOpen && !app.outlineDraft && !(board.outlineRadius && board.outlineRadius > 0);
   const hs = 6 / vp.k; // 手柄尺寸（屏幕 6px）
   const ar = app.autoroute;
 
   return (
     <div className="canvas-wrap pcb">
-      <svg ref={svgRef} className="stage" style={{ cursor }} onPointerDown={onBackgroundDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp} onContextMenu={onContextMenu} fontFamily="'JetBrains Mono',monospace">
+      <svg ref={svgRef} {...view.touchHandlers} className="stage" style={{ cursor }} onPointerDown={onBackgroundDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={(e) => { if (e.pointerType !== 'touch') onUp(e); }} onContextMenu={onContextMenu} fontFamily="'JetBrains Mono',monospace">
         <defs>
           <pattern id="pcb-grid" width={gs} height={gs} patternUnits="userSpaceOnUse" x={vp.x % gs} y={vp.y % gs}><circle cx={0.5} cy={0.5} r={1} fill="#2A2F38" /></pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#pcb-grid)" />
         <g transform={`translate(${vp.x} ${vp.y}) scale(${vp.k})`}>
+
           {/* 板框 */}
           <polygon points={board.outline.map((p) => `${p.x},${p.y}`).join(' ')} fill="#1F2229" stroke={visible('Edge.Cuts') ? LAYER_COLORS['Edge.Cuts'] : 'transparent'} strokeWidth={0.15} />
           {/* 铺铜：轮廓虚线 + 实际填充 */}
@@ -499,13 +529,16 @@ export function PcbCanvas() {
           })}
           {/* 过孔 */}
           {board.vias.map((v) => (
-            <g key={v.id} onPointerDown={onViaDown(v.id)} style={{ cursor: isSelectLike ? 'move' : undefined }} opacity={dimIf(v.net)}>
+            <g key={v.id} onPointerDown={onViaDown(v.id)} style={{ cursor: isSelectLike ? 'move' : undefined }} opacity={dimIf(v.net) * (viaLayers(board,v).includes(app.activeLayer as CopperLayer)?1:.25)}>
               <circle cx={v.x} cy={v.y} r={v.size / 2} fill={app.pcbSelection.includes(v.id) ? '#FFD84D' : LAYER_COLORS[app.activeLayer]} />
+              <title>{`${v.startLayer??'F.Cu'} → ${v.endLayer??'B.Cu'}${v.backdrill?' · Backdrill':''}`}</title>
+              {v.backdrill && <circle cx={v.x} cy={v.y} r={v.backdrill.diameter/2} fill="none" stroke="#F0A040" strokeWidth={0.08} strokeDasharray=".2 .15"/>}
               <circle cx={v.x} cy={v.y} r={v.drill / 2} fill="#1A1D23" />
             </g>
           ))}
           {/* 丝印文字 */}
           {board.texts.filter((t) => visible(t.layer)).map((t) => <text key={t.id} x={t.x} y={t.y} fontSize={t.size * 1.2} fill={app.pcbSelection.includes(t.id) ? '#FFD84D' : LAYER_COLORS[t.layer]} textAnchor="middle" letterSpacing={0.1} onPointerDown={onTextDown(t.id)} style={{ cursor: isSelectLike ? 'move' : undefined }}>{t.text}</text>)}
+          {alignmentGuides.map((g,i)=><line data-alignment-guide={g.axis} key={`align${i}`} x1={g.axis==='x'?g.value:g.from} y1={g.axis==='y'?g.value:g.from} x2={g.axis==='x'?g.value:g.to} y2={g.axis==='y'?g.value:g.to} stroke="#F0A040" strokeWidth={1/vp.k} strokeDasharray={`${4/vp.k} ${3/vp.k}`} pointerEvents="none"/>)}
           {/* 飞线 */}
           <g stroke="#FFFFFF" strokeOpacity={0.45} strokeWidth={0.08} strokeDasharray="0.3 0.3">
             {analysis.ratsnest.lines.map((l, i) => <line key={i} x1={l.a.x} y1={l.a.y} x2={l.b.x} y2={l.b.y} opacity={dimIf(l.net)} stroke={hl === l.net ? '#FFD84D' : undefined} />)}
@@ -513,6 +546,11 @@ export function PcbCanvas() {
           {/* 选中走线的顶点手柄 */}
           {selTrace && isSelectLike && selTrace.points.map((p, i) => <rect key={i} x={p.x - hs / 2} y={p.y - hs / 2} width={hs} height={hs} fill="#16181D" stroke="#FFD84D" strokeWidth={hs / 5} style={{ cursor: 'crosshair' }} onPointerDown={onTracePtDown(selTrace.id, i)} />)}
           {/* 板框顶点手柄（板框工具） */}
+          {tool === 'edge' && notchOpen && board.outline.map((p, i) => {
+            const q = board.outline[(i + 1) % board.outline.length];
+            return <line key={`notch-${i}`} x1={p.x} y1={p.y} x2={q.x} y2={q.y} stroke={notchEdge === i ? '#F0A040' : '#62B8DC'} strokeOpacity={0.6} strokeWidth={hs * 1.5} style={{ cursor: 'pointer' }} onPointerDown={e => { e.stopPropagation(); setNotchEdge(i); }} />;
+          })}
+          {tool === 'edge' && notchOpen && notchPreview && <polygon points={notchPreview.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#F0A040" strokeWidth={0.2} strokeDasharray="1 .5" pointerEvents="none" />}
           {showOutlineHandles && board.outline.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={hs * 0.7} fill="#16181D" stroke={LAYER_COLORS['Edge.Cuts']} strokeWidth={hs / 5} style={{ cursor: 'move' }} onPointerDown={onOutlinePtDown(i)} />)}
           {/* 走线预览 */}
           {app.routing && routePreview && (
@@ -549,6 +587,7 @@ export function PcbCanvas() {
               <g transform={`translate(${(a.x + b.x) / 2 + 0.5} ${(a.y + b.y) / 2 - 0.5})`}><rect x={0} y={-1.4} width={11} height={1.8} rx={0.2} fill="#16181D" opacity={0.9} /><text x={0.4} y={0} fontSize={1.1} fill="#FFD84D">{`${fmt(d)}mm ΔX ${fmt(Math.abs(b.x - a.x))} ΔY ${fmt(Math.abs(b.y - a.y))}`}</text></g>
             </g>); })()}
           {/* 布局优化建议 */}
+          {app.placement.status === 'done' && app.placement.result?.outline && <polygon points={app.placement.result.outline.map(p=>`${p.x},${p.y}`).join(' ')} fill="none" stroke="#F0A040" strokeWidth={0.2} strokeDasharray="1 .5" pointerEvents="none" />}
           {app.placement.status === 'done' && app.placement.result && app.placement.result.moves.map((m) => {
             const original = board.footprints.find((fp) => fp.id === m.id); if (!original) return null;
             const proposed = { ...original, x: m.x, y: m.y, rotation: m.rotation ?? original.rotation }, b = footprintBody(proposed);
@@ -593,8 +632,9 @@ export function PcbCanvas() {
         </g>
         {/* 框选矩形（屏幕坐标） */}
         {marquee && (() => { const a = view.toScreen(marquee.a), b = view.toScreen(marquee.b); const ltr = marquee.b.x >= marquee.a.x; return <rect x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)} width={Math.abs(b.x - a.x)} height={Math.abs(b.y - a.y)} fill={ltr ? 'rgba(61,139,255,.12)' : 'rgba(52,199,89,.12)'} stroke={ltr ? '#3D8BFF' : '#34C759'} strokeWidth={1} strokeDasharray={ltr ? undefined : '4 3'} pointerEvents="none" />; })()}
+        <PcbRulers vp={vp} svgRef={svgRef} cursor={app.cursorWorld}/>
       </svg>
-      <div className="float" style={{ left: 12, top: 12 }}>
+      <div className="float" style={{ left: 30, top: 32 }}>
         <span style={{ width: 8, height: 8, borderRadius: '50%', background: LAYER_COLORS[app.activeLayer] }} /><span>{app.activeLayer}</span><span className="dim">· 当前层 · 数字键 1–{cu.length} 切换</span>
       </div>
       {app.routing && (
@@ -618,6 +658,7 @@ export function PcbCanvas() {
       {tool === 'edge' && !app.routing && (
         <div className="banner" style={{ gap: 10, flexWrap: 'wrap', width: 'max-content', maxWidth: 'calc(100% - 24px)' }} onPointerDown={(e) => e.stopPropagation()}>
           <span className="dim">板框</span>
+          <button className="btn sm" onClick={() => { setNotchEdge(0); setNotchOpen(!notchOpen); app.patch({ outlineDraft: null }); }}>{placementT('outline.notch.action')}</button>
           <span className="row mono" style={{ gap: 4 }}>
             <input className="input mono" key={`w${bb.w}`} style={{ width: 64, height: 22 }} defaultValue={fmt(bb.w)} title="板宽 mm（左上角不动）" onBlur={(e) => resizeBoard(Number(e.target.value), bb.h)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />×
             <input className="input mono" key={`h${bb.h}`} style={{ width: 64, height: 22 }} defaultValue={fmt(bb.h)} title="板高 mm（左上角不动）" onBlur={(e) => resizeBoard(bb.w, Number(e.target.value))} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} /> mm
@@ -629,20 +670,37 @@ export function PcbCanvas() {
           <span className="dim">{app.outlineDraft?.length ? `新板框已 ${app.outlineDraft.length} 点 · 双击闭合 · Esc 取消` : '拖板内 = 移动 · 拖顶点 = 调整 · 点板外 = 画新板框'}</span>
         </div>
       )}
+      {tool === 'edge' && notchOpen && <OutlineNotch outline={board.outline} edge={notchEdge} setEdge={setNotchEdge} preview={setNotchPreview} close={() => setNotchOpen(false)} />}
       {hidden.size > 0 && tool !== 'edge' && app.placement.status === 'idle' && ar.status === 'idle' && (
         <div className="banner" style={{ width: 'max-content', gap: 8, top: 'auto', bottom: 52, left: 'auto', right: 12, transform: 'none' }}><span>已隐藏 {hidden.size} 个元件（{board.footprints.filter((f) => hidden.has(f.id)).slice(0, 6).map((f) => f.ref).join('、')}{hidden.size > 6 ? '…' : ''}）</span><button className="btn sm" onClick={() => app.set('hiddenFootprints', [])}>全部显示</button></div>
       )}
+      <button className="btn sm" data-no-translate title={placementT('pcb.alignSnapHint')} aria-pressed={alignmentEnabled} onClick={()=>setAlignmentEnabled(!alignmentEnabled)} style={{position:'absolute',left:30,bottom:100,zIndex:3}}>{placementT('pcb.alignSnap')}{alignmentEnabled?' ✓':''}</button>
+      {placementChooser && <div className="banner" data-no-translate style={{flexDirection:'column',whiteSpace:'normal',width:'min(500px, calc(100% - 24px))'}}>
+        <span>{placementT('placement.help')}</span>
+        <span className="dim">{placementT('placement.antennaProtection')}</span>
+        {(() => { const size=estimateBoardSize(board,analysis.rules); return <div>
+          <span>{placementT('placement.estimate')}: {size.width} × {size.height} mm</span>
+          <button className="btn sm" disabled={!size.canResize} onClick={()=>runPlacement('initial',true)}>{placementT('placement.useEstimate')}</button>
+          <div className="dim">{placementT('placement.estimateHint')}</div>
+        </div>; })()}
+        <div className="row" style={{flexWrap:'wrap',gap:8}}>
+          <button className="btn sm" onClick={() => runPlacement('initial')}>{placementT('placement.initial')}</button>
+          <button className="btn sm" onClick={() => runPlacement('incremental')}>{placementT('placement.incremental')}</button>
+          <button className="btn sm" onClick={() => setPlacementChooser(false)}>{placementT('placement.cancel')}</button>
+        </div>
+      </div>}
       {app.placement.status === 'running' && (
         <div className="banner" style={{ width: 'max-content', gap: 8 }}><span className="spinner" /><span>布局优化 · {app.placement.stage ?? '整理中…'}</span><button className="btn sm" onClick={cancelPlacement}>取消</button></div>
       )}
       {app.placement.status === 'done' && app.placement.result && (() => { const r = app.placement.result!; return (
         <div className="banner" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6, whiteSpace: 'normal', width: 'min(620px, calc(100% - 24px))', borderColor: '#F0A040' }}>
           <div className="row" style={{ gap: 10 }}>
-            <span style={{ flex: 1, minWidth: 0, lineHeight: 1.6 }}>{r.rejected ? '布局优化：新布局没有让布线变好，已放弃' : `布局优化建议：移动 ${r.moves.length} 个器件${r.legalized ? `（${r.legalized} 个从板外 / 重叠位置摆进板内）` : ''} · 飞线 ${r.before.hpwl} → ${r.after.hpwl} mm${r.before.decouplingAvg || r.after.decouplingAvg ? ` · 去耦距离 ${r.before.decouplingAvg} → ${r.after.decouplingAvg} mm` : ''}${r.routing ? ` · 试布线 ${r.routing.before.routed}/${r.routing.before.total} → ${r.routing.after.routed}/${r.routing.after.total}，过孔 ${r.routing.before.vias} → ${r.routing.after.vias}` : ''}`}</span>
-            {!r.rejected && r.moves.length > 0 && <button className="btn sm primary" style={{ flexShrink: 0 }} onClick={acceptPlacement}>接受</button>}
+            {r.outline && <span>{placementT('placement.estimate')}: {Math.round(r.outline[1].x-r.outline[0].x)} × {Math.round(r.outline[2].y-r.outline[1].y)} mm</span>}
+            <span style={{ flex: 1, minWidth: 0, lineHeight: 1.6 }}>{r.rejected ? r.rejected : `布局优化建议：移动 ${r.moves.length} 个器件${r.legalized ? `（${r.legalized} 个从板外 / 重叠位置摆进板内）` : ''} · 飞线 ${r.before.hpwl} → ${r.after.hpwl} mm${r.before.decouplingAvg || r.after.decouplingAvg ? ` · 去耦距离 ${r.before.decouplingAvg} → ${r.after.decouplingAvg} mm` : ''}${r.routing ? ` · 试布线 ${r.routing.before.routed}/${r.routing.before.total} → ${r.routing.after.routed}/${r.routing.after.total}，过孔 ${r.routing.before.vias} → ${r.routing.after.vias}` : ''}`}</span>
+            {!r.rejected && (r.moves.length > 0 || r.outline) && <button className="btn sm primary" style={{ flexShrink: 0 }} onClick={acceptPlacement}>接受</button>}
             <button className="btn sm" style={{ flexShrink: 0 }} onClick={cancelPlacement}>{r.rejected || !r.moves.length ? '关闭' : '放弃'}</button>
           </div>
-          <div className="dim">橙色虚线为建议位置；不动锁定件、连接器、安装孔和已布线的器件。接受后可 Undo。</div>
+          <div className="dim">橙色虚线为建议位置；保护锁定件、机械固定件和已布线器件；连接器按显式板边约束放置。接受后可 Undo。</div>
         </div>); })()}
       {ar.status === 'running' && (
         <div className="banner" style={{ width: 'max-content', maxWidth: 'calc(100% - 24px)', flexWrap: 'nowrap', gap: 8 }}><span className="spinner" /><span>自动布线中 · {ar.copperCount ?? board.copperCount} 层板</span><span className="mono" style={{ flex: '0 0 auto', width: '9ch', fontVariantNumeric: 'tabular-nums' }}>{ar.progress?.done ?? 0}/{ar.progress?.total ?? analysis.ratsnest.unrouted}</span><span className="dim" title={ar.progress?.net || '准备中'} style={{ flex: '0 1 auto', width: '12ch', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ar.progress?.net || '准备中'}</span>
@@ -653,6 +711,7 @@ export function PcbCanvas() {
       {ar.status === 'done' && ar.result && (
         <div className="banner ai" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6, whiteSpace: 'normal', width: 'min(640px, calc(100% - 24px))' }}>
           <div className="row" style={{ gap: 10 }}>
+
             <span style={{ flex: 1, minWidth: 0, lineHeight: 1.6 }}>自动布线完成 · {ar.copperCount ?? board.copperCount} 层板 · <span className="mono">{ar.result.routed}/{ar.result.total}</span> 连接 · {(ar.result.ms / 1000).toFixed(1)}s{ar.result.failed.length ? <span style={{ color: 'var(--warning)' }}>，{ar.result.failed.length} 条失败</span> : ''}</span>
             <button className="btn sm ai-solid" style={{ flexShrink: 0 }} onClick={acceptAutoroute} disabled={!ar.result.traces.length && !ar.result.moves?.length}>接受</button>
             <button className="btn sm" style={{ flexShrink: 0 }} onClick={cancelAutoroute}>放弃</button>
@@ -673,7 +732,7 @@ export function PcbCanvas() {
         </div>
       )}
       <Hint space="pcb" />
-      <div className="float" style={{ right: 12, top: 12, cursor: 'pointer' }} title="点击编辑板框尺寸 / 位置" onClick={() => app.setPcbTool('edge')}><span className="dim">板</span><span>{fmt(bb.w)}×{fmt(bb.h)} mm</span><span className="dim">✎</span></div>
+      <div className="float" style={{ right: 12, top: 32, cursor: 'pointer' }} title="点击编辑板框尺寸 / 位置" onClick={() => app.setPcbTool('edge')}><span className="dim">板</span><span>{fmt(bb.w)}×{fmt(bb.h)} mm</span><span className="dim">✎</span></div>
     </div>
   );
 }

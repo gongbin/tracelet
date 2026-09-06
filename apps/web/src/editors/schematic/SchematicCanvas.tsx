@@ -87,7 +87,7 @@ export function SchematicCanvas() {
   const sheet = useSheet();
   const sheetIndex = project.schematic.sheets.findIndex((s) => s.id === sheet.id);
   const svgRef = useRef<SVGSVGElement>(null);
-  const view = useViewport(svgRef, { initial: { x: 40, y: 40, k: 0.1 }, minK: 0.02, maxK: 1.2 });
+  const view = useViewport(svgRef, { initial: { x: 40, y: 40, k: 0.1 }, minK: 0.02, maxK: 1.2, onTouchCancel: () => { if (drag.current) editor.rollback(); drag.current = null; setMarquee(null); } });
   const { vp } = view;
   const analysis = getAnalysis(project);
   const drag = useRef<Drag | null>(null);
@@ -423,7 +423,7 @@ export function SchematicCanvas() {
 
   return (
     <div className="canvas-wrap sch">
-      <svg ref={svgRef} className="stage" style={{ cursor }} onPointerDown={onBackgroundDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp} onContextMenu={onContextMenu} fontFamily="Inter,'Noto Sans SC',sans-serif">
+      <svg ref={svgRef} {...view.touchHandlers} className="stage" style={{ cursor }} onPointerDown={onBackgroundDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={(e) => { if (e.pointerType !== 'touch') onUp(e); }} onContextMenu={onContextMenu} fontFamily="Inter,'Noto Sans SC',sans-serif">
         <defs>
           <pattern id="sch-grid" width={gs} height={gs} patternUnits="userSpaceOnUse" x={vp.x % gs} y={vp.y % gs}>
             <circle cx={0.5} cy={0.5} r={step >= SCH_GRID * 5 ? 1.2 : 0.9} fill="#C9C6BE" />

@@ -1,3 +1,4 @@
+import { viaLayers, backdrillLayers } from './via.js';
 import pc from 'polygon-clipping';
 import type { Board, Zone, Trace } from '../model/board.js';
 import type { RuleSet } from '../model/project.js';
@@ -68,6 +69,8 @@ function fillPreparedZone(board: Board, zone: Zone, rules: RuleSet, pads: Return
     for (let i = 0; i < t.points.length - 1; i++) if (Math.hypot(t.points[i + 1].x - t.points[i].x, t.points[i + 1].y - t.points[i].y) > 1e-9) obstacles.push([closed(toPc(stadiumPoly(t.points[i], t.points[i + 1], t.width / 2 + Math.max(clearance, netClassFor(board, t.net)?.clearance ?? 0))))]);
   }
   for (const v of board.vias) {
+    if (backdrillLayers(board,v).includes(zone.layer)) { obstacles.push([closed(toPc(circlePoly(v, v.backdrill!.diameter / 2 + clearance)))]); continue; }
+    if (!viaLayers(board,v).includes(zone.layer)) continue;
     if (v.net && v.net === zone.net) continue;
     obstacles.push([closed(toPc(circlePoly(v, v.size / 2 + Math.max(clearance, netClassFor(board, v.net)?.clearance ?? 0))))]);
   }
@@ -91,7 +94,7 @@ function fillPreparedZone(board: Board, zone: Zone, rules: RuleSet, pads: Return
   // 孤岛移除：保留连接同网络焊盘、过孔或同层走线的铜块
   const anchors: Vec[] = [
     ...pads.filter((p) => !p.def.npth && p.net === zone.net && p.layers.includes(zone.layer)).map((p) => p.center),
-    ...board.vias.filter((v) => v.net === zone.net).map((v) => ({ x: v.x, y: v.y }))
+    ...board.vias.filter((v) => v.net === zone.net && viaLayers(board,v).includes(zone.layer)).map((v) => ({ x: v.x, y: v.y }))
   ];
   const traces = board.traces.filter((t) => t.net === zone.net && t.layer === zone.layer);
   return result.filter((poly) => anchors.some((a) => pointInCopper(poly, a)) || traces.some((t) => traceTouchesPolygon(t, poly)));

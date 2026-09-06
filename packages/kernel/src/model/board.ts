@@ -1,18 +1,18 @@
 import { z } from 'zod';
 import { VecSchema } from './schematic.js';
 
-export const CopperLayerSchema = z.enum(['F.Cu', 'In1.Cu', 'In2.Cu', 'B.Cu']);
+export const CopperLayerSchema = z.enum(['F.Cu', 'In1.Cu', 'In2.Cu', 'In3.Cu', 'In4.Cu', 'B.Cu']);
 export type CopperLayer = z.infer<typeof CopperLayerSchema>;
-export const LayerSchema = z.enum(['F.Cu', 'In1.Cu', 'In2.Cu', 'B.Cu', 'F.Silk', 'B.Silk', 'F.Mask', 'B.Mask', 'Edge.Cuts']);
+export const LayerSchema = z.enum(['F.Cu', 'In1.Cu', 'In2.Cu', 'In3.Cu', 'In4.Cu', 'B.Cu', 'F.Silk', 'B.Silk', 'F.Mask', 'B.Mask', 'Edge.Cuts']);
 export type Layer = z.infer<typeof LayerSchema>;
 
 export const LAYER_COLORS: Record<Layer, string> = {
-  'F.Cu': '#C83434', 'In1.Cu': '#E08A2E', 'In2.Cu': '#3FA34D', 'B.Cu': '#4D7FC4',
+  'F.Cu': '#C83434', 'In1.Cu': '#E08A2E', 'In2.Cu': '#3FA34D', 'In3.Cu': '#B36AD6', 'In4.Cu': '#35B5B0', 'B.Cu': '#4D7FC4',
   'F.Silk': '#F2F2F2', 'B.Silk': '#E8D0A9', 'F.Mask': '#B06CD9', 'B.Mask': '#4FC3D9', 'Edge.Cuts': '#D0D2D6'
 };
 
-export function copperLayers(count: 2 | 4): CopperLayer[] {
-  return count === 4 ? ['F.Cu', 'In1.Cu', 'In2.Cu', 'B.Cu'] : ['F.Cu', 'B.Cu'];
+export function copperLayers(count: 2 | 4 | 6): CopperLayer[] {
+  return count === 6 ? ['F.Cu', 'In1.Cu', 'In2.Cu', 'In3.Cu', 'In4.Cu', 'B.Cu'] : count === 4 ? ['F.Cu', 'In1.Cu', 'In2.Cu', 'B.Cu'] : ['F.Cu', 'B.Cu'];
 }
 
 /** 封装定义中的焊盘（相对封装原点，单位 mm）。 */
@@ -56,6 +56,19 @@ export const BoardFootprintSchema = z.object({
   side: z.enum(['F', 'B']).default('F'),
   /** Fixed placement imported from CAD or set by the user. */
   locked: z.boolean().optional(),
+  /** User-authored placement intent; optional for older projects. */
+  placement: z.object({
+    role: z.enum(['auto', 'ic', 'decoupling', 'passive', 'connector', 'mechanical']).optional(),
+    fixed: z.boolean().optional(),
+    group: z.string().optional(),
+    target: z.object({ footprintId: z.string(), pad: z.string(), maxDistance: z.number().positive().default(3) }).optional(),
+    edge: z.object({
+      index: z.number().int().nonnegative(),
+      /** Mating direction in footprint-local degrees, before bottom-side mirroring. */
+      direction: z.number().finite().default(0),
+      distance: z.number().nonnegative().default(2)
+    }).optional()
+  }).optional(),
   /** 焊盘号 -> 网络名 */
   padNets: z.record(z.string()).default({})
 });
@@ -71,6 +84,9 @@ export const TraceSchema = z.object({
 export type Trace = z.infer<typeof TraceSchema>;
 
 export const ViaSchema = z.object({
+  startLayer: CopperLayerSchema.optional(),
+  endLayer: CopperLayerSchema.optional(),
+  backdrill: z.object({ side: z.enum(['F', 'B']), stopLayer: CopperLayerSchema, diameter: z.number().positive().finite(), stub: z.number().nonnegative().finite() }).optional(),
   id: z.string(),
   x: z.number(),
   y: z.number(),
@@ -110,7 +126,14 @@ export const NetClassSchema = z.object({
   viaSize: z.number(),
   viaDrill: z.number(),
   clearance: z.number(),
-  nets: z.array(z.string()).default([])
+  nets: z.array(z.string()).default([]),
+  allowedLayers: z.array(CopperLayerSchema).min(1).optional(),
+  /** Total planar copper length, including branches; not propagation delay. */
+  maxLength: z.number().positive().optional(),
+  referenceLayer: CopperLayerSchema.optional(),
+  referenceNet: z.string().optional(),
+  neckdown: z.object({ allowed: z.boolean(), minWidth: z.number().positive(), maxLength: z.number().nonnegative() }).optional()
+
 });
 export type NetClass = z.infer<typeof NetClassSchema>;
 
@@ -126,6 +149,9 @@ export type Model3d = z.infer<typeof Model3dSchema>;
 /** 板叠层 / 工艺参数（用于制造说明、3D 外观与 README）。 */
 export const StackupSchema = z.object({
   material: z.string().default('FR-4'),
+  /** Confirmed copper-layer depths from top surface, mm, in copperLayers order. */
+  copperDepths: z.array(z.number().nonnegative().finite()).optional(),
+  impedanceProfiles: z.array(z.object({ kind: z.enum(['microstrip', 'stripline']), width: z.number().positive(), height: z.number().positive(), thickness: z.number().positive(), er: z.number().min(1), target: z.number().positive() })).optional(),
   /** 外层铜厚（oz） */
   copperWeight: z.number().default(1),
   /** 内层铜厚（oz），4 层时有效 */
@@ -145,7 +171,7 @@ export const BoardSchema = z.object({
   stackup: StackupSchema.optional(),
   /** Optional per-footprint-library model overrides, included in project backups. */
   models3d: z.record(Model3dSchema).optional(),
-  copperCount: z.union([z.literal(2), z.literal(4)]).default(2),
+  copperCount: z.union([z.literal(2), z.literal(4), z.literal(6)]).default(2),
   thickness: z.number().default(1.6),
   outline: z.array(VecSchema),
   /** 矩形板框的圆角半径（mm）；outline 里已经是展开后的圆角折线，此值用于改长宽时保持圆角 */
@@ -156,6 +182,10 @@ export const BoardSchema = z.object({
   zones: z.array(ZoneSchema),
   texts: z.array(BoardTextSchema),
   netClasses: z.array(NetClassSchema),
+  differentialPairs: z.array(z.object({
+    positive: z.string().min(1), negative: z.string().min(1),
+    maxSkew: z.number().nonnegative(), gap: z.number().positive(), tolerance: z.number().nonnegative()
+  })).optional(),
   hiddenLayers: z.array(LayerSchema).default(['F.Mask', 'B.Mask'])
 });
 export type Board = z.infer<typeof BoardSchema>;

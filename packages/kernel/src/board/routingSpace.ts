@@ -1,3 +1,4 @@
+import { viaLayers, backdrillLayers } from './via.js';
 import type { Board, CopperLayer } from '../model/board.js';
 import { copperLayers } from '../model/board.js';
 import type { RuleSet } from '../model/project.js';
@@ -15,13 +16,13 @@ export class RoutingSpace {
     this.margin = Math.max(1, ...board.netClasses.map(n => Math.max(n.traceWidth, n.viaSize) / 2 + n.clearance));
     for (const p of allPads(board)) this.add({ rect: p.rect, net: p.def.npth ? '' : p.net, layers: p.layers, clearance: this.gap(p.net) });
     for (const t of board.traces) for (let i = 1; i < t.points.length; i++) this.segment(t.points[i - 1], t.points[i], t.width / 2, [t.layer], t.net);
-    for (const v of board.vias) this.segment(v, v, v.size / 2, copperLayers(board.copperCount), v.net);
+    for (const v of board.vias) { this.segment(v, v, v.size / 2, viaLayers(board,v), v.net); if(v.backdrill) this.segment(v,v,v.backdrill.diameter/2,backdrillLayers(board,v),''); }
   }
-  reserveEscapes() {
+  reserveEscapes(pendingNets?: ReadonlySet<string>) {
     // Protect a short outward corridor for every fine-pitch pad before other nets surround it.
     const pads = allPads(this.board);
     for (const p of pads) {
-      if (!p.net || p.through || p.def.npth || Math.min(p.rect.w,p.rect.h) > .65) continue;
+      if ((pendingNets && !pendingNets.has(p.net)) || !p.net || p.through || p.def.npth || Math.min(p.rect.w,p.rect.h) > .65) continue;
       const fp = this.board.footprints.find(f=>f.id===p.footprintId)!;
       const horizontal = p.rect.w >= p.rect.h;
       const direction = Math.sign(horizontal ? p.center.x-fp.x : p.center.y-fp.y) || 1;

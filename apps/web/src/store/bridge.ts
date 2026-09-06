@@ -69,12 +69,20 @@ export function handle(msg: { type: string; id?: string; rev?: number; doc?: str
     const next = parseProject(msg.doc);
     fromAgent = true; rev = msg.rev ?? rev + 1;
     ed.dispatch(command('Agent 修改', () => ({ ...next, updatedAt: new Date().toISOString() })));
+    // Acknowledge this exact snapshot before an undo or a local edit can replace it.
+    pushProject(true);
     useBridge.setState({ lastAgentEditAt: Date.now(), agentEdits: useBridge.getState().agentEdits + 1 });
   } else if (msg.type === 'open' && msg.doc) {
     app.openProjectObject(parseProject(msg.doc));
     app.toast('Agent 在浏览器中打开了一个新项目', 'success');
   } else if (msg.type === 'undo') {
-    const ed = app.editor; if (ed && (!msg.id || ed.project.id === msg.id)) { const label = ed.undoLabel; if (ed.undo()) app.toast(`Agent 撤销：${label}`); }
+    const ed = app.editor;
+    if (ed && (!msg.id || ed.project.id === msg.id)) {
+      fromAgent = false;
+      const label = ed.undoLabel;
+      if (ed.undo()) app.toast(`Agent 撤销：${label}`);
+      pushProject(true);
+    }
   }
 }
 

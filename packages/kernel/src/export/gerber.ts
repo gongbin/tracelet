@@ -1,3 +1,5 @@
+import { viaLayers, viaSpan, validateVia, backdrillDepth } from '../board/via.js';
+import { estimateImpedance } from '../board/impedance.js';
 /**
  * Gerber RS-274X（含 X2 属性）与 Excellon 钻孔文件导出。
  * 坐标：mm，格式 4.6 绝对坐标；Y 轴翻转（板坐标 y 向下 → Gerber y 向上）。
@@ -82,7 +84,7 @@ function padAperture(w: GerberWriter, p: WorldPad, expand = 0): number {
   return w.rect(pw, ph);
 }
 
-function copperFunction(layer: CopperLayer, count: 2 | 4): string {
+function copperFunction(layer: CopperLayer, count: 2 | 4 | 6): string {
   const idx = copperLayers(count).indexOf(layer) + 1;
   const pos = layer === 'F.Cu' ? 'Top' : layer === 'B.Cu' ? 'Bot' : 'Inr';
   return `Copper,L${idx},${pos}`;
@@ -100,7 +102,7 @@ export function exportCopperLayer(board: Board, layer: CopperLayer, rules: RuleS
   }
   w.setPolarity('D');
   for (const t of board.traces) if (t.layer === layer) w.polyline(w.circle(t.width), t.points);
-  for (const v of board.vias) w.flash(w.circle(v.size), v);
+  for (const v of board.vias) if (viaLayers(board,v).includes(layer)) w.flash(w.circle(v.size), v);
   for (const p of allPads(board)) if (p.layers.includes(layer)) w.flash(padAperture(w, p), p.center);
   return w.toString();
 }
@@ -149,7 +151,7 @@ export function exportProfileLayer(board: Board): string {
 export function exportExcellon(board: Board, plated: boolean): string {
   const holes: { d: number; p: Vec }[] = [];
   for (const p of allPads(board)) if (p.def.drill > 0 && !!p.def.npth === !plated) holes.push({ d: p.def.drill, p: p.center });
-  if (plated) for (const v of board.vias) holes.push({ d: v.drill, p: v });
+  if (plated) for (const v of board.vias.filter(v=>viaSpan(board,v).length===board.copperCount)) holes.push({ d: v.drill, p: v });
   const tools = [...new Set(holes.map((h) => h.d))].sort((a, b) => a - b);
   const L: string[] = ['M48', `; DRILL file {Tracelet ${VERSION}} date ${new Date().toISOString()}`, '; FORMAT={-:-/ absolute / metric / decimal}', `;TYPE=${plated ? 'PLATED' : 'NON_PLATED'}`, 'FMAT,2', 'METRIC'];
   tools.forEach((d, i) => L.push(`T${i + 1}C${d.toFixed(3)}`));
@@ -170,8 +172,22 @@ const slugOf = (name: string) => name.replace(/[^\w一-龥-]+/g, '-').replace(/^
 export function exportFabFiles(project: Project, opts: { bom?: boolean; pnp?: boolean; netlist?: boolean; project?: boolean; assemblyPdf?: boolean; schematicPdf?: boolean } = {}): FabFile[] {
   const board = project.board, rules = ruleSetOf(project), s = slugOf(project.name);
   const files: FabFile[] = [];
+  for(const v of board.vias) { const errors=validateVia(board,v); if(errors.length)throw new Error(`${v.id}: ${errors.join('; ')}`); }
+  const drillGroups=new Map<string, Board['vias']>();
+  for(const v of board.vias) if(viaSpan(board,v).length!==board.copperCount) {
+    const span=viaSpan(board,v), key=`L${copperLayers(board.copperCount).indexOf(span[0])+1}-L${copperLayers(board.copperCount).indexOf(span[span.length-1])+1}`;
+    drillGroups.set(key,[...(drillGroups.get(key)??[]),v]);
+  }
+  for(const [pair,vias] of drillGroups)files.push({name:`${s}-PTH-${pair}.drl`,kind:'drill',content:`; LAYER_PAIR=${pair} BLIND_OR_BURIED\n`+exportExcellon({...board,footprints:[],vias:vias.map(v=>({...v,startLayer:undefined,endLayer:undefined,backdrill:undefined}))},true)});
+  const backdrills=board.vias.filter(v=>v.backdrill);
+  for(const v of backdrills){
+    const bd=v.backdrill!, depth=backdrillDepth(board,v)!;
+    files.push({name:`${s}-BACKDRILL-${bd.side}-${backdrills.indexOf(v)+1}.drl`,kind:'drill',content:`; BACKDRILL FROM=${bd.side} STOP=${bd.stopLayer} DEPTH_MM=${depth.toFixed(4)} STUB_MM=${bd.stub}\n; XY viewed from top, not mirrored. Use accompanying fabrication instructions.\n`+exportExcellon({...board,footprints:[],vias:[{...v,drill:bd.diameter,startLayer:undefined,endLayer:undefined,backdrill:undefined}]},true).replace(';TYPE=PLATED',';TYPE=BACKDRILL_NON_PLATED')});
+  }
+  if(drillGroups.size||backdrills.length)files.push({name:`${s}-advanced-drilling.json`,kind:'readme',content:JSON.stringify({units:'mm',coordinates:'Top view; Y negated in Excellon',copperDepths:board.stackup?.copperDepths,notes:'Separate lamination/drill operations. Backdrill depth is measured from the entry surface to the nominal drill endpoint; confirm tip geometry and tolerance with fabricator. Do not merge with through-drill files.',vias:board.vias.map(v=>({...v,depth:backdrillDepth(board,v)}))},null,2)});
+  if(board.stackup?.impedanceProfiles?.length)files.push({name:`${s}-impedance.json`,kind:'readme',content:JSON.stringify({method:'TI closed-form single-ended microstrip / centered stripline estimate',heightDefinition:'microstrip: dielectric to reference plane; stripline: total plane separation',limitations:'No soldermask, copper roughness, frequency dependence, differential coupling or plane discontinuities. Fabricator confirmation required.',profiles:board.stackup.impedanceProfiles.map(p=>({...p,estimatedOhms:estimateImpedance(p)}))},null,2)});
   const cu = copperLayers(board.copperCount);
-  const ext: Record<CopperLayer, string> = { 'F.Cu': 'gtl', 'In1.Cu': 'g2', 'In2.Cu': 'g3', 'B.Cu': 'gbl' };
+  const ext: Record<CopperLayer, string> = { 'F.Cu': 'gtl', 'In1.Cu': 'g2', 'In2.Cu': 'g3', 'In3.Cu': 'g4', 'In4.Cu': 'g5', 'B.Cu': 'gbl' };
   for (const l of cu) files.push({ name: `${s}-${l.replace('.', '_')}.${ext[l]}`, content: exportCopperLayer(board, l, rules), kind: 'gerber' });
   files.push({ name: `${s}-F_Mask.gts`, content: exportMaskLayer(board, 'F'), kind: 'gerber' });
   files.push({ name: `${s}-B_Mask.gbs`, content: exportMaskLayer(board, 'B'), kind: 'gerber' });
@@ -188,7 +204,7 @@ export function exportFabFiles(project: Project, opts: { bom?: boolean; pnp?: bo
   if (opts.project) files.push({ name: `${s}.eda.json`, content: serializeProject(project), kind: 'project' });
   if (opts.assemblyPdf) files.push({ name: `${s}-Assembly.pdf`, content: exportAssemblyPdf(project), kind: 'pdf' });
   if (opts.schematicPdf) files.push({ name: `${s}-Schematic.pdf`, content: exportSchematicPdf(project), kind: 'pdf' });
-  files.push({ name: 'README.txt', kind: 'readme', content: [`${project.name}`, `Generated by Tracelet ${VERSION} · ${new Date().toISOString()}`, `Layers: ${board.copperCount} · Thickness: ${board.thickness}mm · Rules: ${rules.name}`, '', 'Gerber RS-274X (4.6 mm), Excellon metric decimal.', 'Solder mask files are negative (openings). Vias are tented.', ...(board.stackup ? [`Material: ${board.stackup.material} · Copper: ${board.stackup.copperWeight}oz${board.copperCount === 4 ? ` (inner ${board.stackup.innerCopperWeight}oz)` : ''} · Finish: ${board.stackup.finish} · Mask: ${board.stackup.maskColor} · Silk: ${board.stackup.silkColor}${board.stackup.impedance ? ' · Impedance control required' : ''}`] : []), ''].join('\n') });
+  files.push({ name: 'README.txt', kind: 'readme', content: [`${project.name}`, `Generated by Tracelet ${VERSION} · ${new Date().toISOString()}`, `Layers: ${board.copperCount} · Thickness: ${board.thickness}mm · Rules: ${rules.name}`, '', 'Gerber RS-274X (4.6 mm), Excellon metric decimal.', 'Solder mask files are negative (openings). Vias are tented.', ...(board.stackup ? [`Material: ${board.stackup.material} · Copper: ${board.stackup.copperWeight}oz${board.copperCount > 2 ? ` (inner ${board.stackup.innerCopperWeight}oz)` : ''} · Finish: ${board.stackup.finish} · Mask: ${board.stackup.maskColor} · Silk: ${board.stackup.silkColor}${board.stackup.impedance ? ' · Impedance control required' : ''}`] : []), ''].join('\n') });
   return files;
 }
 

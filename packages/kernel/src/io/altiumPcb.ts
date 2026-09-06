@@ -85,8 +85,8 @@ export function importAltiumPcb(data: Uint8Array): AltiumPcbResult {
   const usedCopper = new Set<number>();
   const layerMap = (l: number): CopperLayer | null => {
     if (l === L.TOP) return 'F.Cu'; if (l === L.BOTTOM) return 'B.Cu';
-    if (l >= 2 && l <= 31) return l === 2 ? 'In1.Cu' : l === 3 ? 'In2.Cu' : null;
-    if (l >= 39 && l <= 54) return l === 39 ? 'In1.Cu' : l === 40 ? 'In2.Cu' : null;
+    if (l >= 2 && l <= 31) return l === 2 ? 'In1.Cu' : l === 3 ? 'In2.Cu' : l === 4 ? 'In3.Cu' : l === 5 ? 'In4.Cu' : null;
+    if (l >= 39 && l <= 54) return l === 39 ? 'In1.Cu' : l === 40 ? 'In2.Cu' : l === 41 ? 'In3.Cu' : l === 42 ? 'In4.Cu' : null;
     return null;
   };
   const silkMap = (l: number): 'F.Silk' | 'B.Silk' | null => (l === L.TOP_OVERLAY ? 'F.Silk' : l === L.BOTTOM_OVERLAY ? 'B.Silk' : null);
@@ -229,9 +229,9 @@ export function importAltiumPcb(data: Uint8Array): AltiumPcbResult {
   const usedTop = new Set([...usedCopper]);
   // 4 层判断：出现内层 / 内电层
   const inner = [...usedTop].filter((l) => (l >= 2 && l <= 31) || (l >= 39 && l <= 54));
-  board.copperCount = inner.length ? 4 : 2;
-  const cuLayers: CopperLayer[] = board.copperCount === 4 ? ['F.Cu', 'In1.Cu', 'In2.Cu', 'B.Cu'] : ['F.Cu', 'B.Cu'];
-  if (inner.length > 2) warnings.push({ where: 'layers', message: `板子有 ${inner.length} 个内层，仅前两个内层被导入（本工程最多 4 层）` });
+  board.copperCount = inner.some(l => (l >= 4 && l <= 31) || (l >= 41 && l <= 54)) ? 6 : inner.length ? 4 : 2;
+  const cuLayers: CopperLayer[] = board.copperCount === 6 ? ['F.Cu', 'In1.Cu', 'In2.Cu', 'In3.Cu', 'In4.Cu', 'B.Cu'] : board.copperCount === 4 ? ['F.Cu', 'In1.Cu', 'In2.Cu', 'B.Cu'] : ['F.Cu', 'B.Cu'];
+  if (inner.length > 4) warnings.push({ where: 'layers', message: `板子有 ${inner.length} 个内层，仅前四个内层被导入（本工程最多 6 层）` });
 
   // ---- 元件与封装：把属于同一元件的焊盘按元件原点 / 旋转 / 面还原成封装局部坐标 ----
   const compFp = new Map<number, { fp: BoardFootprint; def: FootprintDef }>();

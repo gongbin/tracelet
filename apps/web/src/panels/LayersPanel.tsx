@@ -1,3 +1,5 @@
+import { LayerCountSelect } from '../components/LayerCountSelect.js';
+import { RoutingConstraints } from './RoutingConstraints.js';
 import { useState } from 'react';
 import { StackupDialog } from '../components/StackupDialog.js';
 import { pcb, LAYER_COLORS, copperLayers, type Layer } from '@tracelet/kernel';
@@ -41,7 +43,7 @@ export function LayersPanel() {
         })}
       </div>
       <div className="row" style={{ gap: 6 }}>
-        <button className="btn grow" style={{ justifyContent: 'center' }} onClick={() => { const n = board.copperCount === 4 ? 2 : 4; if (app.activeLayer.startsWith('In')) app.set('activeLayer', 'F.Cu'); editor.dispatch(pcb.setCopperCount(n)); }}>{board.copperCount === 4 ? '− 移除内层（改为 2 层）' : '+ 添加内层 In1 / In2（改为 4 层）'}</button>
+        <LayerCountSelect />
         <button className="btn" onClick={() => setStackup(true)} title="板厚、铜厚、表面处理、阻焊 / 丝印颜色">层叠 →</button>
       </div>
       <div className="row muted" style={{ gap: 10 }}>
@@ -54,7 +56,7 @@ export function LayersPanel() {
       <div className="divider" />
       <div className="col" style={{ gap: 6 }}>
         <div className="kicker">网络类</div>
-        {board.netClasses.map((nc) => <div key={nc.name} className="row mono" style={{ justifyContent: 'space-between' }}><span>{nc.name}</span><span className="muted">{nc.traceWidth.toFixed(2)}mm · 过孔 {nc.viaSize}/{nc.viaDrill}</span></div>)}
+        <RoutingConstraints />
       </div>
       <div className="divider" />
       <div className="col" style={{ gap: 6 }}>

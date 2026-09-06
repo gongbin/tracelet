@@ -10,7 +10,7 @@ import { eq, sql } from 'drizzle-orm';
 import pg from 'pg';
 import { projects } from '@tracelet/db';
 
-export interface ProjectMeta { id: string; name: string; updatedAt: string; copperCount: 2 | 4; componentCount: number }
+export interface ProjectMeta { id: string; name: string; updatedAt: string; copperCount: 2 | 4 | 6; componentCount: number }
 export interface ProjectRepo {
   readonly kind: 'file' | 'postgres';
   list(): Promise<ProjectMeta[]>;
@@ -26,7 +26,7 @@ export interface UserInfo { id: string; name: string; email: string }
 export const SEED_USER: UserInfo = { id: '00000000-0000-4000-8000-000000000001', name: '设计者', email: 'owner@tracelet.local' };
 
 /** 服务端只关心元数据字段，其余原样透传（校验由内核 parseProject 完成）。 */
-export interface ProjectDoc { id: string; name: string; updatedAt: string; settings: unknown; board: { copperCount: 2 | 4 }; schematic: { sheets: { components: unknown[] }[] } }
+export interface ProjectDoc { id: string; name: string; updatedAt: string; settings: unknown; board: { copperCount: 2 | 4 | 6 }; schematic: { sheets: { components: unknown[] }[] } }
 export const metaOf = (p: ProjectDoc): ProjectMeta => ({ id: p.id, name: p.name, updatedAt: p.updatedAt, copperCount: p.board.copperCount, componentCount: p.schematic.sheets.reduce((n, s) => n + s.components.length, 0) });
 const safeId = (id: string) => /^[\w.-]{1,120}$/.test(id);
 

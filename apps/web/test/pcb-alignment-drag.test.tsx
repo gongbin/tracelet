@@ -1,0 +1,23 @@
+import {afterEach,expect,it} from 'vitest';
+import {render,fireEvent,cleanup} from '@testing-library/react';
+import {createProject,BoardFootprintSchema,registerFootprints} from '@tracelet/kernel';
+import {PcbCanvas} from '../src/editors/pcb/PcbCanvas';
+import {useApp} from '../src/store/app';
+registerFootprints([{id:'align:part',name:'part',body:{w:2,h:2},height:1,description:'',pads:[{number:'1',x:0,y:0,w:.5,h:.5,shape:'circle',drill:0,npth:false}]}]);
+afterEach(()=>{cleanup();useApp.getState().closeProject();});
+it.each([false,true])('drag alignment, Alt bypass=%s, guide cleanup and undo',alt=>{
+ const p=createProject({name:'align'});p.board.footprints=[10,20].map((x,i)=>BoardFootprintSchema.parse({id:`f${i}`,ref:`R${i+1}`,footprintId:'align:part',x,y:x}));
+ useApp.getState().openProjectObject(p);useApp.getState().go('pcb');useApp.getState().setPcbTool('select');
+ const {container}=render(<PcbCanvas/>),svg=container.querySelector('svg.stage')!;
+ const transform=svg.querySelector('g[transform]')!.getAttribute('transform')!;
+ const [tx,ty,k]=transform.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+ const part=[...svg.querySelectorAll('text')].find(t=>t.textContent==='R1')!.closest('g')!;
+ const pointer=(target:Element,type:string,x:number,y:number)=>{const ev=new MouseEvent(type,{bubbles:true,clientX:x*k+tx,clientY:y*k+ty,altKey:alt});Object.defineProperties(ev,{pointerId:{value:1},pointerType:{value:'mouse'}});fireEvent(target,ev);};
+ pointer(part,'pointerdown',10,10);pointer(svg,'pointermove',19.7,10);
+ const ed=useApp.getState().editor!;
+ expect(ed.project.board.footprints[0].x).toBe(alt?19.75:20);
+ expect(container.querySelectorAll('[data-alignment-guide]').length>0).toBe(!alt);
+ pointer(svg,'pointerup',19.7,10);
+ expect(container.querySelectorAll('[data-alignment-guide]')).toHaveLength(0);
+ ed.undo();expect(ed.project.board.footprints[0].x).toBe(10);
+});

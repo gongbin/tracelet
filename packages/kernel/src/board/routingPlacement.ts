@@ -1,3 +1,4 @@
+import { antennaGeometry } from './antennaPlacement.js';
 import type { Board, BoardFootprint } from '../model/board.js';
 import type { RuleSet } from '../model/project.js';
 import { footprintBody, footprintPads, allPads, netClassFor } from './geometry.js';
@@ -8,7 +9,7 @@ export interface RoutingMove { id: string; x: number; y: number; ref: string; fr
 export function suggestRoutingMoves(board: Board, rules: RuleSet, nets: string[]): RoutingMove[] {
   const wanted = new Set(nets), moves: RoutingMove[] = [];
   let current = board;
-  const candidates = board.footprints.filter(fp => !fp.locked && !/^(J|P|H|MH)\d/i.test(fp.ref) && Object.values(fp.padNets).some(n => wanted.has(n))).sort((a,b)=>Object.values(b.padNets).filter(n=>wanted.has(n)).length-Object.values(a.padNets).filter(n=>wanted.has(n)).length);
+  const candidates = board.footprints.filter(fp => !antennaGeometry(fp,board) && !fp.locked && !fp.placement?.fixed && !fp.placement?.edge && !fp.placement?.target && !['mechanical','connector'].includes(fp.placement?.role ?? '') && !/^(J|P|H|MH)\d/i.test(fp.ref) && Object.values(fp.padNets).some(n => wanted.has(n))).sort((a,b)=>Object.values(b.padNets).filter(n=>wanted.has(n)).length-Object.values(a.padNets).filter(n=>wanted.has(n)).length);
   for (const original of candidates) {
     if (moves.length >= 6) break;
     const own = footprintPads(original, current);

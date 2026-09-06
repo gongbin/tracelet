@@ -1,3 +1,4 @@
+import { viaLayers } from './via.js';
 import type { Board, CopperLayer } from '../model/board.js';
 import { UnionFind, dist, rectRectDist, segRectDist, segSegDist, pointSegDist, type Vec } from '../geometry.js';
 import { allPads, type WorldPad } from './geometry.js';
@@ -39,7 +40,7 @@ export function computeRatsnest(board: Board, rules: RuleSet = RULE_SETS[0], fil
     for (let i = 1; i < t.points.length; i++) {
       const a = t.points[i - 1], b = t.points[i];
       pads.forEach((p, pi) => { if (sameNet(p.net, t.net) && p.layers.includes(t.layer) && segRectDist(a, b, p.rect) <= t.width / 2 + tol) uf.union(node, padId(p, pi)); });
-      board.vias.forEach((v, vi) => { if (sameNet(v.net, t.net) && pointSegDist(v, a, b) <= (t.width + v.size) / 2 + tol) uf.union(node, viaNode(vi)); });
+      board.vias.forEach((v, vi) => { if (viaLayers(board,v).includes(t.layer) && sameNet(v.net, t.net) && pointSegDist(v, a, b) <= (t.width + v.size) / 2 + tol) uf.union(node, viaNode(vi)); });
     }
     for (let tj = 0; tj < ti; tj++) {
       const other = board.traces[tj], target = traceNode(tj, 0);
@@ -52,8 +53,8 @@ export function computeRatsnest(board: Board, rules: RuleSet = RULE_SETS[0], fil
     }
   });
   board.vias.forEach((v, vi) => {
-    pads.forEach((p, pi) => { if (sameNet(v.net, p.net) && segRectDist(v, v, p.rect) <= v.size / 2 + tol) uf.union(viaNode(vi), padId(p, pi)); });
-    for (let j = 0; j < vi; j++) if (sameNet(v.net, board.vias[j].net) && dist(v, board.vias[j]) <= (v.size + board.vias[j].size) / 2 + tol) uf.union(viaNode(vi), viaNode(j));
+    pads.forEach((p, pi) => { if (p.layers.some(l=>viaLayers(board,v).includes(l)) && sameNet(v.net, p.net) && segRectDist(v, v, p.rect) <= v.size / 2 + tol) uf.union(viaNode(vi), padId(p, pi)); });
+    for (let j = 0; j < vi; j++) if (viaLayers(board,v).some(l=>viaLayers(board,board.vias[j]).includes(l)) && sameNet(v.net, board.vias[j].net) && dist(v, board.vias[j]) <= (v.size + board.vias[j].size) / 2 + tol) uf.union(viaNode(vi), viaNode(j));
   });
   // 铺铜：落在实铜内的同网络焊盘/过孔互相连通
   (fills ?? zoneFills(board, rules)).forEach((fill, zi) => {
@@ -63,7 +64,7 @@ export function computeRatsnest(board: Board, rules: RuleSet = RULE_SETS[0], fil
       const island = { zone: fill.zone, polygons: [poly] };
       const node = `zone:${zi}:${pi}`;
       pads.forEach((p, i) => { if (!p.def.npth && p.net === fill.zone.net && p.layers.includes(fill.zone.layer) && pointInFill(island, p.center)) uf.union(node, padId(p, i)); });
-      board.vias.forEach((v, vi) => { if (v.net === fill.zone.net && pointInFill(island, v)) uf.union(node, viaNode(vi)); });
+      board.vias.forEach((v, vi) => { if (viaLayers(board,v).includes(fill.zone.layer) && v.net === fill.zone.net && pointInFill(island, v)) uf.union(node, viaNode(vi)); });
       board.traces.forEach((t, ti) => { if (t.net === fill.zone.net && t.layer === fill.zone.layer && traceTouchesPolygon(t, poly)) uf.union(node, traceNode(ti, 0)); });
     });
   });
@@ -95,6 +96,6 @@ export function computeRatsnest(board: Board, rules: RuleSet = RULE_SETS[0], fil
     c.pads.push(p.center); c.anchors.push({ point: p.center, layers: p.layers });
   });
   board.traces.forEach((t, i) => { const c = components.get(uf.find(traceNode(i, 0))); if (c) for (const point of t.points) c.anchors.push({ point, layers: [t.layer] }); });
-  board.vias.forEach((v, i) => { const c = components.get(uf.find(viaNode(i))); if (c) c.anchors.push({ point: v, layers: copperLayers(board.copperCount) }); });
+  board.vias.forEach((v, i) => { const c = components.get(uf.find(viaNode(i))); if (c) c.anchors.push({ point: v, layers: viaLayers(board,v) }); });
   return { lines, total, unrouted: lines.length, components: [...components.values()] };
 }

@@ -17,7 +17,7 @@ export function OrderTipsDialog({ close, onDownload }: { close: () => void; onDo
   const b = project.board, st = { ...DEFAULT_STACKUP, ...(b.stackup ?? {}) }, bb = boardBounds(b);
   const params: [string, string][] = [
     ['板子尺寸', `${bb.w.toFixed(1)} × ${bb.h.toFixed(1)} mm`], ['层数', `${b.copperCount} 层`], ['板厚', `${b.thickness} mm`], ['板材', st.material],
-    ['铜厚', `外层 ${st.copperWeight} oz${b.copperCount === 4 ? ` · 内层 ${st.innerCopperWeight} oz` : ''}`], ['表面处理', { HASL: '有铅喷锡', LeadFreeHASL: '无铅喷锡', ENIG: '沉金', OSP: 'OSP' }[st.finish]], ['阻焊 / 丝印', `${st.maskColor} / ${st.silkColor}`],
+    ['铜厚', `外层 ${st.copperWeight} oz${b.copperCount > 2 ? ` · 内层 ${st.innerCopperWeight} oz` : ''}`], ['表面处理', { HASL: '有铅喷锡', LeadFreeHASL: '无铅喷锡', ENIG: '沉金', OSP: 'OSP' }[st.finish]], ['阻焊 / 丝印', `${st.maskColor} / ${st.silkColor}`],
     ['过孔', st.viaTenting ? '盖油' : '开窗'], ['阻抗控制', st.impedance ? '需要（见 README）' : '不需要'], ['最小线宽 / 间距', `按规则集「${project.settings.fab}」`]
   ];
   return (

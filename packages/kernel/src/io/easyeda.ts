@@ -212,7 +212,7 @@ export function importEasyEdaSchematic(doc: EdaDoc, opts: { sheetName?: string }
 function b0(children: string[]): string | undefined { for (const c of children) { const a = c.split('~'); if (a[0] === 'T' && a[1] === 'P') return a[12]; } return undefined; }
 
 // ---------------- PCB ----------------
-const LAYER: Record<string, CopperLayer> = { '1': 'F.Cu', '2': 'B.Cu', '21': 'In1.Cu', '22': 'In2.Cu' };
+const LAYER: Record<string, CopperLayer> = { '1': 'F.Cu', '2': 'B.Cu', '21': 'In1.Cu', '22': 'In2.Cu', '23': 'In3.Cu', '24': 'In4.Cu' };
 function rot(p: Vec, deg: number): Vec { const r = (deg * Math.PI) / 180, c = Math.cos(r), s = Math.sin(r); return { x: p.x * c - p.y * s, y: p.x * s + p.y * c }; }
 
 interface FpBuild { def: FootprintDef; padNets: Record<string, string>; ref?: string; value?: string }
@@ -290,7 +290,7 @@ export function importEasyEdaPcb(doc: EdaDoc): PcbImportResult {
       }
     } catch (e) { warnings.push({ where: k, message: (e as Error).message }); }
   }
-  board.copperCount = inner ? 4 : 2;
+  board.copperCount = [...board.traces, ...board.zones].some(t => t.layer === 'In3.Cu' || t.layer === 'In4.Cu') ? 6 : inner ? 4 : 2;
   board.outline = _kicadInternal.chainOutline(edge);
   if (board.outline.length < 3) {
     const pts: Vec[] = [...board.footprints.map((f) => ({ x: f.x, y: f.y })), ...board.traces.flatMap((t) => t.points)];

@@ -74,7 +74,7 @@ export interface AppState {
   traceWidthOverride: number | null;
   viaOverride: { size: number; drill: number } | null;
   favorites: string[];
-  autoroute: { status: 'idle' | 'running' | 'done'; result: AutorouteResult | null; copperCount?: 2 | 4; progress?: { done: number; total: number; net: string } };
+  autoroute: { status: 'idle' | 'running' | 'done'; result: AutorouteResult | null; copperCount?: 2 | 4 | 6; progress?: { done: number; total: number; net: string } };
   /** 布局优化建议（预览 / 接受） */
   placement: { status: 'idle' | 'running' | 'done'; result: PlacementResult | null; stage?: string };
   /** 请求运行布局优化（递增触发） */

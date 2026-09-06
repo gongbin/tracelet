@@ -1,0 +1,20 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { createDemoProject } from '@tracelet/kernel';
+import { OutlineNotch } from '../src/panels/OutlineNotch';
+import { useApp } from '../src/store/app';
+import { usePrefs } from '../src/i18n';
+afterEach(() => { cleanup(); useApp.getState().closeProject(); });
+it('previews without editing, disables invalid cuts and applies one undoable outline edit', () => {
+  usePrefs.getState().setLocale('en'); useApp.getState().openProjectObject(createDemoProject());
+  const ed = useApp.getState().editor!, original = ed.project.board.outline;
+  const preview = vi.fn(), close = vi.fn();
+  render(<OutlineNotch outline={original} edge={0} setEdge={vi.fn()} preview={preview} close={close} />);
+  expect(ed.project.board.outline).toEqual(original);
+  fireEvent.change(screen.getByLabelText('Depth'), {target:{value:'10000'}});
+  expect((screen.getByText('Apply notch') as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText('Depth'), {target:{value:'3'}});
+  fireEvent.click(screen.getByText('Apply notch'));
+  expect(ed.project.board.outline).toHaveLength(original.length + 4);
+  expect(close).toHaveBeenCalled(); ed.undo(); expect(ed.project.board.outline).toEqual(original);
+});

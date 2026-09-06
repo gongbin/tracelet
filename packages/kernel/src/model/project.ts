@@ -75,7 +75,7 @@ export const ProjectSchema = z.object({
 export type Project = z.infer<typeof ProjectSchema>;
 export type ProjectSettings = z.infer<typeof ProjectSettingsSchema>;
 
-export function createProject(opts: { name: string; copperCount?: 2 | 4; unit?: 'mm' | 'mil'; ruleSetId?: string; fab?: string }): Project {
+export function createProject(opts: { name: string; copperCount?: 2 | 4 | 6; unit?: 'mm' | 'mil'; ruleSetId?: string; fab?: string }): Project {
   const now = new Date().toISOString();
   const board = emptyBoard();
   board.copperCount = opts.copperCount ?? 2;

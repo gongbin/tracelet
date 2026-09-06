@@ -1,3 +1,5 @@
+import { viaSpan, viaLayers, copperDepths, backdrillDepth } from '@tracelet/kernel';
+import { copperLayers, type CopperLayer } from '@tracelet/kernel';
 import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import * as THREE from 'three';
@@ -45,16 +47,21 @@ function buildScene(project: Project, s: View3dState, selection: string[], model
   const shape = new THREE.Shape(board.outline.map((p) => new THREE.Vector2(X(p.x), Y(p.y))));
   const pads = board.footprints.flatMap((f) => footprintPads(f, board));
   for (const p of pads) if (p.def.drill > 0) { const hole = new THREE.Path(); hole.absarc(X(p.center.x), Y(p.center.y), p.def.drill / 2, 0, Math.PI * 2, true); shape.holes.push(hole); }
-  for (const v of board.vias) { const hole = new THREE.Path(); hole.absarc(X(v.x), Y(v.y), v.drill / 2, 0, Math.PI * 2, true); shape.holes.push(hole); }
-  const boardGeo = new THREE.ExtrudeGeometry(shape, { depth: T, bevelEnabled: false });
+  const depthList=copperDepths(board)??copperLayers(board.copperCount).map((_,i)=>T*i/(board.copperCount-1));
+  const viaBounds=(v:Board['vias'][number])=>{ const span=viaSpan(board,v), cu=copperLayers(board.copperCount); return [depthList[cu.indexOf(span[0])]??0,depthList[cu.indexOf(span[span.length-1])]??T]; };
+  const drills=board.vias.flatMap(v=>{const [a,b]=viaBounds(v), d=backdrillDepth(board,v);return [{v,a,b,r:v.drill/2},...(v.backdrill&&d!==null?[{v,a:v.backdrill.side==='F'?0:T-d,b:v.backdrill.side==='F'?d:T,r:v.backdrill.diameter/2}]:[])];});
+  const cuts=[...new Set([0,T,...drills.flatMap(d=>[d.a,d.b])])].sort((a,b)=>a-b);
   const boardMat = new THREE.MeshStandardMaterial({ color: s.mask ? maskHex : 0xb8862b, roughness: 0.6, metalness: 0.1 });
-  const boardMesh = new THREE.Mesh(boardGeo, boardMat); g.add(boardMesh);
-  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(boardGeo, 30), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 })); g.add(edges);
+  for(let i=1;i<cuts.length;i++){
+    const a=cuts[i-1],b=cuts[i],mid=(a+b)/2,sh=shape.clone();
+    for(const v of board.vias){const r=Math.max(0,...drills.filter(d=>d.v.id===v.id&&d.a<mid&&d.b>mid).map(d=>d.r));if(!r)continue;const hole=new THREE.Path();hole.absarc(X(v.x),Y(v.y),r,0,Math.PI*2,true);sh.holes.push(hole);}
+    const geo=new THREE.ExtrudeGeometry(sh,{depth:b-a,bevelEnabled:false});const mesh=new THREE.Mesh(geo,boardMat);mesh.position.z=T-b;g.add(mesh);
+  }
 
   // 铺铜与走线（阻焊下为深色铜，铜层透视时露出）
   const a = getAnalysis(project);
   const cuMat = new THREE.MeshStandardMaterial({ color: s.copper || !s.mask ? copperColor : 0x1a5a30, roughness: 0.5, metalness: s.copper ? 0.8 : 0.2 });
-  const zAt = (layer: string) => (layer === 'F.Cu' ? T + 0.02 : layer === 'B.Cu' ? -0.02 : T / 2);
+  const zAt = (layer: string) => (layer === 'F.Cu' ? T + 0.02 : layer === 'B.Cu' ? -0.02 : T * (1 - copperLayers(board.copperCount).indexOf(layer as CopperLayer) / (board.copperCount - 1)));
   if (s.copper || !s.mask) for (const f of a.zones) {
     for (const poly of f.polygons) {
       const sh = new THREE.Shape(poly[0].map((p) => new THREE.Vector2(X(p.x), Y(p.y))));
@@ -80,7 +87,11 @@ function buildScene(project: Project, s: View3dState, selection: string[], model
       const m = new THREE.Mesh(geo, padMat); m.position.set(X(p.center.x), Y(p.center.y), z); g.add(m);
     }
   }
-  for (const v of board.vias) { const m = new THREE.Mesh(new THREE.CylinderGeometry(v.size / 2, v.size / 2, T + 0.06, 20).rotateX(Math.PI / 2), padMat); m.position.set(X(v.x), Y(v.y), T / 2); g.add(m); }
+  for(const v of board.vias){
+    let [a,b]=viaBounds(v);const d=backdrillDepth(board,v);if(v.backdrill&&d!==null){if(v.backdrill.side==='F')a=d;else b=T-d;}
+    const ring=new THREE.Shape();ring.absarc(0,0,v.size/2,0,Math.PI*2,false);const hole=new THREE.Path();hole.absarc(0,0,v.drill/2,0,Math.PI*2,true);ring.holes.push(hole);
+    const mesh=new THREE.Mesh(new THREE.ExtrudeGeometry(ring,{depth:Math.max(.001,b-a),bevelEnabled:false}),padMat);mesh.position.set(X(v.x),Y(v.y),T-b);g.add(mesh);
+  }
 
   // Library models are placed at the footprint origin; fallback boxes stay explicitly marked.
   if (s.components) for (const f of board.footprints) {

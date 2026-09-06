@@ -35,7 +35,8 @@ export function CommandPalette() {
         { id: 'redo', label: `重做${ed.redoLabel ? ' · ' + ed.redoLabel : ''}`, hint: '⇧⌘Z', kind: 'cmd', run: () => { close(); ed.redo(); } },
         { id: 'check', label: '运行检查（ERC / DRC）', kind: 'cmd', run: () => { close(); app.set('rightTab', 'check'); const a = getAnalysis(ed.project); app.toast(`ERC ${a.erc.errors} 错误 ${a.erc.warnings} 警告 · DRC ${a.drc.errors} 错误 ${a.drc.warnings} 警告`); } },
         { id: 'focus', label: app.focusMode ? '退出焦点模式' : '焦点模式（隐藏面板）', hint: 'Tab', kind: 'cmd', run: () => { close(); app.set('focusMode', !app.focusMode); } },
-        { id: 'layers-4', label: ed.project.board.copperCount === 4 ? '改为 2 层板' : '改为 4 层板', kind: 'cmd', run: () => { close(); ed.dispatch(pcb.setCopperCount(ed.project.board.copperCount === 4 ? 2 : 4)); } },
+        { id: 'layers-4', label: ed.project.board.copperCount === 4 ? '改为 2 层板' : '改为 4 层板', kind: 'cmd', run: () => { close(); try { ed.dispatch(pcb.setCopperCount(ed.project.board.copperCount === 4 ? 2 : 4)); } catch { useApp.getState().toast('请先移除内层走线和铺铜'); } } },
+        { id: 'layers-6', label: '6 layers', kind: 'cmd', run: () => { close(); ed.dispatch(pcb.setCopperCount(6)); } },
         { id: 'ai', label: '打开 AI 助手', kind: 'cmd', run: () => { close(); app.set('rightTab', 'ai'); } },
         { id: 'home', label: '关闭项目，返回首页', kind: 'cmd', run: () => { close(); app.closeProject(); } }
       );

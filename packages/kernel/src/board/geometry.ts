@@ -27,8 +27,12 @@ function padWorld(fp: BoardFootprint, pad: PadDef): { center: Vec; rect: Rect } 
   if (fp.side === 'B') local = { x: -local.x, y: local.y };
   const r = rotate(local, fp.rotation);
   const center = { x: fp.x + r.x, y: fp.y + r.y };
-  const swap = Math.abs(((fp.rotation % 180) + 180) % 180 - 90) < 1e-6;
-  const w = swap ? pad.h : pad.w, h = swap ? pad.w : pad.h;
+  const angle = fp.rotation * Math.PI / 180;
+  const cs = Math.abs(Math.cos(angle)), sn = Math.abs(Math.sin(angle));
+  // Conservative bounds for rotated copper; circular pads are rotation invariant.
+  const round = pad.shape === 'circle' && pad.w === pad.h;
+  const w = round ? pad.w : pad.w * cs + pad.h * sn;
+  const h = round ? pad.h : pad.w * sn + pad.h * cs;
   return { center, rect: { x: center.x - w / 2, y: center.y - h / 2, w, h } };
 }
 

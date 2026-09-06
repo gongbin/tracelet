@@ -2,6 +2,8 @@
 
 English · [简体中文](./README.zh-CN.md)
 
+**Live demo:** [tracelet.org](https://tracelet.org/)
+
 A TypeScript headless kernel + web editor + CLI + MCP server, with an optional self-hosted remote storage server. Schematic → PCB → 3D → fab files, all in the browser; your data stays local by default.
 
 ## Parts library: built-in + community updates + mine

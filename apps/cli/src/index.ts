@@ -31,11 +31,12 @@ function reportText(rep: CheckReport, title: string): string {
   return lines.join('\n');
 }
 
-program.command('new <file>').description('创建新项目文件').option('-n, --name <name>', '项目名').option('-l, --layers <n>', '铜层数 2|4', '2').option('-t, --template <id>', `模板 ${PROJECT_TEMPLATES.map((t) => t.id).join('|')}`, 'blank').option('--demo', '使用 ESP32 示例内容')
+program.command('new <file>').description('创建新项目文件').option('-n, --name <name>', '项目名').option('-l, --layers <n>', '铜层数 2|4|6', '2').option('-t, --template <id>', `模板 ${PROJECT_TEMPLATES.map((t) => t.id).join('|')}`, 'blank').option('--demo', '使用 ESP32 示例内容')
   .action((file, o) => {
-    if (o.demo) { const p = createDemoProject(); if (o.name) p.name = o.name; save(file, p); console.log(`已创建示例项目 ${file}`); return; }
+    if (!['2', '4', '6'].includes(o.layers)) throw new Error('Supported layers: 2, 4, 6');
+    if (o.demo) { const p = createDemoProject(); p.board.copperCount = Number(o.layers) as 2 | 4 | 6; if (o.name) p.name = o.name; save(file, p); console.log(`已创建示例项目 ${file}`); return; }
     if (!PROJECT_TEMPLATES.some((t) => t.id === o.template)) { console.error(`未知模板 ${o.template}；可用：${PROJECT_TEMPLATES.map((t) => `${t.id}（${t.name}）`).join('、')}`); process.exit(1); }
-    const p = createFromTemplate(o.template, { name: o.name, copperCount: o.layers === '4' ? 4 : 2 });
+    const p = createFromTemplate(o.template, { name: o.name, copperCount: o.layers === '6' ? 6 : o.layers === '4' ? 4 : 2 });
     mkdirSync(dirname(resolve(file)), { recursive: true }); save(file, p);
     console.log(`已创建 ${file}（模板 ${o.template}，${p.schematic.sheets.reduce((n, sh) => n + sh.components.length, 0)} 元件）`);
   });

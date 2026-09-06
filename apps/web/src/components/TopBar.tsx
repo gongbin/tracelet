@@ -1,3 +1,5 @@
+import { relativeTime } from '../i18n/format.js';
+import { AppearanceControls } from './AppearanceControls.js';
 import { pcb, sch, diffBoardFromSchematic, syncBoardDetailed, exportSchematicPdf, exportAssemblyPdf } from '@tracelet/kernel';
 import { exportProjectFile, backupAllProjects, downloadFile, slug, importProjectFiles } from '../store/backup.js';
 import { useRef } from 'react';
@@ -19,19 +21,12 @@ function withAuthor<T extends { schematic: { sheets: { frame: { author: string }
   const a = usePrefs.getState().userName; if (!a) return p;
   return { ...p, schematic: { ...p.schematic, sheets: p.schematic.sheets.map((s) => (s.frame.author ? s : { ...s, frame: { ...s.frame, author: a } })) } };
 }
-function timeAgo(t: number | null) {
-  if (!t) return '';
-  const s = Math.floor((Date.now() - t) / 1000);
-  if (s < 10) return '刚刚';
-  if (s < 60) return `${s} 秒前`;
-  if (s < 3600) return `${Math.floor(s / 60)} 分钟前`;
-  return `${Math.floor(s / 3600)} 小时前`;
-}
 
 export function TopBar() {
   const project = useProject();
   const editor = useEditor();
   const t = useT();
+  const locale = usePrefs((s) => s.locale);
   const fileRef = useRef<HTMLInputElement>(null);
   const { screen, go, projMenuOpen, set, projects, openProject, closeProject, lastSavedAt, saving, toast, guideOpen, saveError } = useApp();
   const bridgeStatus = useBridge((b) => b.status);
@@ -49,9 +44,9 @@ export function TopBar() {
   return (
     <div className="topbar">
       <button className="iconbtn" title="返回首页" onClick={closeProject}><BrandMark size={24} /></button>
-      <div style={{ position: 'relative', flex: 'none' }}>
+      <div className="topbar-project" style={{ position: 'relative', minWidth: 0 }}>
         <div className="row" style={{ gap: 8, padding: '0 8px', height: 28, borderRadius: 4, cursor: 'pointer', background: projMenuOpen ? 'var(--bg-panel)' : undefined }} onClick={(e) => { e.stopPropagation(); set('projMenuOpen', !projMenuOpen); }}>
-          <span style={{ fontWeight: 500, whiteSpace: 'nowrap' }} data-no-translate>{project.name}</span><span className="muted xs">▾</span>
+          <span style={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} data-no-translate>{project.name}</span><span className="muted xs">▾</span>
         </div>
         {projMenuOpen && (
           <div className="menu" style={{ top: 34, left: 0, width: 280 }} onClick={(e) => e.stopPropagation()}>
@@ -79,15 +74,15 @@ export function TopBar() {
         )}
       </div>
       <span style={{ width: 1, height: 18, background: 'var(--border)', flex: 'none' }} />
-      <div className="row" style={{ gap: 2 }}>
+      <div className="row workspace-tabs" style={{ gap: 2 }}>
         {TABS.map((tab) => (
           <button key={tab.id} className={`ws-tab${screen === tab.id ? ' on' : ''}`} onClick={() => go(tab.id)}>{t(tab.key)}{tab.id === 'sch' && pendingSync && <span className="badge" />}</button>
         ))}
       </div>
       {screen === 'sch' && (
-        <button className="btn quiet" style={{ marginLeft: 6 }} onClick={sync}><Icon d={I.arrow} size={13} stroke={2} />{t('ws.sync')}</button>
+        <button className="btn quiet topbar-sync" style={{ marginLeft: 6 }} onClick={sync}><Icon d={I.arrow} size={13} stroke={2} />{t('ws.sync')}</button>
       )}
-      <button className={`guide-btn ml-auto${guideOpen ? ' on' : ''}`} title={`${t('tab.guide')} · 分步完成一块板`} onClick={() => set('guideOpen', !guideOpen)}><Icon d={I.guide} size={15} stroke={1.8} /><span className="guide-ring" /></button>
+      <button className={`guide-btn ml-auto${guideOpen ? ' on' : ''}`} title={`${t('tab.guide')} · 分步完成一块板`} onClick={() => set('guideOpen', !guideOpen)}><Icon d={I.guide} size={15} stroke={1.8} /></button>
       {guideOpen && <>
         <div className="guide-backdrop" onPointerDown={() => set('guideOpen', false)} />
         <div className="guide-pop">
@@ -98,10 +93,11 @@ export function TopBar() {
       <div className="search-box" onClick={() => set('paletteOpen', true)}>
         <Icon d={I.search} size={13} stroke={2} /><span>{t('ws.search')}</span><span className="ml-auto mono xs">⌘K</span>
       </div>
-      <span className="row xs muted" style={{ gap: 5, whiteSpace: 'nowrap', flex: 'none' }}>
+      <span className="row xs muted topbar-save-status" style={{ gap: 5, whiteSpace: 'nowrap', flex: 'none' }}>
         {bridgeStatus !== 'off' && <span className="xs mono" title="本地 Agent（MCP）连接状态" style={{ color: bridgeStatus === 'connected' ? 'var(--ai)' : 'var(--text-3)', marginRight: 8 }}>{bridgeStatus === 'connected' ? '✨ Agent 已连接' : '✨ Agent 连接中'}</span>}
-        {saveError ? <span title={saveError} style={{ color: 'var(--error)', cursor: 'pointer', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis' }} onClick={() => toast(saveError, 'error')}>● 未保存：{saveError.replace(/^保存失败：/, '')}</span> : <><Icon d={I.cloud} size={13} stroke={2} color={saving ? 'var(--text-3)' : 'var(--success)'} />{saving ? t('ws.saving') : `${t('ws.saved')} · ${timeAgo(lastSavedAt)}`}</>}
+        {saveError ? <span title={saveError} style={{ color: 'var(--error)', cursor: 'pointer', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis' }} onClick={() => toast(saveError, 'error')}>● 未保存：{saveError.replace(/^保存失败：/, '')}</span> : <><Icon d={I.cloud} size={13} stroke={2} color={saving ? 'var(--text-3)' : 'var(--success)'} />{saving ? t('ws.saving') : `${t('ws.saved')} · ${lastSavedAt ? relativeTime(lastSavedAt, locale) : ''}`}</>}
       </span>
+      <div className="header-preferences"><a className="iconbtn" href="https://github.com/gongbin/tracelet" target="_blank" rel="noreferrer" title="GitHub · gongbin/tracelet" aria-label="GitHub"><Icon d={I.github} size={17} stroke={0} fill /></a><AppearanceControls /></div>
       <PrefsMenu />
     </div>
   );

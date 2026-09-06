@@ -14,7 +14,7 @@ import { BUILTIN_FOOTPRINTS } from './footprints.js';
 import { findPin } from '../schematic/geometry.js';
 import type { FootprintDef } from '../model/board.js';
 
-export interface TemplateOptions { name?: string; unit?: 'mm' | 'mil'; ruleSetId?: string; fab?: string; copperCount?: 2 | 4 }
+export interface TemplateOptions { name?: string; unit?: 'mm' | 'mil'; ruleSetId?: string; fab?: string; copperCount?: 2 | 4 | 6 }
 export interface ProjectTemplate { id: string; name: string; description: string; tags: string[]; create(opts?: TemplateOptions): Project }
 
 function base(opts: TemplateOptions, fallbackName: string): ProjectEditor {

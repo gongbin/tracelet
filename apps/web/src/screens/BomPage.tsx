@@ -10,7 +10,7 @@ export function BomPage() {
   const sum = rows.reduce((n, r) => { const p = priceOf(r); return p == null ? n : n + p * r.qty; }, 0);
   return (
     <div className="page">
-      <div className="page-inner" style={{ maxWidth: 1000 }}>
+      <div className="page-inner">
         <div className="row"><h1>BOM</h1><span className="muted small">{rows.length} 种 · {total} 个元件 · 估算 ¥{sum.toFixed(2)}（LCSC 单价）</span>
           <button className="btn ml-auto" onClick={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([exportBomCsv(project)], { type: 'text/csv' })); a.download = `${project.name}_bom.csv`; a.click(); app.toast('已下载 BOM（LCSC 模板）', 'success'); }}>⇩ 下载 CSV（LCSC 模板）</button>
         </div>

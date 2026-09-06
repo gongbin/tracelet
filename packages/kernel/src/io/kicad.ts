@@ -183,7 +183,7 @@ export function importKicadSchematic(text: string, opts: { sheetName?: string; s
 
 // ---------------- PCB ----------------
 
-const CU: Record<string, CopperLayer> = { 'F.Cu': 'F.Cu', 'B.Cu': 'B.Cu', 'In1.Cu': 'In1.Cu', 'In2.Cu': 'In2.Cu' };
+const CU: Record<string, CopperLayer> = { 'F.Cu': 'F.Cu', 'B.Cu': 'B.Cu', 'In1.Cu': 'In1.Cu', 'In2.Cu': 'In2.Cu', 'In3.Cu': 'In3.Cu', 'In4.Cu': 'In4.Cu' };
 
 function arcPoints(start: Vec, mid: Vec, end: Vec, n = 8): Vec[] {
   // 三点圆
@@ -288,8 +288,8 @@ export function importKicadPcb(text: string): PcbImportResult {
   if (general) board.thickness = num(child(general, 'thickness')?.[1], 1.6);
   const layersNode = child(root, 'layers');
   const cuNames = layersNode ? layersNode.filter((l): l is SList => isList(l) && /\.Cu$/.test(str(l[1]))).map((l) => str(l[1])) : ['F.Cu', 'B.Cu'];
-  board.copperCount = cuNames.length >= 4 ? 4 : 2;
-  if (cuNames.length > 4) warnings.push({ where: 'layers', message: `${cuNames.length} 层板暂按 4 层导入` });
+  board.copperCount = cuNames.length >= 6 ? 6 : cuNames.length >= 4 ? 4 : 2;
+  if (cuNames.length > 6) warnings.push({ where: 'layers', message: `${cuNames.length} 层板暂按 6 层导入` });
   const nets = new Map<number, string>();
   for (const n of children(root, 'net')) nets.set(num(n[1]), str(n[2]).replace(/^\//, ''));
   const netName = (node: SList | undefined) => (node ? (str(node[2]) || nets.get(num(node[1])) || '').replace(/^\//, '') : '');
@@ -314,7 +314,8 @@ export function importKicadPcb(text: string): PcbImportResult {
   }
   for (const v of children(root, 'via')) {
     const at = P(child(v, 'at'));
-    board.vias.push({ id: newId('v'), x: at.x, y: at.y, size: num(child(v, 'size')?.[1], 0.6), drill: num(child(v, 'drill')?.[1], 0.3), net: nets.get(num(child(v, 'net')?.[1])) ?? '' } as Via);
+    const vl=child(v,'layers');
+    board.vias.push({ startLayer: CU[str(vl?.[1])]??'F.Cu', endLayer: CU[str(vl?.[2])]??'B.Cu', id: newId('v'), x: at.x, y: at.y, size: num(child(v, 'size')?.[1], 0.6), drill: num(child(v, 'drill')?.[1], 0.3), net: nets.get(num(child(v, 'net')?.[1])) ?? '' } as Via);
   }
   // 铺铜
   for (const z of children(root, 'zone')) {

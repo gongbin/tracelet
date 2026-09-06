@@ -1,16 +1,19 @@
+import { DiagnosticText } from '../i18n/DiagnosticText.js';
+import { usePrefs } from '../i18n/index.js';
 import { useApp, useEditor } from '../store/app.js';
 
 export interface ProblemRow { id: string; mark: string; color: string; text: string; where: string; onLocate?: () => void }
 export interface NetRow { name: string; count: number }
 
 export function BottomBar({ summary, problems, nets }: { summary: { text: string; color?: string }[]; problems: ProblemRow[]; nets: NetRow[] }) {
+  const locale = usePrefs((s) => s.locale);
   const expanded = useApp((s) => s.bottomExpanded);
   const tab = useApp((s) => s.bottomTab);
   const set = useApp((s) => s.set);
   const editor = useEditor();
   const highlight = useApp((s) => s.highlightNet);
   return (
-    <div className="bottombar">
+    <div key={locale} className="bottombar">
       <div className="bottombar-head">
         {summary.map((b, i) => <span key={i} className="row" style={{ color: b.color ?? 'var(--text-2)', gap: 5, cursor: 'pointer' }} onClick={() => set('bottomExpanded', true)}>{b.text}</span>)}
         <span className="ml-auto muted" style={{ cursor: 'pointer' }} onClick={() => set('bottomExpanded', !expanded)}>{expanded ? '▾' : '▴'}</span>
@@ -25,7 +28,7 @@ export function BottomBar({ summary, problems, nets }: { summary: { text: string
           <div className="grow" style={{ overflow: 'auto' }}>
             {tab === 'problems' && (problems.length === 0 ? <div className="dim" style={{ padding: 12 }}>没有问题 🎉</div> : problems.map((p) => (
               <div key={p.id} className="problem-row" onClick={p.onLocate}>
-                <span style={{ color: p.color }}>{p.mark}</span><span>{p.text}</span><span className="muted">{p.where}</span>
+                <span style={{ color: p.color }}>{p.mark}</span><span><DiagnosticText>{p.text}</DiagnosticText></span><span className="muted"><DiagnosticText>{p.where}</DiagnosticText></span>
                 {p.onLocate && <span className="ml-auto" style={{ color: 'var(--accent)' }}>定位</span>}
               </div>
             )))}

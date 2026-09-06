@@ -1,8 +1,12 @@
+import { dist } from '../geometry.js';
+import { viaLayers, backdrillLayers, validateVia } from './via.js';
 import type { Board } from '../model/board.js';
 import type { RuleSet } from '../model/project.js';
 import type { CheckItem, CheckReport } from '../schematic/erc.js';
 import { segRectDist, segSegDist, rectsOverlap, pointInPolygon, expandRect, pointSegDist, type Vec } from '../geometry.js';
 import { allPads, footprintBody, netClassFor } from './geometry.js';
+import { gapBetween } from './routingModel.js';
+import { electricalChecks } from './routingQuality.js';
 import { computeRatsnest } from './ratsnest.js';
 
 const mid = (a: Vec, b: Vec): Vec => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
@@ -18,8 +22,18 @@ export function runDrc(board: Board, rules: RuleSet): CheckReport {
   const heavyOn = (layer: string) => (/^(F|B)\.Cu$/.test(layer) ? outerHeavy : innerHeavy);
   const minTraceOn = (layer: string) => (heavyOn(layer) ? Math.max(rules.minTraceWidth, rules.heavyCopperMinTrace) : rules.minTraceWidth);
   const clearanceOn = (layer: string) => (heavyOn(layer) ? Math.max(rules.minClearance, rules.heavyCopperMinTrace) : rules.minClearance);
-  const clearance = rules.minClearance;
+  const clearanceFor = (a: string, b: string, layer: string) => Math.max(clearanceOn(layer), gapBetween(board, rules, a, b));
 
+  for (const item of electricalChecks(board, rules)) push(item);
+  // Through vias share every copper layer, including inner layers.
+  for (let i = 0; i < board.vias.length; i++) for (let j = i + 1; j < board.vias.length; j++) {
+    const a = board.vias[i], b = board.vias[j];
+    if (!viaLayers(board,a).some(l=>viaLayers(board,b).includes(l))) continue;
+    if (a.net && a.net === b.net) continue;
+    const gap = Math.hypot(a.x-b.x, a.y-b.y) - (a.size+b.size)/2;
+    const need = Math.max(rules.minClearance, gapBetween(board, rules, a.net, b.net), outerHeavy || (board.copperCount > 2 && innerHeavy) ? rules.heavyCopperMinTrace : 0);
+    if (gap < need - 1e-6) push({ rule: 'clearance', severity: 'error', message: `Via clearance ${f(gap)} < ${f(need)}mm`, why: 'Different-net via copper must remain separated on every layer.', refs: [a.net, b.net], objectIds: [a.id, b.id], location: mid(a,b) });
+  }
   // 走线 vs 焊盘
   board.traces.forEach((t) => {
     for (let i = 0; i < t.points.length - 1; i++) {
@@ -28,7 +42,7 @@ export function runDrc(board: Board, rules: RuleSet): CheckReport {
         if (!p.layers.includes(t.layer)) continue;
         if (p.net && t.net && p.net === t.net) continue;
         const d = segRectDist(a, b, p.rect) - t.width / 2;
-        const need = p.def.npth ? Math.max(clearanceOn(t.layer), rules.minNpthClearance) : clearanceOn(t.layer);
+        const need = p.def.npth ? Math.max(clearanceOn(t.layer), rules.minNpthClearance) : clearanceFor(t.net, p.net, t.layer);
         if (d < need - 1e-6) {
           push({ rule: p.def.npth ? 'npth-clearance' : 'clearance', severity: 'error', message: p.def.npth ? `走线离非金属化孔太近 ${f(Math.max(d, 0))} < ${f(need)}mm` : `间距不足 ${f(Math.max(d, 0))} < ${f(need)}mm`, why: p.def.npth ? '无铜孔周围 0.2mm 会被掏空（干膜封孔工艺），太近的铜会被切掉。' : '铜间距低于板厂最小值会在蚀刻时短路。', refs: [`走线 ${t.net || '?'} ↔ 焊盘 ${p.ref}.${p.number}`, t.layer], location: mid(a, b), objectIds: [t.id, p.footprintId] });
         }
@@ -43,7 +57,7 @@ export function runDrc(board: Board, rules: RuleSet): CheckReport {
     if (t1.net && t2.net && t1.net === t2.net) continue;
     for (let a = 0; a < t1.points.length - 1; a++) for (let b = 0; b < t2.points.length - 1; b++) {
       const d = segSegDist(t1.points[a], t1.points[a + 1], t2.points[b], t2.points[b + 1]) - (t1.width + t2.width) / 2;
-      if (d < clearanceOn(t1.layer) - 1e-6) push({ rule: 'clearance', severity: 'error', message: `走线间距不足 ${f(Math.max(d, 0))} < ${f(clearanceOn(t1.layer))}mm`, why: '两条不同网络的走线太近，可能短路。', refs: [`${t1.net || '?'} ↔ ${t2.net || '?'}`, t1.layer], location: mid(t1.points[a], t2.points[b]), objectIds: [t1.id, t2.id] });
+      if (d < clearanceFor(t1.net, t2.net, t1.layer) - 1e-6) push({ rule: 'clearance', severity: 'error', message: `走线间距不足 ${f(Math.max(d, 0))} < ${f(clearanceFor(t1.net, t2.net, t1.layer))}mm`, why: '两条不同网络的走线太近，可能短路。', refs: [`${t1.net || '?'} ↔ ${t2.net || '?'}`, t1.layer], location: mid(t1.points[a], t2.points[b]), objectIds: [t1.id, t2.id] });
     }
   }
 
@@ -52,24 +66,34 @@ export function runDrc(board: Board, rules: RuleSet): CheckReport {
     if (t.width < minTraceOn(t.layer) - 1e-6) push({ rule: 'min-width', severity: 'error', message: `线宽 ${f(t.width)} 低于板厂最小 ${f(minTraceOn(t.layer))}mm${heavyOn(t.layer) ? '（2oz 铜）' : ''}`, why: '过细的走线板厂无法可靠制造；铜越厚，蚀刻能做的最小线宽越大。', refs: [t.net || '?', t.layer], location: t.points[0], objectIds: [t.id] });
     else {
       const nc = netClassFor(board, t.net);
-      if (nc && t.width < nc.traceWidth - 1e-6) push({ rule: 'netclass-width', severity: 'warning', message: `走线宽度低于网络类 ${nc.name}（${f(t.width)} < ${f(nc.traceWidth)}mm）`, why: '电源类走线太细会发热、压降变大。', refs: [t.net || '?'], location: t.points[0], objectIds: [t.id] });
+      if (nc && !nc.neckdown && t.width < nc.traceWidth - 1e-6) push({ rule: 'netclass-width', severity: 'warning', message: `走线宽度低于网络类 ${nc.name}（${f(t.width)} < ${f(nc.traceWidth)}mm）`, why: '电源类走线太细会发热、压降变大。', refs: [t.net || '?'], location: t.points[0], objectIds: [t.id] });
     }
   }
 
   // 过孔 vs 异网络焊盘 / 走线
   for (const v of board.vias) {
     for (const p of pads) {
+      if (!p.layers.some(l=>viaLayers(board,v).includes(l))) continue;
       if (p.net && v.net && p.net === v.net) continue;
       const d = segRectDist(v, v, p.rect) - v.size / 2;
+      const clearance = Math.max(...p.layers.map(layer => clearanceFor(v.net, p.net, layer)));
       if (d < clearance - 1e-6) push({ rule: 'clearance', severity: 'error', message: `过孔与焊盘间距不足 ${f(Math.max(d, 0))} < ${f(clearance)}mm`, why: '过孔环与相邻焊盘太近会短路。', refs: [`过孔 ${v.net || '?'} ↔ ${p.ref}.${p.number}`], location: v, objectIds: [v.id, p.footprintId] });
     }
     for (const t of board.traces) {
+      if (!viaLayers(board,v).includes(t.layer)) continue;
       if (t.net && v.net && t.net === v.net) continue;
+      const clearance = clearanceFor(v.net, t.net, t.layer);
       for (let i = 0; i < t.points.length - 1; i++) { const d = pointSegDist(v, t.points[i], t.points[i + 1]) - v.size / 2 - t.width / 2; if (d < clearance - 1e-6) { push({ rule: 'clearance', severity: 'error', message: `过孔与走线间距不足 ${f(Math.max(d, 0))} < ${f(clearance)}mm`, why: '过孔环与异网络走线太近会短路。', refs: [`过孔 ${v.net || '?'} ↔ 走线 ${t.net || '?'}`, t.layer], location: v, objectIds: [v.id, t.id] }); break; } }
     }
   }
   // 过孔
   for (const v of board.vias) {
+    for(const message of validateVia(board,v)) push({rule:'via-technology',severity:'error',message,why:'Check layer span and fabrication depths.',refs:[v.net],objectIds:[v.id],location:v});
+    if(v.backdrill) {
+      const removed=backdrillLayers(board,v), radius=v.backdrill.diameter/2;
+      const collision=board.traces.some(t=>removed.includes(t.layer)&&t.points.slice(1).some((p,i)=>pointSegDist(v,t.points[i],p)<radius+t.width/2+rules.minClearance)) || pads.some(p=>p.layers.some(l=>removed.includes(l))&&segRectDist(v,v,p.rect)<radius+rules.minClearance) || board.vias.some(other=>other.id!==v.id&&viaLayers(board,other).some(l=>removed.includes(l))&&dist(v,other)<radius+other.size/2+rules.minClearance);
+      if(collision)push({rule:'backdrill-clearance',severity:'error',message:'Backdrill intersects copper on removed layers',why:'Move copper away from the backdrill tool.',refs:[v.net],objectIds:[v.id],location:v});
+    }
     if (v.drill < rules.minDrill - 1e-6) push({ rule: 'min-drill', severity: 'error', message: `过孔孔径 ${f(v.drill)} 低于最小 ${f(rules.minDrill)}mm`, why: '钻头规格有限，太小的孔无法加工。', refs: [v.net || '?'], location: v, objectIds: [v.id] });
     else if (v.drill < rules.preferredDrill - 1e-6) push({ rule: 'small-drill', severity: 'warning', message: `过孔孔径 ${f(v.drill)} 小于常规 ${f(rules.preferredDrill)}mm，属非常规工艺会加价`, why: '板厂常规钻孔 0.3mm 起；更小的孔可做但需塞孔、价格更高。', refs: [v.net || '?'], location: v, objectIds: [v.id] });
     if ((v.size - v.drill) / 2 < rules.minAnnularRing - 1e-6) push({ rule: 'annular-ring', severity: 'error', message: `过孔环宽不足 ${f((v.size - v.drill) / 2)} < ${f(rules.minAnnularRing)}mm`, why: '环宽太小，钻孔偏移时会钻穿铜环。', refs: [v.net || '?'], location: v, objectIds: [v.id] });
@@ -112,7 +136,7 @@ export function runDrc(board: Board, rules: RuleSet): CheckReport {
     if (!a.layers.some((l) => b.layers.includes(l))) continue;
     const dx = Math.max(0, Math.max(a.rect.x, b.rect.x) - Math.min(a.rect.x + a.rect.w, b.rect.x + b.rect.w)), dy = Math.max(0, Math.max(a.rect.y, b.rect.y) - Math.min(a.rect.y + a.rect.h, b.rect.y + b.rect.h));
     const d = Math.hypot(dx, dy);
-    const need = clearanceOn(a.layers[0]);
+    const need = Math.max(...a.layers.filter(layer => b.layers.includes(layer)).map(layer => clearanceFor(a.net, b.net, layer)));
     if (d < need - 1e-6) push({ rule: 'clearance', severity: 'error', message: `焊盘间距不足 ${f(d)} < ${f(need)}mm`, why: '两个元件的异网络焊盘太近，蚀刻 / 焊接时会短路。', refs: [`${a.ref}.${a.number} ↔ ${b.ref}.${b.number}`], location: a.center, objectIds: [a.footprintId, b.footprintId] });
   }
   // 丝印：字高、字符压焊盘

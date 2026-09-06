@@ -1,4 +1,5 @@
-import { usePrefs } from '../i18n/index.js';
+import { templateName } from '../i18n/templates.js';
+import { usePrefs, useT } from '../i18n/index.js';
 import { useState } from 'react';
 import { RULE_SETS, PROJECT_TEMPLATES, createFromTemplate, MAIN_SHEET_NAME } from '@tracelet/kernel';
 import { useApp } from '../store/app.js';
@@ -11,18 +12,21 @@ const FABS = [
 
 export function Wizard() {
   const { set, openProjectObject } = useApp();
-  const DEFAULT_NAME = usePrefs.getState().locale === 'en' ? 'LED blinker' : 'LED 闪灯板';
-  const [name, setName] = useState(DEFAULT_NAME);
-  const [layers, setLayers] = useState<2 | 4>(2);
+  const locale = usePrefs((s) => s.locale);
+  const t = useT();
+  const [customName, setName] = useState<string | null>(null);
+  const [layers, setLayers] = useState<2 | 4 | 6>(2);
   const [fab, setFab] = useState('jlc');
   const [unit, setUnit] = useState<'mm' | 'mil'>('mm');
   const [tpl, setTpl] = useState<string>('blank');
+  const defaultName = tpl === 'blank' ? t('template.blinker') : templateName(tpl, locale, '');
+  const name = customName ?? defaultName;
   const close = () => set('wizardOpen', false);
 
   const create = () => {
     const fabName = RULE_SETS.find((r) => r.id === fab)?.name ?? '嘉立创';
     const author = usePrefs.getState().userName;
-    const made = createFromTemplate(tpl, { name: name || undefined, copperCount: layers, unit, ruleSetId: fab, fab: fabName });
+    const made = createFromTemplate(tpl, { name: name || defaultName, copperCount: layers, unit, ruleSetId: fab, fab: fabName });
     if (usePrefs.getState().locale === 'en') for (const sh of made.schematic.sheets) if (sh.name === MAIN_SHEET_NAME) sh.name = 'Main';
     if (author) for (const sh of made.schematic.sheets) if (!sh.frame.author) sh.frame.author = author;
     openProjectObject(made);
@@ -39,7 +43,7 @@ export function Wizard() {
         <div className="dialog-body kv" style={{ gap: '14px 12px' }}>
           <span className="k">项目名</span><input className="input lg input-focus-ring" autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && create()} />
           <span className="k">层数</span>
-          <div className="seg"><span className={`seg-opt${layers === 2 ? ' on' : ''}`} onClick={() => setLayers(2)}>2 层 · 大多数创客项目</span><span className={`seg-opt${layers === 4 ? ' on' : ''}`} onClick={() => setLayers(4)}>4 层</span></div>
+          <div className="seg"><span className={`seg-opt${layers === 2 ? ' on' : ''}`} onClick={() => setLayers(2)}>2 层 · 大多数创客项目</span><span className={`seg-opt${layers === 4 ? ' on' : ''}`} onClick={() => setLayers(4)}>4 层</span><span className={`seg-opt${layers === 6 ? ' on' : ''}`} onClick={() => setLayers(6)}>6 层</span></div>
           <span className="k">板厂规则</span>
           <div className="col" style={{ gap: 6 }}>
             {FABS.map((f) => (
@@ -54,7 +58,7 @@ export function Wizard() {
           <span className="k">模板</span>
           <div className="col" style={{ gap: 6 }}>
             <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-              {PROJECT_TEMPLATES.map((t) => <span key={t.id} className={`chip${tpl === t.id ? ' on' : ''}`} style={{ padding: '5px 10px' }} onClick={() => { setTpl(t.id); if (t.id !== 'blank' && (name === '' || name === DEFAULT_NAME || PROJECT_TEMPLATES.some((x) => x.name === name))) setName(t.name); }}>{t.name}</span>)}
+              {PROJECT_TEMPLATES.map((item) => <span key={item.id} className={`chip${tpl === item.id ? ' on' : ''}`} style={{ padding: '5px 10px' }} data-no-translate onClick={() => { setTpl(item.id); if (customName === '') setName(null); }}>{templateName(item.id, locale, item.name)}</span>)}
             </div>
             {tplInfo && tplInfo.id !== 'blank' && <div className="small muted">{tplInfo.description} · 生成后可自由修改</div>}
           </div>

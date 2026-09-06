@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as RPE, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type PointerEvent as RPE, type RefObject, type SVGProps } from 'react';
 import type { Vec, Rect } from '@tracelet/kernel';
 import { usePrefs } from '../i18n/index.js';
 
@@ -16,13 +16,19 @@ export interface ViewportApi {
   panStart: (e: RPE) => boolean;
   panMove: (e: RPE) => boolean;
   panEnd: (e: RPE) => boolean;
+  touchHandlers: Pick<SVGProps<SVGSVGElement>, 'onPointerDownCapture' | 'onPointerMoveCapture' | 'onPointerUpCapture' | 'onPointerCancelCapture' | 'onLostPointerCapture'>;
   panning: boolean;
   spaceDown: boolean;
 }
 
-export function useViewport(svgRef: RefObject<SVGSVGElement | null>, opts: { initial: VP; minK: number; maxK: number }): ViewportApi {
-  const [vp, setVp] = useState<VP>(opts.initial);
-  const vpRef = useRef(vp); vpRef.current = vp;
+export function useViewport(svgRef: RefObject<SVGSVGElement | null>, opts: { initial: VP; minK: number; maxK: number; onTouchCancel?: () => void }): ViewportApi {
+  const [vp, updateVp] = useState<VP>(opts.initial);
+  const vpRef = useRef(vp);
+  const setVp = useCallback((next: VP) => { vpRef.current = next; updateVp(next); }, []);
+  const touches = useRef(new Map<number, Vec>());
+  const multiTouch = useRef(false);
+  const touchBase = useRef<{ center: Vec; distance: number; vp: VP } | null>(null);
+  const cancelTouch = useRef(opts.onTouchCancel); cancelTouch.current = opts.onTouchCancel;
   const [panning, setPanning] = useState(false);
   const [spaceDown, setSpaceDown] = useState(false);
   const drag = useRef<{ sx: number; sy: number; ox: number; oy: number; id: number } | null>(null);
@@ -90,18 +96,67 @@ export function useViewport(svgRef: RefObject<SVGSVGElement | null>, opts: { ini
     return false;
   }, [spaceDown]);
   const panMove = useCallback((e: RPE) => {
-    const d = drag.current; if (!d) return false;
+    const d = drag.current; if (!d || d.id !== e.pointerId) return false;
     setVp({ ...vpRef.current, x: d.ox + (e.clientX - d.sx), y: d.oy + (e.clientY - d.sy) });
     return true;
   }, []);
   const panEnd = useCallback((e: RPE) => {
-    if (!drag.current) return false;
+    if (!drag.current || drag.current.id !== e.pointerId) return false;
     drag.current = null; setPanning(false);
     try { (e.currentTarget as Element).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
     return true;
   }, []);
 
-  return { vp, setVp, toWorld, toScreen, fit, centerOn, panStart, panMove, panEnd, panning, spaceDown };
+  const rebaseTouch = () => {
+    const [a, b] = [...touches.current.values()];
+    if (!a || !b) { touchBase.current = null; return; }
+    touchBase.current = { center: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), vp: vpRef.current };
+  };
+  const consume = (e: RPE) => { e.preventDefault(); e.stopPropagation(); };
+  const endTouch = (e: RPE, cancelled = false) => {
+    if (e.pointerType !== 'touch' || !touches.current.has(e.pointerId)) return;
+    const wasMulti = multiTouch.current;
+    touches.current.delete(e.pointerId);
+    if (wasMulti || cancelled) consume(e);
+    if (cancelled && !wasMulti) cancelTouch.current?.();
+    if (!touches.current.size) { multiTouch.current = false; touchBase.current = null; setPanning(false); }
+    else rebaseTouch(); // A replacement finger starts from the current view, never the old pair.
+    // A lone finger after a pinch stays consumed until every finger has lifted.
+    // Normal pointerup releases capture automatically; do not release early and lose its bubbling event.
+  };
+  const touchHandlers: ViewportApi['touchHandlers'] = {
+    onPointerDownCapture: (e) => {
+      if (e.pointerType !== 'touch') return;
+      touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      e.currentTarget.setPointerCapture(e.pointerId);
+      if (touches.current.size >= 2 || multiTouch.current) {
+        consume(e);
+        if (!multiTouch.current) { cancelTouch.current?.(); drag.current = null; }
+        multiTouch.current = true;
+        setPanning(true);
+        rebaseTouch();
+      }
+    },
+    onPointerMoveCapture: (e) => {
+      if (e.pointerType !== 'touch' || !touches.current.has(e.pointerId)) return;
+      touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (!multiTouch.current) return;
+      consume(e);
+      const base = touchBase.current;
+      const [a, b] = [...touches.current.values()];
+      if (!base || !a || !b) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const center = { x: (a.x + b.x) / 2 - rect.left, y: (a.y + b.y) / 2 - rect.top };
+      const k = Math.max(opts.minK, Math.min(opts.maxK, base.vp.k * Math.hypot(a.x - b.x, a.y - b.y) / base.distance));
+      const world = { x: (base.center.x - rect.left - base.vp.x) / base.vp.k, y: (base.center.y - rect.top - base.vp.y) / base.vp.k };
+      setVp({ k, x: center.x - world.x * k, y: center.y - world.y * k });
+    },
+    onPointerUpCapture: (e) => endTouch(e),
+    onPointerCancelCapture: (e) => endTouch(e, true),
+    onLostPointerCapture: (e) => { if (e.target === e.currentTarget) endTouch(e, true); }
+  };
+
+  return { vp, setVp, toWorld, toScreen, fit, centerOn, panStart, panMove, panEnd, touchHandlers, panning, spaceDown };
 }
 
 /** 自适应栅格步长：保证屏幕上相邻格点至少 minPx。 */

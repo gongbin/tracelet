@@ -1,3 +1,5 @@
+import { ViaTechnology } from './ViaTechnology.js';
+import { PlacementSettings } from './PlacementSettings.js';
 import { useEffect, useState } from 'react';
 import { sch, pcb, getSymbol, BUILTIN_FOOTPRINTS, allParts, findFootprint, footprintPads, milToMm, formatLength, copperLayers, registeredFootprints, crossSheetLabelNames, traceLengthStats, polylineLength } from '@tracelet/kernel';
 import { useApp, useEditor, useProject, useSheet } from '../store/app.js';
@@ -36,6 +38,7 @@ export function PropertiesPanel() {
             <span className="k">旋转</span><div className="seg sm">{[0, 90, 180, 270].map((r) => <span key={r} className={`seg-opt mono${fp.rotation === r ? ' on' : ''}`} onClick={() => editor.dispatch(pcb.rotateFootprint(fp.id, r - fp.rotation))}>{r}°</span>)}</div>
             <span className="k">面</span><div className="seg sm"><span className={`seg-opt${fp.side === 'F' ? ' on' : ''}`} onClick={() => fp.side !== 'F' && editor.dispatch(pcb.flipFootprint(fp.id))}>顶层</span><span className={`seg-opt${fp.side === 'B' ? ' on' : ''}`} onClick={() => fp.side !== 'B' && editor.dispatch(pcb.flipFootprint(fp.id))}>底层</span></div>
           </div>
+          <PlacementSettings fp={fp} />
           <div className="divider" />
           <div className="col" style={{ gap: 6 }}>
             <div className="row"><span className="muted">焊盘</span><span className="mono">{pads.length}</span></div>
@@ -69,6 +72,7 @@ export function PropertiesPanel() {
           <span className="k">孔径 (mm)</span><ValueInput value={String(via.drill)} onCommit={(v) => { const n = Number(v); if (n > 0) editor.dispatch(pcb.setViaProps(via.id, { drill: n })); }} />
           <span className="k">位置</span><div className="row" style={{ gap: 6 }}><ValueInput value={via.x.toFixed(2)} onCommit={(v) => editor.dispatch(pcb.setViaProps(via.id, { x: Number(v) }))} /><ValueInput value={via.y.toFixed(2)} onCommit={(v) => editor.dispatch(pcb.setViaProps(via.id, { y: Number(v) }))} /></div>
         </div>
+        <ViaTechnology key={via.id+JSON.stringify([via.startLayer,via.endLayer,via.backdrill,via.size,via.drill])} via={via}/>
       </div>
     );
     const txt = project.board.texts.find((t) => t.id === id);

@@ -1,4 +1,5 @@
 import { ProjectSchema, FORMAT_VERSION, type Project } from '../model/project.js';
+import { restoreLegacyBodyOffset } from '../library/legacyBodyOffsets.js';
 import { registerProjectLibrary } from '../library/registry.js';
 
 export function serializeProject(p: Project, pretty = true): string {
@@ -24,6 +25,7 @@ export function parseProject(text: string | unknown): Project {
 /** 旧版导入的封装本体只有宽高、默认居中于原点；焊盘落在外框之外时，把外框中心挪到焊盘包围盒中心（并放大到能包住焊盘）。 */
 function migrateFootprintBodies(p: Project): void {
   for (const f of p.library?.footprints ?? []) {
+    restoreLegacyBodyOffset(f);
     if (f.body.x !== undefined || f.body.y !== undefined || !f.pads.length) continue;
     const x1 = Math.min(...f.pads.map((q) => q.x - q.w / 2)), x2 = Math.max(...f.pads.map((q) => q.x + q.w / 2)), y1 = Math.min(...f.pads.map((q) => q.y - q.h / 2)), y2 = Math.max(...f.pads.map((q) => q.y + q.h / 2));
     const inside = x1 >= -f.body.w / 2 - 0.3 && x2 <= f.body.w / 2 + 0.3 && y1 >= -f.body.h / 2 - 0.3 && y2 <= f.body.h / 2 + 0.3;

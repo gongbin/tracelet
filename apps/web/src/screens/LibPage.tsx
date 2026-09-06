@@ -17,7 +17,7 @@ export function LibPage() {
   const pg = pageSlice(results, page, PAGE);
   return (
     <div className="page">
-      <div className="page-inner" style={{ maxWidth: 1100 }}>
+      <div className="page-inner">
         <div className="row"><h1>{t('lib.title')}</h1><span className="muted small">内置 {allParts().length} 个零件 · 导入 KiCad 工程会把其中的符号 / 封装带入项目库</span></div>
         <input className="input lg" style={{ maxWidth: 420 }} placeholder="搜索型号、参数、关键字（例如 0402 100nF、esp32、ldo）" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} />
         <CategoryFilter value={cat} onChange={(c) => { setCat(c); setPage(0); }} onlyUsed={false} />

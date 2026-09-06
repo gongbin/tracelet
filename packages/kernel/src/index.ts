@@ -48,3 +48,7 @@ export * from './export/strokefont.js';
 export * from './export/gerber.js';
 export * from './export/pdf.js';
 export * from './demo.js';
+export { notchOutline } from './board/notch.js';
+export * from './board/via.js';
+export * from './board/impedance.js';
+export * from './board/engineeringReport.js';
