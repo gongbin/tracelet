@@ -3,7 +3,7 @@
  * 与 CLI / MCP 共用同一套内核命令，这里只是 JSON Schema 描述 + 执行映射。
  */
 import type Anthropic from '@anthropic-ai/sdk';
-import { sch, pcb, lib, searchParts, BUILTIN_PARTS, autoroute, getSymbol, findPin, generateSchematic, registeredSymbols, registeredFootprints, footprintFromName, type Project, type ProjectEditor, type ExtractedSchematic } from '@tracelet/kernel';
+import { sch, pcb, lib, searchParts, BUILTIN_PARTS, autoroute, getSymbol, findPin, pinGeoms, generateSchematic, registeredSymbols, registeredFootprints, footprintFromName, type Project, type ProjectEditor, type ExtractedSchematic } from '@tracelet/kernel';
 import { getAnalysis } from '../store/analysis.js';
 import { useApp } from '../store/app.js';
 import { locateItem } from '../panels/CheckPanel.js';
@@ -39,7 +39,10 @@ export const TOOL_DEFS: Anthropic.Tool[] = [
   T('search_symbols', '搜索已注册的符号（内置 + 本项目导入 / 生成的），用于 place_component 的 symbol 参数。', { query: { type: 'string' } }, ['query']),
   T('list_sheets', '列出所有图纸及元件数，并告知当前图纸。', {}),
   T('switch_sheet', '切换当前图纸（按名字或 id）。', { sheet: { type: 'string' } }, ['sheet']),
-  T('add_sheet', '新建一张空图纸并切换过去。', { name: { type: 'string' } }, ['name'])
+  T('add_sheet', '新建一张空图纸并切换过去。', { name: { type: 'string' } }, ['name']),
+  T('delete_sheet', '删除一张图纸（按名字或 id；至少保留一张）。用于清理生成失败留下的空壳 / 悬空线图纸。', { sheet: { type: 'string' } }, ['sheet']),
+  T('rename_sheet', '重命名图纸。', { sheet: { type: 'string' }, name: { type: 'string' } }, ['sheet', 'name']),
+  T('delete_dangling', '删除当前图纸上两端都没接到任何引脚 / 标签 / 其他导线的悬空导线，以及没贴在导线上的网络标签。', {})
 ];
 
 function summary(p: Project) {
@@ -50,7 +53,9 @@ function summary(p: Project) {
     nets: a.netlist.nets.length, unconnectedPins: a.netlist.unconnectedPins.map((x) => `${x.ref}.${x.pinName}`),
     erc: { errors: a.erc.errors, warnings: a.erc.warnings }, drc: { errors: a.drc.errors, warnings: a.drc.warnings },
     pcb: { footprints: p.board.footprints.length, traces: p.board.traces.length, vias: p.board.vias.length, unrouted: `${a.ratsnest.unrouted}/${a.ratsnest.total}`, copperCount: p.board.copperCount, size: `${p.board.outline.reduce((m, q) => Math.max(m, q.x), 0)}×${p.board.outline.reduce((m, q) => Math.max(m, q.y), 0)} mm` },
-    rules: a.rules.name
+    rules: a.rules.name,
+    // 符号定义丢失的元件（占位盒、无引脚）：这些元件的连线都是悬空的，需要重新生成 / 替换
+    missingSymbols: p.schematic.sheets.flatMap((s) => s.components).filter((c) => getSymbol(c.symbolId).source === 'missing').map((c) => `${c.ref} (${c.symbolId})`)
   };
 }
 
@@ -136,7 +141,13 @@ export async function runTool(name: string, input: Record<string, unknown>, ctx:
       useApp.getState().patch({ sheetId: r.sheet.id, selection: [] });
       if (useApp.getState().screen !== 'sch') useApp.getState().go('sch');
       ctx.log(`生成图纸「${r.sheet.name}」：${r.stats.components} 元件 · ${r.stats.nets} 网络`);
-      return J({ sheet: r.sheet.name, components: r.stats.components, labeledPins: r.stats.labeledPins, nets: r.stats.nets, replacedEmptySheet: replaceEmpty, hint: '已切换到新图纸；可继续用 run_erc / review_schematic 检查，再用 place_component / connect_pins / set_component_value 修改' });
+      // 生成后自检：元件是否真的在图纸上、符号是否可用、网络是否有引脚
+      const made = p().schematic.sheets.find((sh) => sh.id === r.sheet.id);
+      const real = (made?.components ?? []).filter((c) => !getSymbol(c.symbolId).power);
+      const a = getAnalysis(p());
+      const emptyNets = a.netlist.nets.filter((n) => n.pins.length === 0).map((n) => n.name);
+      const skipped = spec.components.filter((c) => !c.ref || !c.pins?.length).map((c) => c.ref || '(无位号)');
+      return J({ sheet: r.sheet.name, sheetId: r.sheet.id, components: real.map((c) => `${c.ref} ${c.value}`), labeledPins: r.stats.labeledPins, nets: r.stats.nets, skipped, emptyNets, replacedEmptySheet: replaceEmpty, ok: real.length > 0 && emptyNets.length === 0, hint: real.length ? '已切换到新图纸；用 run_erc / review_schematic 复核；有出入用 place_component / connect_pins / set_component_value / delete_components 修改' : '没有元件落到图纸上：检查 components[].ref 与 pins 是否为空' });
     }
     case 'delete_components': {
       const refs = Array.isArray(input.refs) ? (input.refs as string[]) : [];
@@ -162,6 +173,26 @@ export async function runTool(name: string, input: Record<string, unknown>, ctx:
     case 'search_symbols': { const q = String(input.query ?? '').toLowerCase(); ctx.log(`搜索符号 ${q}`); return J(registeredSymbols().filter((sy) => !q || sy.id.toLowerCase().includes(q) || sy.name.toLowerCase().includes(q) || (sy.description ?? '').toLowerCase().includes(q)).slice(0, 12).map((sy) => ({ id: sy.id, name: sy.name, pins: sy.pins.length, power: sy.power, description: sy.description }))); }
     case 'list_sheets': return J({ current: sheetId, sheets: p().schematic.sheets.map((sh) => ({ id: sh.id, name: sh.name, components: sh.components.filter((c) => !getSymbol(c.symbolId).power).length, wires: sh.wires.length })) });
     case 'switch_sheet': { const key = String(input.sheet ?? ''); const sh = p().schematic.sheets.find((x) => x.id === key || x.name === key); if (!sh) return '没有这张图纸'; useApp.getState().patch({ sheetId: sh.id, selection: [] }); ctx.log(`切换到图纸 ${sh.name}`); return `当前图纸：${sh.name}`; }
+    case 'delete_sheet': {
+      const key = String(input.sheet ?? ''); const sh = p().schematic.sheets.find((x) => x.id === key || x.name === key); if (!sh) return '没有这张图纸';
+      if (p().schematic.sheets.length <= 1) return '至少要保留一张图纸（可以先新建再删）';
+      editor.dispatch(sch.deleteSheet(sh.id)); const rest = p().schematic.sheets; if (!rest.some((x) => x.id === useApp.getState().sheetId)) useApp.getState().patch({ sheetId: rest[0].id, selection: [] });
+      ctx.log(`删除图纸 ${sh.name}`); return `已删除图纸「${sh.name}」（可 Undo）`;
+    }
+    case 'rename_sheet': { const key = String(input.sheet ?? ''); const sh = p().schematic.sheets.find((x) => x.id === key || x.name === key); if (!sh) return '没有这张图纸'; editor.dispatch(sch.renameSheet(sh.id, String(input.name))); ctx.log(`图纸 ${sh.name} → ${input.name}`); return '已重命名'; }
+    case 'delete_dangling': {
+      const cur = p().schematic.sheets.find((sh) => sh.id === sheetId)!;
+      const ends = new Set<string>(); const key = (v: { x: number; y: number }) => `${Math.round(v.x)},${Math.round(v.y)}`;
+      for (const c of cur.components) for (const g of pinGeoms(c, getSymbol(c.symbolId))) ends.add(key(g.end));
+      for (const l of cur.labels) ends.add(key(l));
+      const onSeg = (pt: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) => Math.abs((b.x - a.x) * (pt.y - a.y) - (b.y - a.y) * (pt.x - a.x)) < 1 && pt.x >= Math.min(a.x, b.x) - 1 && pt.x <= Math.max(a.x, b.x) + 1 && pt.y >= Math.min(a.y, b.y) - 1 && pt.y <= Math.max(a.y, b.y) + 1;
+      const touches = (w: typeof cur.wires[number], end: { x: number; y: number }) => ends.has(key(end)) || cur.wires.some((o) => o.id !== w.id && (o.points.some((q) => key(q) === key(end)) || o.points.slice(1).some((b, i) => onSeg(end, o.points[i], b))));
+      const dangling = cur.wires.filter((w) => !touches(w, w.points[0]) && !touches(w, w.points[w.points.length - 1])).map((w) => w.id);
+      const orphanLabels = cur.labels.filter((l) => !cur.wires.some((w) => w.points.some((q) => key(q) === key(l)) || w.points.slice(1).some((b, i) => onSeg(l, w.points[i], b)))).map((l) => l.id);
+      if (!dangling.length && !orphanLabels.length) return '没有悬空导线或孤立标签';
+      editor.begin('清理悬空导线'); if (dangling.length) editor.dispatch(sch.deleteWires(cur.id, dangling)); if (orphanLabels.length) editor.dispatch(sch.deleteLabels(cur.id, orphanLabels)); editor.commit();
+      ctx.log(`清理 ${dangling.length} 条悬空导线 / ${orphanLabels.length} 个孤立标签`); return `已删除 ${dangling.length} 条悬空导线、${orphanLabels.length} 个孤立标签（可 Undo）`;
+    }
     case 'add_sheet': { const r = sch.addSheet(String(input.name || `图纸 ${p().schematic.sheets.length + 1}`)); editor.dispatch(r.command); useApp.getState().patch({ sheetId: r.id, selection: [] }); ctx.log(`新建图纸 ${input.name}`); return `已新建并切换到图纸 ${r.id}`; }
     default: return `未知工具 ${name}`;
   }
