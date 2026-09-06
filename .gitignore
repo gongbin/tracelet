@@ -11,3 +11,10 @@ test/screenshots/
 # 内部开发资料，不入库（后续放专门文档仓库）
 docs/
 ui-demo/
+
+# Local-only engineering and deployment notes; never publish
+/PCB_ENGINE_ROADMAP.md
+/ADVANCED_PCB.md
+/deploy/README.md
+/deploy/README.m
+/deploy/.README.md.sw?
