@@ -3,6 +3,18 @@
 TypeScript 无头内核 + Web 编辑器 + CLI + MCP server + 可选的自建远程存储服务端。
 
 
+
+## Altium Designer 导入
+
+支持直接导入 .SchDoc / .PcbDoc（OLE 复合文档二进制格式，独立实现的解析器，格式知识参考 KiCad / altium2kicad 等公开实现）：
+
+- 原理图：元件（符号图形、引脚、位号、Comment、封装名）、导线、总线、结点、网络标签、端口、电源端口（映射为内置 GND / 电源符号）、图纸符号与入口（按名字连通）、自由文字与线框。多部件元件按当前部件导入。
+- PCB：板框（Board Shape / Keep-Out）、元件与封装（焊盘形状 / 孔 / 旋转 / 底面镜像）、走线、圆弧、过孔、铺铜轮廓（Polygon）与矩形填充、丝印文字，2 层或 4 层（多于两个内层只取前两个）。
+- 原理图元件与 PCB 封装按位号关联；焊盘网络来自 PCB，缺失时用原理图网表补全。
+- 暂不支持：SchLib / PcbLib / IntLib 库文件、盲埋孔、槽孔、内电层分割（Split Plane，这些网络会显示为未布线）、规则（Rules）到网络类的映射、图片。非 90° 旋转的元件焊盘按轴对齐矩形近似，DRC 可能对这类元件误报。
+
+用法：网页里多选全部 .SchDoc + .PcbDoc 拖入（或首页「导入」）；CLI `tracelet import altium a.SchDoc b.SchDoc board.PcbDoc -o out.eda.json`；MCP `import_altium`。
+
 ## 板厂规则（DRC）与嘉立创工艺能力对照
 
 规则集 `jlc` / `jlcpcb` 按嘉立创公开的工艺能力页（[www.jlc.com/portal/vtechnology.html](https://www.jlc.com/portal/vtechnology.html)，2026-09 核对）设置，默认比板厂极限留有余量：
@@ -93,7 +105,7 @@ claude mcp add tracelet -- pnpm --dir /path/to/tracelet cli serve --mcp --live
 claude mcp add tracelet -- pnpm --dir /path/to/tracelet cli serve --mcp -f /path/to/project.eda.json
 ```
 
-工具：`open_project / new_project / new_from_template / list_templates / list_open_projects / use_project / import_kicad / import_easyeda / import_library / generate_footprint / project_summary / get_netlist / get_component / run_erc / run_drc / review_schematic / search_parts / place_component / connect_pins / add_net_label / set_component_value / sync_to_pcb / move_footprint / set_board_outline / check_placement / optimize_placement / autoroute / trace_lengths / export_fab / export_pdf / undo`。文件模式下每次修改自动保存到打开的文件。
+工具：`open_project / new_project / new_from_template / list_templates / list_open_projects / use_project / import_kicad / import_altium / import_easyeda / import_library / generate_footprint / project_summary / get_netlist / get_component / run_erc / run_drc / review_schematic / search_parts / place_component / connect_pins / add_net_label / set_component_value / sync_to_pcb / move_footprint / set_board_outline / check_placement / optimize_placement / autoroute / trace_lengths / export_fab / export_pdf / undo`。文件模式下每次修改自动保存到打开的文件。
 
 ## 存储模式
 

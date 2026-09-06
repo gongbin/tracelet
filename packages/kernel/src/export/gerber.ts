@@ -199,9 +199,9 @@ export function zipFiles(files: FabFile[]): Uint8Array {
 }
 
 /** 解包 zip（用于导入备份）。 */
-export function unzipFiles(data: Uint8Array): { name: string; content: string }[] {
+export function unzipFiles(data: Uint8Array): { name: string; content: string; bytes: Uint8Array }[] {
   const entries = unzipSync(data);
-  return Object.entries(entries).filter(([name]) => !name.endsWith('/')).map(([name, bytes]) => ({ name, content: strFromU8(bytes) }));
+  return Object.entries(entries).filter(([name]) => !name.endsWith('/')).map(([name, bytes]) => ({ name, content: strFromU8(bytes), bytes }));
 }
 
 export function exportFabZip(project: Project, opts?: Parameters<typeof exportFabFiles>[1]): { name: string; data: Uint8Array } {

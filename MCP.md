@@ -155,6 +155,7 @@ claude mcp list          # 查看
 | `sync_to_pcb` | 原理图 → PCB（新增 / 删除封装、更新焊盘网络） | — |
 | `set_board_outline` | 矩形板框 | `width`, `height` |
 | `move_footprint` | 移动 / 旋转封装 | `ref`, `x`, `y`, `rotation?` |
+| `import_altium` | 导入 Altium Designer 工程（多个 .SchDoc + 一个 .PcbDoc） | `files[]`, `out?` |
 | `check_placement` | 布线前布局检查：重叠 / 出板 / 间距 / 去耦距离 / 晶振距离 / 连接器位置 / 干扰 / 长飞线 / 对齐 | — |
 | `optimize_placement` | 模拟退火整理布局（不动锁定件、连接器、已布线器件），用试布线验证不变差才应用（可 undo） | `timeMs?`, `apply?` |
 | `autoroute` | A* 自动布线并应用（可 undo） | `nets?[]` |

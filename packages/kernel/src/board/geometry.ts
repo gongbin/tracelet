@@ -60,7 +60,13 @@ export function footprintBody(fp: BoardFootprint): Rect {
   let local = { x: def.body.x ?? 0, y: def.body.y ?? 0 };
   if (fp.side === 'B') local = { x: -local.x, y: local.y };
   const r = rotate(local, fp.rotation);
-  return { x: fp.x + r.x - w / 2, y: fp.y + r.y - h / 2, w, h };
+  const ninety = Math.abs(((fp.rotation % 90) + 90) % 90) < 1e-6;
+  if (ninety) return { x: fp.x + r.x - w / 2, y: fp.y + r.y - h / 2, w, h };
+  // 任意角度（如 Altium 导入的 45°）：取旋转后本体四角的轴对齐包围盒
+  const hw = def.body.w / 2, hh = def.body.h / 2;
+  const cs = [{ x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh }].map((c) => rotate(c, fp.rotation));
+  const xs = cs.map((c) => c.x), ys = cs.map((c) => c.y);
+  return { x: fp.x + r.x + Math.min(...xs), y: fp.y + r.y + Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
 }
 
 export function boardBounds(board: Board): Rect {

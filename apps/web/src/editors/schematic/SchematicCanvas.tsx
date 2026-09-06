@@ -530,7 +530,7 @@ export function SchematicCanvas() {
           <div style={{ color: '#6B6B6B' }}>空白图纸 · 从这里开始</div>
           <div className="row" style={{ gap: 12 }}>
             <button className="btn xl primary" style={{ boxShadow: '0 4px 14px rgba(61,139,255,.35)' }} onClick={() => app.setSchTool('place')}>放置第一个元件 <span className="mono" style={{ opacity: .8 }}>A</span></button>
-            <button className="btn xl light" onClick={() => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.kicad_sch,.kicad_pcb,.kicad_pro,.zip,.json'; i.multiple = true; i.onchange = () => { if (i.files?.length) void import('../../store/backup.js').then((m) => m.importProjectFiles(Array.from(i.files!))); }; i.click(); }}>导入 KiCad</button>
+            <button className="btn xl light" onClick={() => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.kicad_sch,.kicad_pcb,.kicad_pro,.SchDoc,.PcbDoc,.zip,.json'; i.multiple = true; i.onchange = () => { if (i.files?.length) void import('../../store/backup.js').then((m) => m.importProjectFiles(Array.from(i.files!))); }; i.click(); }}>导入 KiCad / Altium</button>
             <button className="btn xl light" onClick={() => app.set('rightTab', 'ai')}><span style={{ color: 'var(--ai)' }}>✨</span>用 AI 生成起点</button>
           </div>
           <div style={{ color: '#8A8A8A', fontSize: 12 }}>小技巧：按 <b className="mono">R</b> / <b className="mono">C</b> / <b className="mono">D</b> 直接放电阻 / 电容 / LED</div>

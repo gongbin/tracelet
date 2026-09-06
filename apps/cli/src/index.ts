@@ -8,7 +8,7 @@ import { resolve, dirname } from 'node:path';
 import { Command } from 'commander';
 import {
   parseProject, serializeProject, createProject, createDemoProject, buildNetlist, runErc, runDrc, computeRatsnest, reviewSchematic, ruleSetOf, RULE_SETS,
-  exportBomCsv, exportNetlistJson, exportPickAndPlaceCsv, exportFabFiles, exportFabZip, importKicadProject, ProjectEditor, pcb, sch, lib, diffBoardFromSchematic, getSymbol, type Project, type CheckReport,
+  exportBomCsv, exportNetlistJson, exportPickAndPlaceCsv, exportFabFiles, exportFabZip, importKicadProject, importAltiumProject, ProjectEditor, pcb, sch, lib, diffBoardFromSchematic, getSymbol, type Project, type CheckReport,
   PROJECT_TEMPLATES, createFromTemplate, exportSchematicPdf, exportAssemblyPdf, importLibraryFile, footprintFromName, generateFootprint, importEasyEdaProject, checkPlacement, optimizePlacement, type FootprintSpec
 } from '@tracelet/kernel';
 import { basename } from 'node:path';
@@ -102,6 +102,17 @@ exp.command('zip <file>').description('打包全部制造文件为 zip').option(
 });
 
 const imp = program.command('import').description('导入其他格式');
+imp.command('altium <files...>').description('导入 Altium Designer 工程（.SchDoc 可多个 = 多页，.PcbDoc 一个）').option('-o, --out <file>', '输出 .eda.json').option('-n, --name <name>').action((files: string[], o) => {
+  const schs = files.filter((f) => /\.schdoc$/i.test(f)).map((f) => ({ name: basename(f).replace(/\.schdoc$/i, ''), data: new Uint8Array(readFileSync(resolve(f))) }));
+  const pcbFile = files.find((f) => /\.pcbdoc$/i.test(f));
+  const name = o.name ?? basename(pcbFile ?? files[0]).replace(/\.(schdoc|pcbdoc)$/i, '');
+  const r = importAltiumProject({ name, schematics: schs, pcb: pcbFile ? new Uint8Array(readFileSync(resolve(pcbFile))) : undefined });
+  for (const w of r.warnings) console.error(`提示 · ${w.where}: ${w.message}`);
+  const out = o.out ?? `${name}.eda.json`;
+  save(out, r.project);
+  const comps = r.project.schematic.sheets.reduce((n, s) => n + s.components.length, 0);
+  console.log(`已导入 ${schs.length} 页原理图（${comps} 元件）${pcbFile ? `、PCB（${r.project.board.footprints.length} 封装 / ${r.project.board.traces.length} 走线 / ${r.project.board.vias.length} 过孔）` : ''} → ${out}`);
+});
 imp.command('kicad <files...>').description('导入 KiCad 工程（.kicad_sch 可多个 = 多页，.kicad_pcb 一个）').option('-o, --out <file>', '输出 .eda.json').option('-n, --name <name>').action((files: string[], o) => {
   const schs = files.filter((f) => f.endsWith('.kicad_sch')).map((f) => ({ name: basename(f, '.kicad_sch'), text: readFileSync(resolve(f), 'utf8') }));
   const pcbFile = files.find((f) => f.endsWith('.kicad_pcb'));
