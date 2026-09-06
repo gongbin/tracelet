@@ -36,24 +36,43 @@ export function crossSheetLabelNames(schematic: Schematic): Set<string> {
   for (const sh of schematic.sheets) for (const l of sh.labels) { if (!count.has(l.text)) count.set(l.text, new Set()); count.get(l.text)!.add(sh.id); }
   return new Set([...count].filter(([, sheets]) => sheets.size > 1).map(([n]) => n));
 }
+export const GND_NET_RE = /^(?:[ADP]?GND[A-Z0-9_]*|VSS[A-Z0-9_]*|GROUND|EARTH|0V)$/i;
+export const POWER_NET_RE = /^(?:[+-]?\d+(?:\.\d+)?V\d*[A-Z0-9_]*|V(?:CC|DD|EE|BUS|BAT|IN|OUT|SYS|PP|REF|AUX|IO)[A-Z0-9_]*|\+?[0-9]V[0-9]+[A-Z0-9_]*)$/i;
+export type NetLabelGlyph = 'text' | 'gnd' | 'power';
+export interface NetLabelLayout { glyph: NetLabelGlyph; text: { x: number; y: number; anchor: 'start' | 'middle' | 'end' }; lines: Vec[][]; circles: { c: Vec; r: number }[] }
 /**
- * 网络标签布局：红色纯文字贴在导线末端（芯片引脚引出一根线 + 文字）。
- * 文字放在导线上方并朝导线延伸方向排：导线在右 → 文字从锚点向右；导线在左 → 向左；竖直导线 → 文字在远离导线的一端居中。
+ * 网络标签布局：
+ * - 普通网络：红色纯文字贴在导线末端（芯片引脚引出一根线 + 文字），文字顺着导线方向排。
+ * - 地网络（GND / AGND / VSS…）：在锚点画标准地符号（短竖线 + 3 条渐短横线），GND 文字居中在远端；方向背离导线（导线在上就朝下）。
+ * - 电源网络（+5V / +3V3 / VCC / VDD…）：短竖线 + 末端空心圆，文字在圆外侧；方向同样背离导线，默认朝上。
  */
-export function netLabelLayout(sheet: Sheet, label: NetLabel, _crossSheet?: Set<string>): { port: boolean; text: { x: number; y: number; anchor: 'start' | 'middle' | 'end' }; r: number } {
-  void label.kind; void _crossSheet;
-  let dir: 'up' | 'down' | 'left' | 'right' | null = null;
+export function netLabelLayout(sheet: Sheet, label: NetLabel, _crossSheet?: Set<string>): NetLabelLayout {
+  void _crossSheet;
+  let dir: 'up' | 'down' | 'left' | 'right' | null = null; // 导线相对锚点的方向
   for (const w of sheet.wires) {
     const n = w.points.length; if (n < 2) continue;
     const ends: [Vec, Vec][] = [[w.points[0], w.points[1]], [w.points[n - 1], w.points[n - 2]]];
     for (const [e, q] of ends) if (Math.abs(e.x - label.x) < 1e-6 && Math.abs(e.y - label.y) < 1e-6) { const dx = q.x - e.x, dy = q.y - e.y; dir = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'); }
     if (dir) break;
   }
-  const text = dir === 'left' ? { x: label.x - 20, y: label.y - 40, anchor: 'end' as const }
-    : dir === 'down' ? { x: label.x, y: label.y - 40, anchor: 'middle' as const }
-    : dir === 'up' ? { x: label.x, y: label.y + 110, anchor: 'middle' as const }
-    : { x: label.x + 20, y: label.y - 40, anchor: 'start' as const };
-  return { port: false, text, r: 0 };
+  const { x, y } = label;
+  const glyph: NetLabelGlyph = label.kind === 'net' ? 'text' : GND_NET_RE.test(label.text) ? 'gnd' : POWER_NET_RE.test(label.text) ? 'power' : 'text';
+  if (glyph === 'gnd') {
+    const sgn = dir === 'down' ? -1 : 1; // 导线在下方 → 地符号朝上；其余朝下
+    const lines: Vec[][] = [[{ x, y }, { x, y: y + sgn * 100 }]];
+    GND_BARS.forEach((f, k) => lines.push([{ x: x - 150 * f, y: y + sgn * (100 + k * 50) }, { x: x + 150 * f, y: y + sgn * (100 + k * 50) }]));
+    return { glyph, lines, circles: [], text: { x, y: sgn > 0 ? y + 100 + 100 + 120 : y - 100 - 100 - 50, anchor: 'middle' } };
+  }
+  if (glyph === 'power') {
+    const sgn = dir === 'up' ? 1 : -1; // 导线在上方 → 端口朝下；其余朝上
+    const c = { x, y: y + sgn * 140 };
+    return { glyph, lines: [[{ x, y }, { x, y: y + sgn * 100 }]], circles: [{ c, r: 40 }], text: { x, y: sgn < 0 ? c.y - 40 - 50 : c.y + 40 + 110, anchor: 'middle' } };
+  }
+  const text = dir === 'left' ? { x: x - 20, y: y - 40, anchor: 'end' as const }
+    : dir === 'down' ? { x, y: y - 40, anchor: 'middle' as const }
+    : dir === 'up' ? { x, y: y + 110, anchor: 'middle' as const }
+    : { x: x + 20, y: y - 40, anchor: 'start' as const };
+  return { glyph, text, lines: [], circles: [] };
 }
 /** 地符号 4 条横线的相对宽度（从接线端起）。 */
 export const GND_BARS = [1, 0.66, 0.33];

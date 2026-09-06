@@ -459,12 +459,14 @@ export function SchematicCanvas() {
           {/* 标签 */}
           {sheet.labels.map((l) => (
             <g key={l.id} onPointerDown={onLabelDown(l.id)} style={{ cursor: editable ? 'move' : 'pointer' }}>
-              {/* 标准网络标签：红色纯文字贴在导线末端上方 */}
+              {/* 网络标签：普通网络红色纯文字；GND 类画地符号；电源类画端口圆 */}
               {(() => { const lay = netLabelLayout(sheet, l, crossSheet); const sel = app.selection.includes(l.id); const tw = l.text.length * 62;
                 const hx = lay.text.anchor === 'middle' ? lay.text.x - tw / 2 - 20 : lay.text.anchor === 'end' ? lay.text.x - tw - 20 : lay.text.x - 20;
                 return <>
-                  <rect x={Math.min(hx, l.x - 60)} y={Math.min(lay.text.y - 110, l.y - 60)} width={Math.max(hx + tw + 40, l.x + 60) - Math.min(hx, l.x - 60)} height={Math.max(lay.text.y + 40, l.y + 60) - Math.min(lay.text.y - 110, l.y - 60)} rx={20} fill={sel ? 'rgba(255,216,77,.35)' : 'transparent'} stroke={sel ? '#E5B800' : 'none'} strokeWidth={12} />
-                  <text x={lay.text.x} y={lay.text.y} fontSize={100} fontFamily="'JetBrains Mono',monospace" fill={SCH_COLORS.netLabel} textAnchor={lay.text.anchor}>{l.text}</text>
+                  <rect x={Math.min(hx, l.x - 160)} y={Math.min(lay.text.y - 110, l.y - 60, ...lay.lines.flat().map((q) => q.y - 30))} width={Math.max(hx + tw + 40, l.x + 160) - Math.min(hx, l.x - 160)} height={Math.max(lay.text.y + 40, l.y + 60, ...lay.lines.flat().map((q) => q.y + 30)) - Math.min(lay.text.y - 110, l.y - 60, ...lay.lines.flat().map((q) => q.y - 30))} rx={20} fill={sel ? 'rgba(255,216,77,.35)' : 'transparent'} stroke={sel ? '#E5B800' : 'none'} strokeWidth={12} />
+                  {lay.lines.map((ln, k) => <path key={k} d={ln.map((q, j) => `${j ? 'L' : 'M'}${q.x} ${q.y}`).join('')} stroke={SCH_COLORS.wire} strokeWidth={16} fill="none" strokeLinecap="round" />)}
+                  {lay.circles.map((ci, k) => <circle key={'c' + k} cx={ci.c.x} cy={ci.c.y} r={ci.r} stroke={SCH_COLORS.wire} strokeWidth={16} fill={SCH_COLORS.fill} />)}
+                  <text x={lay.text.x} y={lay.text.y} fontSize={100} fontFamily={lay.glyph === 'text' ? "'JetBrains Mono',monospace" : undefined} fill={lay.glyph === 'text' ? SCH_COLORS.netLabel : SCH_COLORS.text} textAnchor={lay.text.anchor}>{l.text}</text>
                 </>; })()}
             </g>
           ))}

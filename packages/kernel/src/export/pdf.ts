@@ -142,7 +142,11 @@ export function paintSheet(project: Project, sheet: Sheet, index: number): { w: 
   const cross = crossSheetLabelNames(project.schematic);
   for (const l of sheet.labels) {
     const lay = netLabelLayout(sheet, l, cross);
-    P.color(SCH_COLORS.netLabel, false); P.text(lay.text.x, lay.text.y, l.text, 100, lay.text.anchor);
+    const ink = lay.glyph === 'text' ? SCH_COLORS.netLabel : SCH_COLORS.wire;
+    P.color(ink); P.color(SCH_COLORS.fill, false);
+    for (const ln of lay.lines) P.polyline(ln, 16);
+    for (const ci of lay.circles) P.circle(ci.c, ci.r, 16, true);
+    P.color(lay.glyph === 'text' ? SCH_COLORS.netLabel : SCH_COLORS.text, false); P.text(lay.text.x, lay.text.y, l.text, 100, lay.text.anchor);
   }
   return { w: pw, h: ph, content: P.content() };
 }
