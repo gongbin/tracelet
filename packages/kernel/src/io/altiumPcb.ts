@@ -208,15 +208,24 @@ export function importAltiumPcb(data: Uint8Array): AltiumPcbResult {
     const vx = boardProps[`VX${i}`]; if (vx === undefined) break;
     const p = { x: lengthProp(vx), y: -lengthProp(boardProps[`VY${i}`]) };
     const kind = Number(boardProps[`KIND${i}`] ?? 0);
-    if (kind === 1 && boardProps[`CX${i}`] !== undefined) {
-      // 圆弧段：从上一顶点沿圆弧到下一顶点，用折线逼近
+    outline.push(p);
+    if (kind === 1 && boardProps[`CX${i}`] !== undefined && boardProps[`VX${i + 1}`] !== undefined) {
+      // 圆弧段：本顶点 → 下一顶点沿圆弧走；SA/EA 只给出角度跨度，方向按两端点实际角度判断
       const c = { x: lengthProp(boardProps[`CX${i}`]), y: -lengthProp(boardProps[`CY${i}`]) };
-      const rad = lengthProp(boardProps[`R${i}`]); let sa = Number(boardProps[`SA${i}`] ?? 0), ea = Number(boardProps[`EA${i}`] ?? 0);
-      if (ea <= sa) ea += 360;
-      const n = Math.max(4, Math.ceil((ea - sa) / 10));
-      for (let k = 0; k <= n; k++) { const a = ((sa + ((ea - sa) * k) / n) * Math.PI) / 180; outline.push({ x: c.x + rad * Math.cos(a), y: c.y - rad * Math.sin(a) }); }
-    } else outline.push(p);
+      const rad = lengthProp(boardProps[`R${i}`]);
+      const q = { x: lengthProp(boardProps[`VX${i + 1}`]), y: -lengthProp(boardProps[`VY${i + 1}`]) };
+      const ang = (v: Vec) => Math.atan2(-(v.y - c.y), v.x - c.x); // y 向上的角度
+      const a0 = ang(p), a1 = ang(q);
+      const span = (((Number(boardProps[`EA${i}`] ?? 0) - Number(boardProps[`SA${i}`] ?? 0)) % 360) + 360) % 360 || 360;
+      let ccw = a1 - a0; while (ccw <= 0) ccw += Math.PI * 2; // 逆时针跨度
+      const cw = Math.PI * 2 - ccw;
+      const useCcw = Math.abs(ccw - (span * Math.PI) / 180) <= Math.abs(cw - (span * Math.PI) / 180);
+      const sweep = useCcw ? ccw : -cw;
+      const n = Math.max(3, Math.ceil(Math.abs(sweep) / (Math.PI / 18)));
+      for (let k = 1; k < n; k++) { const a = a0 + (sweep * k) / n; outline.push({ x: c.x + rad * Math.cos(a), y: c.y - rad * Math.sin(a) }); }
+    }
   }
+  while (outline.length > 1 && Math.hypot(outline[0].x - outline[outline.length - 1].x, outline[0].y - outline[outline.length - 1].y) < 1e-6) outline.pop();
   const usedTop = new Set([...usedCopper]);
   // 4 层判断：出现内层 / 内电层
   const inner = [...usedTop].filter((l) => (l >= 2 && l <= 31) || (l >= 39 && l <= 54));
@@ -283,7 +292,7 @@ export function importAltiumPcb(data: Uint8Array): AltiumPcbResult {
     if (isPlane(t.layer)) continue;
     if (t.component !== 0xffff && !isCopperNum(t.layer)) continue; // 元件丝印线已并入本体
     const layer = layerMap(t.layer);
-    if (layer) { if (!cuLayers.includes(layer)) continue; board.traces.push({ id: newId('t'), layer, net: netName(t.net), width: r3(t.width), points: [rv(t.a), rv(t.b)] } as Trace); continue; }
+    if (layer) { if (!cuLayers.includes(layer) || Math.hypot(t.a.x - t.b.x, t.a.y - t.b.y) < 1e-6 || !(t.width > 0)) continue; board.traces.push({ id: newId('t'), layer, net: netName(t.net), width: r3(t.width), points: [rv(t.a), rv(t.b)] } as Trace); continue; }
     if (t.layer === L.KEEPOUT && !outline.length) bump('keepoutTracks');
   }
   for (const a of arcs) {
@@ -300,7 +309,9 @@ export function importAltiumPcb(data: Uint8Array): AltiumPcbResult {
     if (!layer || !cuLayers.includes(layer)) continue;
     const pts: Vec[] = [];
     for (let i = 0; p[`VX${i}`] !== undefined; i++) pts.push({ x: lengthProp(p[`VX${i}`]), y: -lengthProp(p[`VY${i}`]) });
-    if (pts.length >= 3) board.zones.push({ id: newId('z'), layer, net: p.NET ?? '', polygon: pts.map(rv), thermal: 'relief', thermalGap: 0.3, spokeWidth: 0.4, clearance: 0 } as Zone);
+    const zn = /^\d+$/.test(p.NET ?? '') ? netName(Number(p.NET)) : (p.NET ?? ''); // Polygons6 的 NET 是网络序号
+    const ring = cleanRing(pts.map(rv));
+    if (ring.length >= 3) board.zones.push({ id: newId('z'), layer, net: zn, polygon: ring, thermal: 'relief', thermalGap: 0.3, spokeWidth: 0.4, clearance: 0 } as Zone);
   }
   for (const f of fills) {
     if (f.keepout) continue;
@@ -319,19 +330,20 @@ export function importAltiumPcb(data: Uint8Array): AltiumPcbResult {
     if ((rg.props.ISBOARDCUTOUT ?? '').toUpperCase() === 'TRUE' || Number(rg.props.KIND ?? 0) !== 0) continue;
     const layer = layerMap(rg.layer); if (!layer || !cuLayers.includes(layer)) continue;
     const nn = netName(rg.net); if (!nn && rg.layer >= 39) continue;
-    board.zones.push({ id: newId('z'), layer, net: nn, polygon: rg.outline.map(rv), thermal: 'relief', thermalGap: 0.3, spokeWidth: 0.4, clearance: 0 } as Zone);
+    const ring = cleanRing(rg.outline.map(rv)); if (ring.length < 3) continue;
+    board.zones.push({ id: newId('z'), layer, net: nn, polygon: ring, thermal: 'relief', thermalGap: 0.3, spokeWidth: 0.4, clearance: 0 } as Zone);
   }
   // ---- 内电层（负片整层 = 一个网络）：整板铺铜 ----
   for (let i = 1; i <= 16; i++) {
     const nn = (boardProps[`PLANE${i}NETNAME`] ?? '').trim();
     if (!nn || /^\(/.test(nn)) continue; // (No Net) / (Multiple Nets)
     const layer = layerMap(38 + i); if (!layer || !cuLayers.includes(layer) || !outline.length) continue;
-    board.zones.push({ id: newId('z'), layer, net: nn, polygon: outline.map(rv), thermal: 'relief', thermalGap: 0.3, spokeWidth: 0.4, clearance: 0 } as Zone);
+    board.zones.push({ id: newId('z'), layer, net: nn, polygon: cleanRing(outline.map(rv)), thermal: 'relief', thermalGap: 0.3, spokeWidth: 0.4, clearance: 0 } as Zone);
   }
 
   // ---- 自由文字（丝印）；元件的位号 / 注释文字由本工程自动绘制 ----
   for (const t of texts) {
-    if (t.component !== 0xffff || t.designator || t.comment || t.text.startsWith('.')) continue;
+    if (t.component !== 0xffff || t.designator || t.comment || /^'?\./.test(t.text)) continue; // .Designator / '.Layer_Name' 这类特殊字符串
     const layer = silkMap(t.layer); if (!layer) continue;
     const size = Math.max(0.5, r3(t.height));
     const w = t.text.length * size * 0.65;
@@ -374,6 +386,13 @@ export function importAltiumPcb(data: Uint8Array): AltiumPcbResult {
 }
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
+/** 去掉相邻重复点与首尾重复点 */
+function cleanRing(pts: Vec[]): Vec[] {
+  const out: Vec[] = [];
+  for (const p of pts) if (!out.length || Math.hypot(p.x - out[out.length - 1].x, p.y - out[out.length - 1].y) > 1e-6) out.push(p);
+  while (out.length > 1 && Math.hypot(out[0].x - out[out.length - 1].x, out[0].y - out[out.length - 1].y) <= 1e-6) out.pop();
+  return out;
+}
 const rv = (p: Vec): Vec => ({ x: r3(p.x), y: r3(p.y) });
 function arcPts(c: Vec, r: number, sa: number, ea: number): Vec[] {
   let a0 = sa, a1 = ea; if (a1 <= a0) a1 += 360;

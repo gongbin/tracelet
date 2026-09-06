@@ -35,7 +35,9 @@ function fillPreparedZone(board: Board, zone: Zone, rules: RuleSet, pads: Return
   const nc = netClassFor(board, zone.net);
   const clearance = Math.max(rules.minClearance, zone.clearance ?? 0, nc?.clearance ?? 0.2);
 
-  const zonePoly: PcMulti = [[closed(toPc(zone.polygon))]];
+  const ring = zone.polygon.filter((p, i, a) => !i || Math.hypot(p.x - a[i - 1].x, p.y - a[i - 1].y) > 1e-9);
+  if (ring.length < 3) return [];
+  const zonePoly: PcMulti = [[closed(toPc(ring))]];
   let area: PcMulti;
   try {
     area = pc.intersection(zonePoly, inside);
@@ -63,7 +65,7 @@ function fillPreparedZone(board: Board, zone: Zone, rules: RuleSet, pads: Return
   }
   for (const t of board.traces) {
     if (t.layer !== zone.layer || (t.net && t.net === zone.net)) continue;
-    for (let i = 0; i < t.points.length - 1; i++) obstacles.push([closed(toPc(stadiumPoly(t.points[i], t.points[i + 1], t.width / 2 + Math.max(clearance, netClassFor(board, t.net)?.clearance ?? 0))))]);
+    for (let i = 0; i < t.points.length - 1; i++) if (Math.hypot(t.points[i + 1].x - t.points[i].x, t.points[i + 1].y - t.points[i].y) > 1e-9) obstacles.push([closed(toPc(stadiumPoly(t.points[i], t.points[i + 1], t.width / 2 + Math.max(clearance, netClassFor(board, t.net)?.clearance ?? 0))))]);
   }
   for (const v of board.vias) {
     if (v.net && v.net === zone.net) continue;
@@ -71,7 +73,18 @@ function fillPreparedZone(board: Board, zone: Zone, rules: RuleSet, pads: Return
   }
 
   let fill: PcMulti;
-  try { fill = obstacles.length ? pc.difference(area, obstacles) : area; } catch { return []; }
+  try { fill = obstacles.length ? pc.difference(area, obstacles) : area; }
+  catch {
+    // 多边形裁剪库偶尔在近乎重合的边上失败（导入的板常见重叠走线）：退化为分批 / 逐个相减，跳过出错的障碍
+    fill = area;
+    const CH = 64;
+    for (let i = 0; i < obstacles.length; i += CH) {
+      const batch = obstacles.slice(i, i + CH);
+      try { fill = pc.difference(fill, batch); }
+      catch { for (const ob of batch) { try { fill = pc.difference(fill, [ob]); } catch { /* 跳过 */ } } }
+      if (!fill.length) break;
+    }
+  }
   const result = fromPc(fill);
   if (!zone.net) return result;
 
