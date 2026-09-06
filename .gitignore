@@ -28,3 +28,6 @@ ui-demo/
 /deploy/**/*.md
 /internal/
 /notes/
+
+# Entire deployment directory is local-only
+/deploy/
