@@ -56,7 +56,11 @@ export function footprintBody(fp: BoardFootprint): Rect {
   const def = footprintDef(fp);
   const swap = Math.abs(((fp.rotation % 180) + 180) % 180 - 90) < 1e-6;
   const w = swap ? def.body.h : def.body.w, h = swap ? def.body.w : def.body.h;
-  return { x: fp.x - w / 2, y: fp.y - h / 2, w, h };
+  // 本体中心偏移与焊盘走同一套变换（底层镜像 x，再旋转）
+  let local = { x: def.body.x ?? 0, y: def.body.y ?? 0 };
+  if (fp.side === 'B') local = { x: -local.x, y: local.y };
+  const r = rotate(local, fp.rotation);
+  return { x: fp.x + r.x - w / 2, y: fp.y + r.y - h / 2, w, h };
 }
 
 export function boardBounds(board: Board): Rect {

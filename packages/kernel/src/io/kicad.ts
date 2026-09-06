@@ -259,17 +259,23 @@ export function parseFootprintNode(fp: SList, netName: (node: SList | undefined)
     if (nn && !padNets[number]) padNets[number] = nn;
   }
   // 本体：优先 courtyard，其次 fab，其次焊盘外接框
-  const boxFrom = (layerName: string): { w: number; h: number } | null => {
+  const boxFrom = (layerName: string): { w: number; h: number; x: number; y: number } | null => {
     const pts: Vec[] = [];
     for (const ln of children(fp, 'fp_line')) if (str(child(ln, 'layer')?.[1]) === layerName) pts.push(P(child(ln, 'start')), P(child(ln, 'end')));
     for (const r of children(fp, 'fp_rect')) if (str(child(r, 'layer')?.[1]) === layerName) pts.push(P(child(r, 'start')), P(child(r, 'end')));
     for (const c of children(fp, 'fp_circle')) if (str(child(c, 'layer')?.[1]) === layerName) { const ce = P(child(c, 'center')), en = P(child(c, 'end')); const r = dist(ce, en); pts.push({ x: ce.x - r, y: ce.y - r }, { x: ce.x + r, y: ce.y + r }); }
     if (!pts.length) return null;
-    return { w: Math.max(...pts.map((p) => p.x)) - Math.min(...pts.map((p) => p.x)), h: Math.max(...pts.map((p) => p.y)) - Math.min(...pts.map((p) => p.y)) };
+    const x1 = Math.min(...pts.map((p) => p.x)), x2 = Math.max(...pts.map((p) => p.x)), y1 = Math.min(...pts.map((p) => p.y)), y2 = Math.max(...pts.map((p) => p.y));
+    return { w: x2 - x1, h: y2 - y1, x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
   };
-  const body = boxFrom('F.CrtYd') ?? boxFrom('B.CrtYd') ?? boxFrom('F.Fab') ?? boxFrom('B.Fab') ?? boxFrom('F.SilkS') ?? (pads.length ? { w: Math.max(...pads.map((p) => Math.abs(p.x) + p.w / 2)) * 2 + 0.2, h: Math.max(...pads.map((p) => Math.abs(p.y) + p.h / 2)) * 2 + 0.2 } : { w: 2, h: 2 });
+  const padBox = (): { w: number; h: number; x: number; y: number } => {
+    if (!pads.length) return { w: 2, h: 2, x: 0, y: 0 };
+    const x1 = Math.min(...pads.map((p) => p.x - p.w / 2)), x2 = Math.max(...pads.map((p) => p.x + p.w / 2)), y1 = Math.min(...pads.map((p) => p.y - p.h / 2)), y2 = Math.max(...pads.map((p) => p.y + p.h / 2));
+    return { w: x2 - x1 + 0.2, h: y2 - y1 + 0.2, x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
+  };
+  const body = boxFrom('F.CrtYd') ?? boxFrom('B.CrtYd') ?? boxFrom('F.Fab') ?? boxFrom('B.Fab') ?? boxFrom('F.SilkS') ?? padBox();
   const isTht = pads.some((p) => p.drill > 0 && !p.npth);
-  const def: Omit<FootprintDef, 'id'> = { name: shortName, body: { w: Math.round(body.w * 100) / 100, h: Math.round(body.h * 100) / 100 }, pads, height: isTht ? 4 : 1, description: descr ? str(descr[1]) : `KiCad ${libName}` };
+  const def: Omit<FootprintDef, 'id'> = { name: shortName, body: { w: Math.round(body.w * 100) / 100, h: Math.round(body.h * 100) / 100, ...(Math.abs(body.x) > 0.005 || Math.abs(body.y) > 0.005 ? { x: Math.round(body.x * 1000) / 1000, y: Math.round(body.y * 1000) / 1000 } : {}) }, pads, height: isTht ? 4 : 1, description: descr ? str(descr[1]) : `KiCad ${libName}` };
   return { def, shortName, libName, props, padNets, at: { x: num(at?.[1]), y: num(at?.[2]) }, angle: fpAngle, side, locked: fp.includes('locked') || str(child(fp, 'locked')?.[1]) === 'yes' };
 }
 

@@ -22,10 +22,11 @@ export function SymbolThumb({ sym, size = 30 }: { sym: SymbolDef; size?: number 
 
 /** 封装缩略图。 */
 export function FootprintThumb({ fp, size = 60 }: { fp: FootprintDef; size?: number }) {
-  const ext = Math.max(fp.body.w, fp.body.h, ...fp.pads.map((p) => Math.abs(p.x) * 2 + p.w), ...fp.pads.map((p) => Math.abs(p.y) * 2 + p.h)) * 1.25 || 2;
+  const bx = fp.body.x ?? 0, by = fp.body.y ?? 0;
+  const ext = Math.max(fp.body.w + 2 * Math.abs(bx), fp.body.h + 2 * Math.abs(by), ...fp.pads.map((p) => Math.abs(p.x) * 2 + p.w), ...fp.pads.map((p) => Math.abs(p.y) * 2 + p.h)) * 1.25 || 2;
   return (
     <svg width={size} height={size} viewBox={`${-ext / 2} ${-ext / 2} ${ext} ${ext}`}>
-      <rect x={-fp.body.w / 2} y={-fp.body.h / 2} width={fp.body.w} height={fp.body.h} fill="none" stroke="#F2F2F2" strokeWidth={ext / 120} />
+      <rect x={bx - fp.body.w / 2} y={by - fp.body.h / 2} width={fp.body.w} height={fp.body.h} fill="none" stroke="#F2F2F2" strokeWidth={ext / 120} />
       {fp.pads.map((p, i) => p.shape === 'circle' || p.shape === 'oval'
         ? <ellipse key={i} cx={p.x} cy={p.y} rx={p.w / 2} ry={p.h / 2} fill={p.npth ? 'none' : '#C83434'} stroke={p.npth ? '#D0D2D6' : 'none'} strokeWidth={ext / 120} />
         : <rect key={i} x={p.x - p.w / 2} y={p.y - p.h / 2} width={p.w} height={p.h} rx={p.shape === 'roundrect' ? Math.min(p.w, p.h) * 0.25 : 0} fill="#C83434" />)}

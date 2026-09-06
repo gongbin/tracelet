@@ -91,7 +91,7 @@ function buildScene(project: Project, s: View3dState, selection: string[], model
     if (loaded && config) root.add(modelInstance(loaded, config));
     else {
       const m = new THREE.Mesh(new THREE.BoxGeometry(def.body.w, def.body.h, h), new THREE.MeshStandardMaterial({ color: 0x9aa1ad, roughness: .7 }));
-      m.position.z = h / 2; root.add(m);
+      m.position.set(def.body.x ?? 0, -(def.body.y ?? 0), h / 2); root.add(m); // 本体中心偏移（连接器原点常在 1 脚）
     }
     root.position.set(X(f.x), Y(f.y), f.side === 'F' ? T + .015 : -.015);
     root.rotation.z = -f.rotation * Math.PI / 180;
