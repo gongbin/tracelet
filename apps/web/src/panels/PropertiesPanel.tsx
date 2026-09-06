@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { sch, pcb, getSymbol, BUILTIN_FOOTPRINTS, BUILTIN_PARTS, findFootprint, footprintPads, milToMm, formatLength, copperLayers, registeredFootprints, crossSheetLabelNames } from '@tracelet/kernel';
+import { sch, pcb, getSymbol, BUILTIN_FOOTPRINTS, BUILTIN_PARTS, findFootprint, footprintPads, milToMm, formatLength, copperLayers, registeredFootprints, crossSheetLabelNames, traceLengthStats, polylineLength } from '@tracelet/kernel';
 import { useApp, useEditor, useProject, useSheet } from '../store/app.js';
 import { getAnalysis } from '../store/analysis.js';
 
@@ -53,6 +53,8 @@ export function PropertiesPanel() {
           <span className="k">层</span><select className="input mono" value={tr.layer} onChange={(e) => editor.dispatch(pcb.setTraceProps(tr.id, { layer: e.target.value as typeof tr.layer }))}>{copperLayers(project.board.copperCount).map((l) => <option key={l} value={l}>{l}</option>)}</select>
           <span className="k">宽度 (mm)</span><ValueInput value={String(tr.width)} onCommit={(v) => { const n = Number(v); if (n > 0) editor.dispatch(pcb.setTraceProps(tr.id, { width: n })); }} />
           <span className="k">段数</span><span className="field mono">{tr.points.length - 1}</span>
+          <span className="k">本段长度</span><span className="field mono">{polylineLength(tr.points).toFixed(2)} mm</span>
+          {tr.net && (() => { const st = traceLengthStats(project.board).nets.find((n) => n.net === tr.net); return st ? <><span className="k">网络总长</span><span className="field mono" title={Object.entries(st.byLayer).map(([l, v]) => `${l} ${v} mm`).join(' · ')}>{st.length.toFixed(2)} mm · {st.segments} 段 · {st.vias} 过孔</span></> : null; })()}
         </div>
         <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>{[0.15, 0.25, 0.3, 0.5, 0.8, 1.0].map((w) => <span key={w} className={`chip mono${Math.abs(tr.width - w) < 1e-9 ? ' on' : ''}`} onClick={() => editor.dispatch(pcb.setTraceProps(tr.id, { width: w }))}>{w}</span>)}</div>
         <div className="dim xs">再次点击已选中的走线并拖动可平移线段；拖动黄色手柄移动顶点。</div>
@@ -104,6 +106,20 @@ export function PropertiesPanel() {
         <div className="divider" />
         <div className="kicker">板</div>
         <div className="kv"><span className="k">元件</span><span className="mono">{bb.footprints.length}</span><span className="k">走线</span><span className="mono">{bb.traces.length}</span><span className="k">过孔</span><span className="mono">{bb.vias.length}</span><span className="k">未布线</span><span className="mono" style={{ color: a.ratsnest.unrouted ? 'var(--warning)' : 'var(--success)' }}>{a.ratsnest.unrouted}/{a.ratsnest.total}</span></div>
+        {bb.traces.length > 0 && (() => { const st = traceLengthStats(bb); return <>
+          <div className="divider" />
+          <div className="row"><span className="kicker">走线长度</span><span className="ml-auto mono xs">共 {st.total.toFixed(1)} mm · {st.vias} 过孔</span></div>
+          <div className="col" style={{ gap: 1, maxHeight: 240, overflow: 'auto' }}>
+            {st.nets.map((n) => <div key={n.net} className="row mono xs" title={`${Object.entries(n.byLayer).map(([l, v]) => `${l} ${v} mm`).join(' · ')} · ${n.segments} 段`} style={{ gap: 6, padding: '2px 4px', borderRadius: 4, cursor: 'pointer', background: app.highlightNet === n.net ? 'var(--bg-raised)' : 'transparent' }} onClick={() => app.patch({ highlightNet: app.highlightNet === n.net ? null : n.net })}>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.net}</span>
+              <span style={{ width: 70, height: 4, borderRadius: 2, background: 'var(--border)', overflow: 'hidden', flex: 'none' }}><span style={{ display: 'block', width: `${Math.max(2, (100 * n.length) / (st.nets[0]?.length || 1))}%`, height: '100%', background: 'var(--accent)' }} /></span>
+              <span style={{ width: 62, textAlign: 'right', flex: 'none' }}>{n.length.toFixed(1)} mm</span>
+              <span className="muted" style={{ width: 26, textAlign: 'right', flex: 'none' }}>{n.vias ? `${n.vias}v` : ''}</span>
+            </div>)}
+            {st.unassigned > 0 && <div className="dim xs">无网络走线 {st.unassigned.toFixed(1)} mm</div>}
+          </div>
+          <div className="dim xs">点网络名高亮该网络；差分对 / 时钟线可据此对比长度。</div>
+        </>; })()}
         <div className="divider" />
         <div className="kicker">下一步</div>
         <div className="col" style={{ gap: 6 }}>

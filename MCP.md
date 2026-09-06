@@ -158,6 +158,7 @@ claude mcp list          # 查看
 | `check_placement` | 布线前布局检查：重叠 / 出板 / 间距 / 去耦距离 / 晶振距离 / 连接器位置 / 干扰 / 长飞线 / 对齐 | — |
 | `optimize_placement` | 模拟退火整理布局（不动锁定件、连接器、已布线器件），用试布线验证不变差才应用（可 undo） | `timeMs?`, `apply?` |
 | `autoroute` | A* 自动布线并应用（可 undo） | `nets?[]` |
+| `trace_lengths` | 按网络统计走线长度 / 段数 / 过孔 / 各层长度 | `net?` |
 | `export_fab` | Gerber + Excellon + BOM + 坐标写入目录 | `dir` |
 | `export_pdf` | 原理图 / 装配图 PDF | `schematic?`, `assembly?` |
 

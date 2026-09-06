@@ -71,7 +71,7 @@ claude mcp add tracelet -- pnpm --dir /path/to/tracelet cli serve --mcp --live
 claude mcp add tracelet -- pnpm --dir /path/to/tracelet cli serve --mcp -f /path/to/project.eda.json
 ```
 
-工具：`open_project / new_project / new_from_template / list_templates / list_open_projects / use_project / import_kicad / import_easyeda / import_library / generate_footprint / project_summary / get_netlist / get_component / run_erc / run_drc / review_schematic / search_parts / place_component / connect_pins / add_net_label / set_component_value / sync_to_pcb / move_footprint / set_board_outline / check_placement / optimize_placement / autoroute / export_fab / export_pdf / undo`。文件模式下每次修改自动保存到打开的文件。
+工具：`open_project / new_project / new_from_template / list_templates / list_open_projects / use_project / import_kicad / import_easyeda / import_library / generate_footprint / project_summary / get_netlist / get_component / run_erc / run_drc / review_schematic / search_parts / place_component / connect_pins / add_net_label / set_component_value / sync_to_pcb / move_footprint / set_board_outline / check_placement / optimize_placement / autoroute / trace_lengths / export_fab / export_pdf / undo`。文件模式下每次修改自动保存到打开的文件。
 
 ## 存储模式
 
