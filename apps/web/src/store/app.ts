@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { usePrefs } from '../i18n/index.js';
 import { ProjectEditor, pcb, type sch, type Project, type CopperLayer, type Layer, type Vec, type AutorouteResult, type PlacementResult, type Sheet } from '@tracelet/kernel';
 type Clipboard = sch.Clipboard;
 import { createProjectStore, type ProjectMeta, type ProjectStore } from './projectStore.js';
@@ -165,6 +166,8 @@ export const useApp = create<AppState>((set, get) => ({
   view3d: 'iso',
 
   async refreshProjects() {
+    // 远程模式：用服务器上的姓名（种子用户）覆盖本地
+    void get().store.me?.().then((u) => { if (u?.name && u.name !== usePrefs.getState().userName) usePrefs.getState().setUserName(u.name); }).catch(() => {});
     try { set({ projects: await get().store.list() }); } catch (e) { get().toast(`无法读取项目列表：${(e as Error).message}`, 'error'); }
   },
   async openProject(id) {

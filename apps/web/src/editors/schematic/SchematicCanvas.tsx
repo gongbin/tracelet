@@ -6,6 +6,7 @@ import { useViewport, gridStep } from '../../hooks/useViewport.js';
 import { SymbolGlyph } from './SymbolGlyph.js';
 import { SCH_COLORS, crossSheetLabelNames, netLabelLayout } from '@tracelet/kernel';
 import { Hint } from '../../components/Hint.js';
+import { usePrefs } from '../../i18n/index.js';
 
 let SCH_SNAP = SCH_GRID;
 const G = (v: number) => snapTo(v, SCH_SNAP);
@@ -35,7 +36,9 @@ type Drag =
   | { kind: 'marquee'; start: Vec; add: boolean };
 
 /** 图纸边框 + 标题栏（A4/A3/A2）。 */
-function SheetFrame({ project, sheetName, index, total, frame }: { project: { name: string; updatedAt: string }; sheetName: string; index: number; total: number; frame: SheetFrameDef }) {
+function SheetFrame({ project, sheetName, index, total, frame: frame0 }: { project: { name: string; updatedAt: string }; sheetName: string; index: number; total: number; frame: SheetFrameDef }) {
+  const userName = usePrefs((s) => s.userName);
+  const frame = frame0.author ? frame0 : { ...frame0, author: userName }; // 未填作者时用头像里的姓名
   const paper = paperSize(frame);
   if (!paper) return null;
   const W = paper.w, H = paper.h;

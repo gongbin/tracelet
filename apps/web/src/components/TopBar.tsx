@@ -4,7 +4,7 @@ import { useRef } from 'react';
 import { useApp, useEditor, useProject, type Screen } from '../store/app.js';
 import { Icon } from './Icon.js';
 import { I } from '../icons.js';
-import { useT } from '../i18n/index.js';
+import { useT, usePrefs } from '../i18n/index.js';
 import { PrefsMenu } from './PrefsMenu.js';
 import { useBridge } from '../store/bridge.js';
 import { GuidePanel } from '../panels/GuidePanel.js';
@@ -13,6 +13,11 @@ const TABS: { id: Screen; key: 'ws.sch' | 'ws.pcb' | 'ws.3d' | 'ws.lib' | 'ws.bo
   { id: 'sch', key: 'ws.sch' }, { id: 'pcb', key: 'ws.pcb' }, { id: '3d', key: 'ws.3d' }, { id: 'lib', key: 'ws.lib' }, { id: 'bom', key: 'ws.bom' }, { id: 'fab', key: 'ws.fab' }
 ];
 
+/** 导出 PDF 时把头像里的姓名填进没写作者的图纸 */
+function withAuthor<T extends { schematic: { sheets: { frame: { author: string } }[] } }>(p: T): T {
+  const a = usePrefs.getState().userName; if (!a) return p;
+  return { ...p, schematic: { ...p.schematic, sheets: p.schematic.sheets.map((s) => (s.frame.author ? s : { ...s, frame: { ...s.frame, author: a } })) } };
+}
 function timeAgo(t: number | null) {
   if (!t) return '';
   const s = Math.floor((Date.now() - t) / 1000);
@@ -61,8 +66,8 @@ export function TopBar() {
             <div className="menu-item" onClick={() => { set('projMenuOpen', false); fileRef.current?.click(); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇪</span>{t('proj.import')}</div>
             <div className="menu-item" onClick={() => { set('projMenuOpen', false); exportProjectFile(project); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇩</span>{t('proj.export')}</div>
             <div className="menu-item" onClick={() => { set('projMenuOpen', false); void backupAllProjects().then((n) => toast(`已备份 ${n} 个项目`, 'success')); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⧉</span>{t('proj.backup')}</div>
-            <div className="menu-item" title="矢量 PDF，每页一张图纸；标准字体不含中文，中文以 ? 显示" onClick={() => { set('projMenuOpen', false); downloadFile(`${slug(project.name)}-schematic.pdf`, exportSchematicPdf(project), 'application/pdf'); toast('已导出原理图 PDF', 'success'); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇩</span>导出原理图 PDF</div>
-            <div className="menu-item" title="顶层 / 底层装配图（位号 + 外形）" onClick={() => { set('projMenuOpen', false); downloadFile(`${slug(project.name)}-assembly.pdf`, exportAssemblyPdf(project), 'application/pdf'); toast('已导出装配图 PDF', 'success'); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇩</span>导出装配图 PDF</div>
+            <div className="menu-item" title="矢量 PDF，每页一张图纸；标准字体不含中文，中文以 ? 显示" onClick={() => { set('projMenuOpen', false); downloadFile(`${slug(project.name)}-schematic.pdf`, exportSchematicPdf(withAuthor(project)), 'application/pdf'); toast('已导出原理图 PDF', 'success'); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇩</span>导出原理图 PDF</div>
+            <div className="menu-item" title="顶层 / 底层装配图（位号 + 外形）" onClick={() => { set('projMenuOpen', false); downloadFile(`${slug(project.name)}-assembly.pdf`, exportAssemblyPdf(withAuthor(project)), 'application/pdf'); toast('已导出装配图 PDF', 'success'); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇩</span>导出装配图 PDF</div>
             <input ref={fileRef} type="file" accept=".json,.zip,.kicad_sch,.kicad_pcb,.kicad_pro,.SchDoc,.PcbDoc" multiple hidden onChange={(e) => { const fs = e.target.files; if (fs?.length) void importProjectFiles(Array.from(fs)); e.target.value = ''; }} />
             <div className="menu-sep" />
             <div className="menu-item" onClick={() => { const n = prompt('项目名', project.name); if (n && n !== project.name) editor.dispatch(sch.renameProject(n)); set('projMenuOpen', false); }}><span style={{ width: 14 }} />重命名</div>

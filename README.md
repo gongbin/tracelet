@@ -4,6 +4,11 @@ TypeScript 无头内核 + Web 编辑器 + CLI + MCP server + 可选的自建远�
 
 
 
+
+## 用户姓名与标题栏作者
+
+右上角头像可编辑姓名：新建工程的每张图纸标题栏作者自动填该姓名，未填作者的旧图纸显示与 PDF 导出也用它。本地模式存在浏览器；远程模式通过 `GET/PUT /api/me` 存到服务器：文件存储写 `data/_user.json`，PostgreSQL 写 `users` 表并在首次启动时插入种子用户（`owner@tracelet.local` / 设计者）。
+
 ## Altium Designer 导入
 
 支持直接导入 .SchDoc / .PcbDoc（OLE 复合文档二进制格式，独立实现的解析器，格式知识参考 KiCad / altium2kicad 等公开实现）：

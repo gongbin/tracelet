@@ -4,7 +4,13 @@ import { useApp } from '../store/app.js';
 import { loadStoreConfig, saveStoreConfig } from '../store/projectStore.js';
 import { useBridge } from '../store/bridge.js';
 
-/** 头像菜单：语言 / 主题 / 存储模式。 */
+/** 头像显示：中文名取末两字，英文名取首字母。 */
+export function initials(name: string): string {
+  const n = name.trim(); if (!n) return '我';
+  if (/[\u4e00-\u9fff]/.test(n)) return n.length <= 2 ? n : n.slice(-2);
+  return n.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+}
+/** 头像菜单：姓名 / 语言 / 主题 / 存储模式。 */
 export function PrefsMenu({ large }: { large?: boolean }) {
   const [open, setOpen] = useState(false);
   const prefs = usePrefs();
@@ -24,11 +30,14 @@ export function PrefsMenu({ large }: { large?: boolean }) {
   return (
     <div ref={ref} style={{ position: 'relative', flex: 'none' }} onClick={(e) => e.stopPropagation()}>
       <div className="row" style={{ gap: 0, cursor: 'pointer' }} onClick={() => setOpen(!open)}>
-        <span className="avatar" style={{ width: size, height: size, background: '#7A8A5E', fontSize: large ? 11 : 10 }}>林</span>
-        {!large && <span className="avatar" style={{ background: 'var(--ai)', color: 'var(--bg-topbar)', marginLeft: -8 }}>杰</span>}
+        <span className="avatar" title={prefs.userName ? `${prefs.userName} · 点击编辑姓名与偏好` : '点击设置姓名'} style={{ width: size, height: size, background: '#7A8A5E', fontSize: large ? 11 : 10 }}>{initials(prefs.userName)}</span>
       </div>
       {open && (
         <div className="menu" style={{ top: size + 8, right: 0, width: 260 }}>
+          <div className="menu-head">姓名（写入原理图标题栏作者）</div>
+          <div className="row" style={{ padding: '0 6px 6px', gap: 6 }}>
+            <input className="input" placeholder="如 张三" defaultValue={prefs.userName} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} onBlur={(e) => { const n = e.target.value.trim(); if (n === prefs.userName) return; prefs.setUserName(n); if (app.store.kind === 'remote' && app.store.setMe) void app.store.setMe(n).then(() => app.toast('姓名已同步到服务器', 'success')).catch(() => app.toast('姓名已保存在本机，同步到服务器失败', 'error')); else app.toast('姓名已保存；新图纸标题栏会自动填作者', 'success'); }} />
+          </div>
           <div className="menu-head">{t('settings.language')}</div>
           <div className="row" style={{ padding: '0 6px 6px', gap: 6 }}>
             {LOCALES.map((l) => <span key={l} className={`chip${prefs.locale === l ? ' on' : ''}`} onClick={() => prefs.setLocale(l)}>{t(`lang.${l}` as 'lang.en')}</span>)}

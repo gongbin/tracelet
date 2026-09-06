@@ -20,6 +20,9 @@ export interface ProjectStore {
   load(id: string): Promise<Project | null>;
   save(project: Project): Promise<void>;
   remove(id: string): Promise<void>;
+  /** 远程模式：服务器上的当前用户（种子用户） */
+  me?(): Promise<{ name: string; email?: string } | null>;
+  setMe?(name: string): Promise<void>;
 }
 
 export interface StoreConfig { mode: 'local' | 'remote'; url?: string; token?: string }
@@ -84,6 +87,8 @@ export class RemoteProjectStore implements ProjectStore {
   async load(id: string) { try { return parseProject(await this.req<unknown>(`/api/projects/${id}`)); } catch { return null; } }
   save(project: Project) { return this.req<void>(`/api/projects/${project.id}`, { method: 'PUT', body: serializeProject(project, false) }); }
   remove(id: string) { return this.req<void>(`/api/projects/${id}`, { method: 'DELETE' }); }
+  async me() { try { return await this.req<{ name: string; email?: string }>('/api/me'); } catch { return null; } }
+  setMe(name: string) { return this.req<void>('/api/me', { method: 'PUT', body: JSON.stringify({ name }) }); }
 }
 
 export function createProjectStore(cfg: StoreConfig = loadStoreConfig()): ProjectStore {

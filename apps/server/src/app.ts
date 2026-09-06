@@ -18,6 +18,8 @@ export function createApp(repo: ProjectRepo, opts: AppOptions = {}) {
     await next();
   });
   app.get('/api/health', async (c) => c.json({ ok: true, kind: repo.kind, projects: (await repo.list()).length, version: '0.1.0' }));
+  app.get('/api/me', async (c) => c.json(await repo.getUser()));
+  app.put('/api/me', async (c) => { let body: { name?: unknown }; try { body = await c.req.json(); } catch { return c.json({ error: 'invalid json' }, 400); } if (typeof body.name !== 'string' || !body.name.trim()) return c.json({ error: 'name required' }, 400); return c.json(await repo.setUser(body.name)); });
   app.get('/api/projects', async (c) => c.json(await repo.list()));
   app.get('/api/projects/:id', async (c) => { const doc = await repo.get(c.req.param('id')); return doc ? c.json(doc) : c.json({ error: 'not found' }, 404); });
   app.put('/api/projects/:id', async (c) => {

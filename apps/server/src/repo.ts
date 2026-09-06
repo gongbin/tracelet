@@ -17,8 +17,13 @@ export interface ProjectRepo {
   get(id: string): Promise<unknown | null>;
   put(id: string, doc: ProjectDoc): Promise<void>;
   remove(id: string): Promise<boolean>;
+  /** 当前用户（单租户：种子用户，可改名） */
+  getUser(): Promise<UserInfo>;
+  setUser(name: string): Promise<UserInfo>;
   close?(): Promise<void>;
 }
+export interface UserInfo { id: string; name: string; email: string }
+export const SEED_USER: UserInfo = { id: '00000000-0000-4000-8000-000000000001', name: '设计者', email: 'owner@tracelet.local' };
 
 /** 服务端只关心元数据字段，其余原样透传（校验由内核 parseProject 完成）。 */
 export interface ProjectDoc { id: string; name: string; updatedAt: string; settings: unknown; board: { copperCount: 2 | 4 }; schematic: { sheets: { components: unknown[] }[] } }
@@ -40,6 +45,9 @@ export class FileRepo implements ProjectRepo {
   async get(id: string) { if (!safeId(id)) return null; try { return JSON.parse(await readFile(this.path(id), 'utf8')) as unknown; } catch { return null; } }
   async put(id: string, doc: ProjectDoc) { if (!safeId(id)) throw new Error('bad id'); await mkdir(this.dir, { recursive: true }); const tmp = this.path(id) + '.tmp'; await writeFile(tmp, JSON.stringify(doc)); const { rename } = await import('node:fs/promises'); await rename(tmp, this.path(id)); }
   async remove(id: string) { if (!safeId(id)) return false; try { await stat(this.path(id)); await rm(this.path(id)); return true; } catch { return false; } }
+  private userPath() { return join(this.dir, '_user.json'); }
+  async getUser(): Promise<UserInfo> { try { return { ...SEED_USER, ...(JSON.parse(await readFile(this.userPath(), 'utf8')) as Partial<UserInfo>) }; } catch { return SEED_USER; } }
+  async setUser(name: string) { await mkdir(this.dir, { recursive: true }); const u = { ...(await this.getUser()), name: name.trim().slice(0, 80) || SEED_USER.name }; await writeFile(this.userPath(), JSON.stringify(u)); return u; }
 }
 
 export class PgRepo implements ProjectRepo {
@@ -52,7 +60,20 @@ export class PgRepo implements ProjectRepo {
     await this.db.execute(sql`CREATE TABLE IF NOT EXISTS projects (
       id text PRIMARY KEY, org_id uuid, owner_id uuid, name text NOT NULL, settings jsonb NOT NULL, document jsonb NOT NULL, yjs_state text,
       is_public boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`);
+    await this.db.execute(sql`CREATE TABLE IF NOT EXISTS users (id uuid PRIMARY KEY, email text NOT NULL UNIQUE, name text NOT NULL, created_at timestamptz NOT NULL DEFAULT now())`);
+    // 种子用户：单机 / 小团队先用一个账号，姓名可在头像菜单里改
+    await this.db.execute(sql`INSERT INTO users (id, email, name) VALUES (${SEED_USER.id}::uuid, ${SEED_USER.email}, ${SEED_USER.name}) ON CONFLICT (email) DO NOTHING`);
     return this;
+  }
+  async getUser(): Promise<UserInfo> {
+    const rows = await this.db.execute(sql`SELECT id, email, name FROM users ORDER BY created_at ASC LIMIT 1`);
+    const r = (rows.rows as { id: string; email: string; name: string }[])[0];
+    return r ? { id: String(r.id), email: r.email, name: r.name } : SEED_USER;
+  }
+  async setUser(name: string): Promise<UserInfo> {
+    const u = await this.getUser(); const n = name.trim().slice(0, 80) || SEED_USER.name;
+    await this.db.execute(sql`INSERT INTO users (id, email, name) VALUES (${u.id}::uuid, ${u.email}, ${n}) ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name`);
+    return { ...u, name: n };
   }
   async list() {
     const rows = await this.db.select({ document: projects.document }).from(projects).orderBy(sql`updated_at desc`);

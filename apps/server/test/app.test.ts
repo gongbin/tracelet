@@ -41,4 +41,13 @@ describe('server API（文件存储）', () => {
     expect(pre.status).toBeLessThan(400);
     expect(pre.headers.get('access-control-allow-origin')).toBe('*');
   });
+  it('当前用户：种子用户可读、可改名', async () => {
+    const app = createApp(await new FileRepo(dir).init());
+    const me = await (await app.request('/api/me')).json() as { name: string; email: string };
+    expect(me.name).toBe('设计者'); expect(me.email).toContain('@');
+    const put = await app.request('/api/me', { method: 'PUT', body: JSON.stringify({ name: '张三' }), headers: { 'content-type': 'application/json' } });
+    expect(put.status).toBe(200);
+    expect(((await (await app.request('/api/me')).json()) as { name: string }).name).toBe('张三');
+    expect((await app.request('/api/me', { method: 'PUT', body: JSON.stringify({ name: '' }), headers: { 'content-type': 'application/json' } })).status).toBe(400);
+  });
 });

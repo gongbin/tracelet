@@ -1,3 +1,4 @@
+import { usePrefs } from '../i18n/index.js';
 import { useState } from 'react';
 import { RULE_SETS, PROJECT_TEMPLATES, createFromTemplate } from '@tracelet/kernel';
 import { useApp } from '../store/app.js';
@@ -19,7 +20,10 @@ export function Wizard() {
 
   const create = () => {
     const fabName = RULE_SETS.find((r) => r.id === fab)?.name ?? '嘉立创';
-    openProjectObject(createFromTemplate(tpl, { name: name || undefined, copperCount: layers, unit, ruleSetId: fab, fab: fabName }));
+    const author = usePrefs.getState().userName;
+    const made = createFromTemplate(tpl, { name: name || undefined, copperCount: layers, unit, ruleSetId: fab, fab: fabName });
+    if (author) for (const sh of made.schematic.sheets) if (!sh.frame.author) sh.frame.author = author;
+    openProjectObject(made);
   };
   const tplInfo = PROJECT_TEMPLATES.find((t) => t.id === tpl);
 
