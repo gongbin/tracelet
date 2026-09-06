@@ -43,7 +43,7 @@ export interface NetLabelLayout { glyph: NetLabelGlyph; text: { x: number; y: nu
 /**
  * 网络标签布局：
  * - 普通网络：红色纯文字贴在导线末端（芯片引脚引出一根线 + 文字），文字顺着导线方向排。
- * - 地网络（GND / AGND / VSS…）：在锚点画标准地符号（短竖线 + 3 条渐短横线），GND 文字居中在远端；方向背离导线（导线在上就朝下）。
+ * - 地网络（GND / AGND / VSS…）：在锚点画标准地符号（短竖线 + 3 条渐短横线），GND 文字居中在远端（4 条横线，最短的近似一个点）；方向背离导线（导线在上就朝下）。
  * - 电源网络（+5V / +3V3 / VCC / VDD…）：短竖线 + 末端空心圆，文字在圆外侧；方向同样背离导线，默认朝上。
  */
 export function netLabelLayout(sheet: Sheet, label: NetLabel, _crossSheet?: Set<string>): NetLabelLayout {
@@ -61,7 +61,8 @@ export function netLabelLayout(sheet: Sheet, label: NetLabel, _crossSheet?: Set<
     const sgn = dir === 'down' ? -1 : 1; // 导线在下方 → 地符号朝上；其余朝下
     const lines: Vec[][] = [[{ x, y }, { x, y: y + sgn * 100 }]];
     GND_BARS.forEach((f, k) => lines.push([{ x: x - 150 * f, y: y + sgn * (100 + k * 50) }, { x: x + 150 * f, y: y + sgn * (100 + k * 50) }]));
-    return { glyph, lines, circles: [], text: { x, y: sgn > 0 ? y + 100 + 100 + 120 : y - 100 - 100 - 50, anchor: 'middle' } };
+    const far = 100 + (GND_BARS.length - 1) * 50;
+    return { glyph, lines, circles: [], text: { x, y: sgn > 0 ? y + far + 120 : y - far - 50, anchor: 'middle' } };
   }
   if (glyph === 'power') {
     const sgn = dir === 'up' ? 1 : -1; // 导线在上方 → 端口朝下；其余朝上
@@ -75,7 +76,7 @@ export function netLabelLayout(sheet: Sheet, label: NetLabel, _crossSheet?: Set<
   return { glyph, text, lines: [], circles: [] };
 }
 /** 地符号 4 条横线的相对宽度（从接线端起）。 */
-export const GND_BARS = [1, 0.66, 0.33];
+export const GND_BARS = [1, 0.66, 0.33, 0.08]; // 4 条：最短一条近似一个点
 /** 电阻折线（竖直方向，6 个半周期）。 */
 export function resistorZigzag(w: number, h: number): Vec[] {
   const y0 = h * 0.08, y1 = h * 0.92, s = (y1 - y0) / 6;
@@ -127,7 +128,7 @@ export function symbolLocalStrokes(sym: SymbolDef): StrokeSet {
       out.lines.push({ points: [{ x: w * 0.55, y: h * 0.05 }, { x: w * 0.55 + 60, y: h * 0.05 - 70 }], width: SW * 0.7 }, { points: [{ x: w * 0.7, y: h * 0.12 }, { x: w * 0.7 + 60, y: h * 0.12 - 70 }], width: SW * 0.7 });
       break;
     case 'gnd':
-      // 标准地符号：3 条横线一条比一条短，接在导线末端（旋转 180° 即朝上）
+      // 标准地符号：4 条横线一条比一条短（最后一条近似一个点），接在导线末端（旋转 180° 即朝上）
       for (const [k, f] of GND_BARS.entries()) out.lines.push({ points: [{ x: (w * (1 - f)) / 2, y: k * 50 }, { x: (w * (1 + f)) / 2, y: k * 50 }], width: SW });
       break;
     case 'power':
