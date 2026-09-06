@@ -1,9 +1,13 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { PROJECT_TEMPLATES, createDemoProject } from '@tracelet/kernel';
 import { importProjectFiles, backupAllProjects } from '../store/backup.js';
 import { useApp } from '../store/app.js';
 import { Icon } from '../components/Icon.js';
 import { I } from '../icons.js';
+import { BrandMark } from '../components/BrandMark.js';
+import { Pager } from '../components/Pager.js';
+
+export const REPO_URL = 'https://github.com/gongbin/tracelet';
 import { useT } from '../i18n/index.js';
 import { PrefsMenu } from '../components/PrefsMenu.js';
 
@@ -22,21 +26,29 @@ const SAMPLES = [
 ];
 
 export function Home() {
-  const { projects, openProject, deleteProject, set, toast, store, openProjectObject } = useApp();
+  const { projects, openProject, deleteProject, set, toast, store, openProjectObject, go } = useApp();
+  const [page, setPage] = useState(0); const PAGE = 24; const pageCount = Math.max(1, Math.ceil(projects.length / PAGE)); const shown = projects.slice(page * PAGE, page * PAGE + PAGE);
   const fileRef = useRef<HTMLInputElement>(null);
   const t = useT();
 
   const onImport = async (files: File[]) => { await importProjectFiles(files); };
 
+  const openLibrary = async () => { const recent = projects[0]; if (recent) { await openProject(recent.id); go('lib'); } else { toast(t('nav.library.empty')); } };
   return (
     <div className="home" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const fs = Array.from(e.dataTransfer.files); if (fs.length) void onImport(fs); }}>
       <div className="home-nav">
-        <div className="row" style={{ gap: 8, flexShrink: 0, color: '#F5F5F7', fontWeight: 600, fontSize: 18, letterSpacing: '-0.5px' }}>
-          <img src={`${import.meta.env.BASE_URL}brand/tracelet-mark-white.svg`} alt="" width={28} height={28} style={{ display: 'block' }} />
+        <div className="row brand" style={{ gap: 8, flexShrink: 0, fontWeight: 600, fontSize: 18, letterSpacing: '-0.5px' }}>
+          <BrandMark size={28} />
           <span>Tracelet</span>
         </div>
-        <div className="row" style={{ gap: 20 }}><span style={{ fontWeight: 500 }}>{t('nav.projects')}</span><span className="muted">{t('nav.library')}</span><span className="muted">{t('nav.community')}</span><span className="muted">{t('nav.docs')}</span></div>
+        <div className="row" style={{ gap: 20 }}>
+          <a className="home-link on" href="#projects" onClick={(e) => { e.preventDefault(); document.getElementById('projects')?.scrollIntoView({ behavior: 'smooth' }); }}>{t('nav.projects')}</a>
+          <a className="home-link" href="#library" title={t('nav.library.tip')} onClick={(e) => { e.preventDefault(); void openLibrary(); }}>{t('nav.library')}</a>
+          <a className="home-link" href={`${REPO_URL}/discussions`} target="_blank" rel="noreferrer">{t('nav.community')}</a>
+          <a className="home-link" href={`${REPO_URL}#readme`} target="_blank" rel="noreferrer">{t('nav.docs')}</a>
+        </div>
         <div className="search-box ml-auto" style={{ flexBasis: 260 }} onClick={() => set('paletteOpen', true)}><Icon d={I.search} size={14} stroke={2} /><span>{t('home.search')}</span><span className="ml-auto mono xs">⌘K</span></div>
+        <a className="iconbtn" href={REPO_URL} target="_blank" rel="noreferrer" title="GitHub · gongbin/tracelet" aria-label="GitHub"><Icon d={I.github} size={18} stroke={0} fill /></a>
         <span className="xs muted mono" title="存储模式">{store.kind === 'local' ? t('home.storage.local') : t('home.storage.remote')}</span>
         <PrefsMenu large />
       </div>
@@ -67,21 +79,22 @@ export function Home() {
             <button className="btn sm ml-auto" onClick={() => void backupAllProjects().then((n) => toast(`已备份 ${n} 个项目`, 'success'))}>⧉ {t('proj.backup')}</button>
             <div className="seg sm" style={{ height: 24 }}><span className="seg-opt" style={{ padding: '0 8px' }}>列表</span><span className="seg-opt" style={{ padding: '0 8px', background: 'var(--bg-raised)', color: 'var(--text)' }}>网格</span></div>
           </div>
-          <div className="proj-grid">
+          <div className="proj-grid" id="projects">
             {projects.length === 0 && <div className="dim">还没有项目，点上面"新建项目"开始。</div>}
-            {projects.map((p) => (
+            {shown.map((p) => (
               <div key={p.id} className="proj-card" onClick={() => void openProject(p.id)}>
                 <div className="proj-thumb">
                   <svg width="150" height="90" viewBox="0 0 150 90"><rect x="8" y="8" width="134" height="74" rx="6" fill="#2A2F38" stroke="#D0D2D6" strokeWidth="1.5" /><rect x="30" y="26" width="34" height="34" fill="#1A1D23" stroke="#C83434" /><rect x="84" y="22" width="10" height="6" fill="#C83434" /><rect x="84" y="34" width="10" height="6" fill="#C83434" /><rect x="84" y="46" width="10" height="6" fill="#C83434" /><rect x="112" y="30" width="10" height="20" fill="#C83434" /><path d="M64 43h20M94 37h18M94 49h18" stroke="#C83434" strokeWidth="2" /><path d="M30 70h60" stroke="#4D7FC4" strokeWidth="2" opacity=".5" /><circle cx="18" cy="18" r="3" fill="none" stroke="#D0D2D6" /><circle cx="132" cy="72" r="3" fill="none" stroke="#D0D2D6" /></svg>
                 </div>
                 <div className="col" style={{ padding: '10px 12px', gap: 2 }}>
-                  <div style={{ fontWeight: 500 }}>{p.name}</div>
+                  <div style={{ fontWeight: 500 }} data-no-translate>{p.name}</div>
                   <div className="small muted">{timeAgo(p.updatedAt)} · {p.copperCount} 层 · {p.componentCount} 元件</div>
                 </div>
                 <button className="btn sm ghost del" onClick={(e) => { e.stopPropagation(); if (confirm(`删除项目「${p.name}」？此操作不可撤销。`)) void deleteProject(p.id); }}>删除</button>
               </div>
             ))}
           </div>
+          <Pager page={page} count={pageCount} total={projects.length} onChange={setPage} />
         </div>
         <div className="col" style={{ gap: 14 }}>
           <div><h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>{t('home.community')}</h2><div className="small muted" style={{ marginTop: 2 }}>一键生成到你的项目里，随意改</div></div>
@@ -96,6 +109,30 @@ export function Home() {
           </div>
         </div>
       </div>
+      <footer className="home-footer">
+        <div className="home-footer-inner">
+          <div className="col" style={{ gap: 8, maxWidth: 460 }}>
+            <div className="row brand" style={{ gap: 8, fontWeight: 600 }}><BrandMark size={20} /><span>Tracelet</span><span className="xs muted mono" style={{ fontWeight: 400 }}>open source</span></div>
+            <div className="small muted">{t('home.footer.about')}</div>
+            <div className="small muted">{t('home.footer.license')}</div>
+          </div>
+          <div className="home-footer-cols">
+            <div className="col" style={{ gap: 6 }}>
+              <div className="xs muted" style={{ letterSpacing: '.04em' }}>GitHub</div>
+              <a className="home-flink" href={REPO_URL} target="_blank" rel="noreferrer"><Icon d={I.github} size={14} stroke={0} fill /> {t('home.footer.repo')}</a>
+              <a className="home-flink" href={`${REPO_URL}/issues`} target="_blank" rel="noreferrer">{t('home.footer.issues')}</a>
+              <a className="home-flink" href={`${REPO_URL}/discussions`} target="_blank" rel="noreferrer">{t('home.footer.discuss')}</a>
+            </div>
+            <div className="col" style={{ gap: 6 }}>
+              <div className="xs muted" style={{ letterSpacing: '.04em' }}>{t('nav.docs')}</div>
+              <a className="home-flink" href={`${REPO_URL}#readme`} target="_blank" rel="noreferrer">{t('home.footer.readme')}</a>
+              <a className="home-flink" href={`${REPO_URL}/blob/main/MCP.md`} target="_blank" rel="noreferrer">{t('home.footer.mcp')}</a>
+              <a className="home-flink" href={`${REPO_URL}/tree/main/apps/server`} target="_blank" rel="noreferrer">{t('home.footer.selfhost')}</a>
+            </div>
+          </div>
+        </div>
+        <div className="home-footer-bottom xs muted mono">© {new Date().getFullYear()} Tracelet contributors · MIT</div>
+      </footer>
     </div>
   );
 }

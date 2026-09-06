@@ -13,5 +13,7 @@ export const en: Partial<Record<MessageKey, string>> = {
   'proj.export': 'Export project (.eda.json)', 'proj.backup': 'Back up all projects (zip)', 'proj.import': 'Import project / backup…',
   'fab.title': 'Fabrication', 'fab.precheck': 'Pre-flight checks', 'fab.export': 'Export', 'fab.download': 'Download fab files (zip)', 'fab.preview': 'Preview Gerber', 'fab.order': 'Ordering guide →',
   'lib.all': 'All categories', 'lib.title': 'Parts library', 'lib.place': 'Place in schematic',
+  'nav.library.tip': 'Open the most recent project and go to the parts library', 'nav.library.empty': 'Create or import a project first, then open the library', 'home.footer.about': 'Tracelet is an open-source online PCB design tool: schematic → PCB → 3D → fab files. Your data stays in your browser by default.', 'home.footer.license': 'MIT license · stars, issues and PRs welcome', 'home.footer.repo': 'GitHub repository', 'home.footer.issues': 'Report an issue', 'home.footer.discuss': 'Discussions', 'home.footer.readme': 'Docs (README)', 'home.footer.mcp': 'MCP / CLI integration', 'home.footer.selfhost': 'Self-host the server', 'pager.prev': 'Prev', 'pager.next': 'Next', 'pager.page': 'Page {page} / {count} · {total} items',
+  'all': 'All',
   'palette.placeholder': 'Type a command; @ parts, # nets', 'palette.empty': 'No matches'
 };

@@ -25,16 +25,16 @@ export interface Part {
 }
 export type PartSource = 'builtin' | 'community' | 'user';
 
-export const PART_CATEGORIES: { id: string; name: string; group: string }[] = [
-  { id: 'resistor', name: '电阻', group: '无源器件' }, { id: 'capacitor', name: '电容', group: '无源器件' }, { id: 'inductor', name: '电感', group: '无源器件' },
-  { id: 'microcontroller', name: '微控制器', group: '集成电路' }, { id: 'logic', name: '逻辑器件', group: '集成电路' }, { id: 'memory', name: '存储器', group: '集成电路' }, { id: 'interface-ic', name: '接口芯片', group: '集成电路' }, { id: 'amplifier', name: '放大器', group: '集成电路' }, { id: 'data-converter', name: '数据转换', group: '集成电路' }, { id: 'clock-timing', name: '时钟', group: '集成电路' },
-  { id: 'diode', name: '二极管', group: '半导体' }, { id: 'transistor', name: '晶体管', group: '半导体' },
-  { id: 'power-management', name: '电源管理', group: '电源与保护' }, { id: 'circuit-protection', name: '电路保护', group: '电源与保护' }, { id: 'fuse', name: '保险丝', group: '电源与保护' }, { id: 'battery', name: '电池', group: '电源与保护' },
-  { id: 'connector', name: '连接器', group: '机电与连接' }, { id: 'terminal', name: '端子', group: '机电与连接' }, { id: 'switch', name: '开关', group: '机电与连接' }, { id: 'relay', name: '继电器', group: '机电与连接' }, { id: 'mechanical', name: '机械件', group: '机电与连接' },
-  { id: 'optoelectronics', name: '光电器件', group: '光电与显示' }, { id: 'display', name: '显示', group: '光电与显示' },
-  { id: 'communication-module', name: '通信模块', group: '模块与开发' }, { id: 'functional-module', name: '功能模块', group: '模块与开发' }, { id: 'development-board', name: '开发板', group: '模块与开发' },
-  { id: 'rf-wireless', name: '射频无线', group: '通信' }, { id: 'antenna', name: '天线', group: '通信' },
-  { id: 'crystal', name: '晶振', group: '无源器件' }, { id: 'sensor', name: '传感器', group: '模块与开发' }
+export const PART_CATEGORIES: { id: string; name: string; group: string; /** 英文名 / 分组（英文界面用） */ en: string; groupEn: string }[] = [
+  { id: 'resistor', name: '电阻', group: '无源器件', en: 'Resistors', groupEn: 'Passives' }, { id: 'capacitor', name: '电容', group: '无源器件', en: 'Capacitors', groupEn: 'Passives' }, { id: 'inductor', name: '电感', group: '无源器件', en: 'Inductors', groupEn: 'Passives' },
+  { id: 'microcontroller', name: '微控制器', group: '集成电路', en: 'Microcontrollers', groupEn: 'ICs' }, { id: 'logic', name: '逻辑器件', group: '集成电路', en: 'Logic', groupEn: 'ICs' }, { id: 'memory', name: '存储器', group: '集成电路', en: 'Memory', groupEn: 'ICs' }, { id: 'interface-ic', name: '接口芯片', group: '集成电路', en: 'Interface ICs', groupEn: 'ICs' }, { id: 'amplifier', name: '放大器', group: '集成电路', en: 'Amplifiers', groupEn: 'ICs' }, { id: 'data-converter', name: '数据转换', group: '集成电路', en: 'Data converters', groupEn: 'ICs' }, { id: 'clock-timing', name: '时钟', group: '集成电路', en: 'Clock & timing', groupEn: 'ICs' },
+  { id: 'diode', name: '二极管', group: '半导体', en: 'Diodes', groupEn: 'Semiconductors' }, { id: 'transistor', name: '晶体管', group: '半导体', en: 'Transistors', groupEn: 'Semiconductors' },
+  { id: 'power-management', name: '电源管理', group: '电源与保护', en: 'Power management', groupEn: 'Power & protection' }, { id: 'circuit-protection', name: '电路保护', group: '电源与保护', en: 'Circuit protection', groupEn: 'Power & protection' }, { id: 'fuse', name: '保险丝', group: '电源与保护', en: 'Fuses', groupEn: 'Power & protection' }, { id: 'battery', name: '电池', group: '电源与保护', en: 'Batteries', groupEn: 'Power & protection' },
+  { id: 'connector', name: '连接器', group: '机电与连接', en: 'Connectors', groupEn: 'Electromechanical' }, { id: 'terminal', name: '端子', group: '机电与连接', en: 'Terminals', groupEn: 'Electromechanical' }, { id: 'switch', name: '开关', group: '机电与连接', en: 'Switches', groupEn: 'Electromechanical' }, { id: 'relay', name: '继电器', group: '机电与连接', en: 'Relays', groupEn: 'Electromechanical' }, { id: 'mechanical', name: '机械件', group: '机电与连接', en: 'Mechanical', groupEn: 'Electromechanical' },
+  { id: 'optoelectronics', name: '光电器件', group: '光电与显示', en: 'Optoelectronics', groupEn: 'Opto & display' }, { id: 'display', name: '显示', group: '光电与显示', en: 'Displays', groupEn: 'Opto & display' },
+  { id: 'communication-module', name: '通信模块', group: '模块与开发', en: 'Comm modules', groupEn: 'Modules & dev' }, { id: 'functional-module', name: '功能模块', group: '模块与开发', en: 'Function modules', groupEn: 'Modules & dev' }, { id: 'development-board', name: '开发板', group: '模块与开发', en: 'Dev boards', groupEn: 'Modules & dev' },
+  { id: 'rf-wireless', name: '射频无线', group: '通信', en: 'RF / wireless', groupEn: 'Communication' }, { id: 'antenna', name: '天线', group: '通信', en: 'Antennas', groupEn: 'Communication' },
+  { id: 'crystal', name: '晶振', group: '无源器件', en: 'Crystals', groupEn: 'Passives' }, { id: 'sensor', name: '传感器', group: '模块与开发', en: 'Sensors', groupEn: 'Modules & dev' }
 ];
 
 import { PARTS_BASE, icSymbol } from './partsBase.js';
@@ -174,4 +174,10 @@ export function partsToCsv(parts: Part[]): string {
 }
 export function partsToJson(parts: Part[], version = new Date().toISOString().slice(0, 10)): string {
   return JSON.stringify({ version, parts: parts.map(({ source: _s, ...p }) => p) }, null, 2);
+}
+
+/** 分类显示名：locale 以 en 开头时返回英文。 */
+export function categoryLabel(id: string | undefined, locale?: string): { name: string; group: string } | undefined {
+  const c = PART_CATEGORIES.find((x) => x.id === id); if (!c) return undefined;
+  return locale?.startsWith('en') ? { name: c.en, group: c.groupEn } : { name: c.name, group: c.group };
 }

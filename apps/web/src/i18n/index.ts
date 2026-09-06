@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { zhCN, type MessageKey } from './zh-CN.js';
 import { en } from './en.js';
+import { setAutoTranslate } from './auto.js';
 
 export type Locale = 'zh-CN' | 'en';
 export type Theme = 'dark' | 'light' | 'system';
@@ -19,7 +20,7 @@ export const usePrefs = create<PrefState>((set) => ({
   userName: load<string>('tracelet:user', ''),
   setUserName: (userName) => { try { localStorage.setItem('tracelet:user', userName); } catch { /* ignore */ } set({ userName }); },
   setWheelMode: (wheelMode) => { try { localStorage.setItem('tracelet:wheel', wheelMode); } catch { /* ignore */ } set({ wheelMode }); },
-  setLocale: (locale) => { try { localStorage.setItem('tracelet:locale', locale); } catch { /* ignore */ } set({ locale }); },
+  setLocale: (locale) => { try { localStorage.setItem('tracelet:locale', locale); } catch { /* ignore */ } set({ locale }); if (typeof document !== 'undefined') setAutoTranslate(locale === 'en'); },
   setTheme: (theme) => { try { localStorage.setItem('tracelet:theme', theme); } catch { /* ignore */ } applyTheme(theme); set({ theme }); }
 }));
 
@@ -42,3 +43,4 @@ export function useT() {
 }
 
 applyTheme(usePrefs.getState().theme);
+if (typeof document !== 'undefined' && usePrefs.getState().locale === 'en') queueMicrotask(() => setAutoTranslate(true));

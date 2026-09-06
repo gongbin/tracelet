@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from 'react';
-import { sch, getSymbol, findPin, previewRoute, snapComponentOrigin, componentBounds, SCH_GRID, snapTo, pointOnSeg, pointSegDist, rectsOverlap, milToMm, paperSize, titleBlockSize, type SheetFrame as SheetFrameDef, type Vec, type Rect, type Wire } from '@tracelet/kernel';
+import { sch, getSymbol, findPin, previewRoute, snapComponentOrigin, componentBounds, SCH_GRID, snapTo, pointOnSeg, pointSegDist, rectsOverlap, milToMm, paperSize, titleBlockSize, type SheetFrame as SheetFrameDef, type Vec, type Rect, type Wire, frameLabels, sheetDisplayName } from '@tracelet/kernel';
 import { useApp, useEditor, useProject, useSheet } from '../../store/app.js';
 import { getAnalysis } from '../../store/analysis.js';
 import { useViewport, gridStep } from '../../hooks/useViewport.js';
@@ -48,8 +48,9 @@ function SheetFrame({ project, sheetName, index, total, frame: frame0 }: { proje
   const sx = tbW / 4400, sy = tbH / 900; // 列 / 行按标题栏尺寸等比缩放
   const X = (v: number) => tx + v * sx, Y = (v: number) => ty + v * sy;
   const date = frame.date || project.updatedAt.slice(0, 10);
-  const L = frame.labels;
-  const sizeText = frame.size === 'custom' ? `${Math.round(W * 0.0254)}×${Math.round(H * 0.0254)} mm` : `${frame.size}${frame.landscape ? '' : ' 纵向'}`;
+  const locale = usePrefs((p) => p.locale);
+  const L = frameLabels(frame, locale);
+  const sizeText = frame.size === 'custom' ? `${Math.round(W * 0.0254)}×${Math.round(H * 0.0254)} mm` : `${frame.size}${frame.landscape ? '' : (locale === 'en' ? ' portrait' : ' 纵向')}`;
   return (
     <g pointerEvents="none" fontFamily="Inter,'Noto Sans SC',sans-serif">
       <rect x={0} y={0} width={W} height={H} fill="none" stroke={ink} strokeWidth={10} />
@@ -68,7 +69,7 @@ function SheetFrame({ project, sheetName, index, total, frame: frame0 }: { proje
       <g fill={text} fontSize={100}>
         <text x={X(80)} y={Y(110)}>{frame.company || 'Tracelet'}</text>
         <text x={X(80)} y={Y(240)} fontSize={Math.min(170, 170 * sy)} fontWeight={600} fill="#3A3835">{frame.title || project.name}</text>
-        <text x={X(80)} y={Y(410)}>{L.sheet}</text><text x={X(80)} y={Y(540)} fontSize={140} fill="#3A3835">{sheetName}</text>
+        <text x={X(80)} y={Y(410)}>{L.sheet}</text><text x={X(80)} y={Y(540)} fontSize={140} fill="#3A3835">{sheetDisplayName(sheetName, locale)}</text>
         <text x={X(80)} y={Y(700)}>{L.date}</text><text x={X(80)} y={Y(840)} fontSize={130} fill="#3A3835">{date}</text>
         <text x={X(2680)} y={Y(700)}>{L.revision}</text><text x={X(2680)} y={Y(840)} fontSize={130} fill="#3A3835">{frame.revision}</text>
         <text x={X(3580)} y={Y(700)}>{L.page}</text><text x={X(3580)} y={Y(840)} fontSize={130} fill="#3A3835">{index + 1} / {total}</text>

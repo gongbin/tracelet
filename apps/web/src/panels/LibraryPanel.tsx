@@ -1,6 +1,7 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { allParts, searchParts, getSymbol, findFootprint, BUILTIN_FOOTPRINTS, importLibraryFile, lib, LIBRARY_FILE_HINT, type Part, type SymbolDef, type FootprintDef } from '@tracelet/kernel';
 import { useApp, useProject, useEditor } from '../store/app.js';
+import { Pager, pageSlice } from '../components/Pager.js';
 import { readFileText } from '../store/backup.js';
 import { Icon } from '../components/Icon.js';
 import { I } from '../icons.js';
@@ -48,7 +49,11 @@ export function LibraryPanel() {
     // PCB 页优先显示可直接放到板上的封装
     return onPcb ? [...list.filter((e) => !e.symbolId), ...list.filter((e) => e.symbolId)] : list;
   }, [app.libQuery, q, cat, tab, project.library, app.favorites, onPcb, inventory.items]);
-  const sel = entries.find((e) => e.id === app.libSelected) ?? entries[0];
+  const [page, setPage] = useState(0);
+  const LIB_PAGE = 60;
+  useEffect(() => { setPage(0); }, [app.libQuery, cat, tab]);
+  const pg = pageSlice(entries, page, LIB_PAGE);
+  const sel = entries.find((e) => e.id === app.libSelected) ?? pg.shown[0];
 
   const placeSymbol = (e: Entry) => {
     if (!e.symbolId) { app.toast('这条库存没有指定符号：在库存里填符号 id（如 sym:R），或先从官方库放置再「加入库存」'); return; }
@@ -114,7 +119,7 @@ export function LibraryPanel() {
         {tab !== 'project' && <div style={{ paddingBottom: 4 }}><CategoryFilter value={cat} onChange={setCat} /></div>}
       </div>
       <div className="grow" style={{ overflow: 'auto', padding: 6 }}>
-        {entries.map((e) => (
+        {pg.shown.map((e) => (
           <div key={e.id} className={`part-row${sel?.id === e.id ? ' on' : ''}`} onClick={() => app.set('libSelected', e.id)} onDoubleClick={() => primary(e)}>
             <div className="part-thumb">{e.symbolId ? <SymbolThumb sym={getSymbol(e.symbolId)} /> : findFootprint(e.footprintId) ? <FootprintThumb fp={findFootprint(e.footprintId)!} size={30} /> : <span className="dim">▢</span>}</div>
             <div className="col grow" style={{ gap: 2, minWidth: 0 }}>
@@ -125,6 +130,7 @@ export function LibraryPanel() {
             </div>
           </div>
         ))}
+        <Pager page={pg.page} count={pg.count} total={entries.length} onChange={setPage} compact />
         {entries.length === 0 && (
           <div className="col" style={{ padding: 12, gap: 8 }}>
             <div className="muted">{tab === 'fav' ? '还没有收藏：在条目右侧点 ☆' : tab === 'inv' ? '库存为空：点「+ 手动添加」、导入 CSV，或在任意元件预览里点「+ 库存」' : tab === 'project' ? '项目库为空：导入 KiCad 库文件、参数化生成封装，或导入 KiCad 工程时自动带入' : `没有找到「${app.libQuery}」`}</div>

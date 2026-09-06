@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import { useApp, useEditor, useProject, type Screen } from '../store/app.js';
 import { Icon } from './Icon.js';
 import { I } from '../icons.js';
+import { BrandMark } from './BrandMark.js';
 import { useT, usePrefs } from '../i18n/index.js';
 import { PrefsMenu } from './PrefsMenu.js';
 import { useBridge } from '../store/bridge.js';
@@ -47,10 +48,10 @@ export function TopBar() {
 
   return (
     <div className="topbar">
-      <button className="iconbtn" title="返回首页" onClick={closeProject}><img className="logo" src={`${import.meta.env.BASE_URL}brand/tracelet-mark-white.svg`} alt="" width={24} height={24} /></button>
+      <button className="iconbtn" title="返回首页" onClick={closeProject}><BrandMark size={24} /></button>
       <div style={{ position: 'relative', flex: 'none' }}>
         <div className="row" style={{ gap: 8, padding: '0 8px', height: 28, borderRadius: 4, cursor: 'pointer', background: projMenuOpen ? 'var(--bg-panel)' : undefined }} onClick={(e) => { e.stopPropagation(); set('projMenuOpen', !projMenuOpen); }}>
-          <span style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{project.name}</span><span className="muted xs">▾</span>
+          <span style={{ fontWeight: 500, whiteSpace: 'nowrap' }} data-no-translate>{project.name}</span><span className="muted xs">▾</span>
         </div>
         {projMenuOpen && (
           <div className="menu" style={{ top: 34, left: 0, width: 280 }} onClick={(e) => e.stopPropagation()}>
@@ -58,7 +59,7 @@ export function TopBar() {
             {projects.slice(0, 6).map((p) => (
               <div key={p.id} className={`menu-item${p.id === project.id ? ' on' : ''}`} onClick={() => { set('projMenuOpen', false); if (p.id !== project.id) void openProject(p.id); }}>
                 <span style={{ width: 14, height: 10, borderRadius: 2, background: 'var(--bg-canvas)', border: '1px solid var(--border)', flex: 'none' }} />
-                <span className="grow nowrap">{p.name}</span><span className="dim xs">{p.copperCount} 层</span>
+                <span className="grow nowrap" data-no-translate>{p.name}</span><span className="dim xs">{p.copperCount} 层</span>
               </div>
             ))}
             <div className="menu-sep" />
@@ -66,7 +67,7 @@ export function TopBar() {
             <div className="menu-item" onClick={() => { set('projMenuOpen', false); fileRef.current?.click(); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇪</span>{t('proj.import')}</div>
             <div className="menu-item" onClick={() => { set('projMenuOpen', false); exportProjectFile(project); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇩</span>{t('proj.export')}</div>
             <div className="menu-item" onClick={() => { set('projMenuOpen', false); void backupAllProjects().then((n) => toast(`已备份 ${n} 个项目`, 'success')); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⧉</span>{t('proj.backup')}</div>
-            <div className="menu-item" title="矢量 PDF，每页一张图纸；标准字体不含中文，中文以 ? 显示" onClick={() => { set('projMenuOpen', false); downloadFile(`${slug(project.name)}-schematic.pdf`, exportSchematicPdf(withAuthor(project)), 'application/pdf'); toast('已导出原理图 PDF', 'success'); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇩</span>导出原理图 PDF</div>
+            <div className="menu-item" title="矢量 PDF，每页一张图纸；标准字体不含中文，中文以 ? 显示" onClick={() => { set('projMenuOpen', false); downloadFile(`${slug(project.name)}-schematic.pdf`, exportSchematicPdf(withAuthor(project), { locale: usePrefs.getState().locale }), 'application/pdf'); toast('已导出原理图 PDF', 'success'); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇩</span>导出原理图 PDF</div>
             <div className="menu-item" title="顶层 / 底层装配图（位号 + 外形）" onClick={() => { set('projMenuOpen', false); downloadFile(`${slug(project.name)}-assembly.pdf`, exportAssemblyPdf(withAuthor(project)), 'application/pdf'); toast('已导出装配图 PDF', 'success'); }}><span className="muted" style={{ width: 14, textAlign: 'center' }}>⇩</span>导出装配图 PDF</div>
             <input ref={fileRef} type="file" accept=".json,.zip,.kicad_sch,.kicad_pcb,.kicad_pro,.SchDoc,.PcbDoc" multiple hidden onChange={(e) => { const fs = e.target.files; if (fs?.length) void importProjectFiles(Array.from(fs)); e.target.value = ''; }} />
             <div className="menu-sep" />

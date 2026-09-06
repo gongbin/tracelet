@@ -1,6 +1,7 @@
 import { modelFor, needsModel } from '../editors/three/models.js';
 import { useEffect } from 'react';
-import { sch, pcb, copperLayers, LAYER_COLORS, netClassFor, milToMm, formatLength, snapTo, SCH_GRID, getSymbol, boardBounds, paperSize, type CheckItem } from '@tracelet/kernel';
+import { sch, pcb, copperLayers, LAYER_COLORS, netClassFor, milToMm, formatLength, snapTo, SCH_GRID, getSymbol, boardBounds, paperSize, type CheckItem, sheetDisplayName } from '@tracelet/kernel';
+import { usePrefs } from '../i18n/index.js';
 import { SheetFrameDialog } from '../components/SheetFrameDialog.js';
 type Clipboard = sch.Clipboard;
 import { useState } from 'react';
@@ -54,6 +55,7 @@ const DRAW_MODES: ['line' | 'rect' | 'text', string, string][] = [['line', '线�
 const PWR_OPTIONS = [['+3V3', '#800000', '常用 · 3.3V 逻辑'], ['+5V', '#800000', 'USB 供电'], ['VCC', '#800000', '通用电源'], ['GND', '#800000', '地']];
 
 export function Workspace() {
+  const locale = usePrefs((p) => p.locale);
   const project = useProject();
   const editor = useEditor();
   const app = useApp();
@@ -280,7 +282,7 @@ export function Workspace() {
                   <span key={s.id} className={`pill row${s.id === sheet.id ? ' on' : ''}`} style={{ gap: 6 }} onClick={() => app.patch({ sheetId: s.id, selection: [] })} onDoubleClick={() => setRenaming(s.id)} title="双击重命名">
                     {renaming === s.id
                       ? <input autoFocus className="input mono" style={{ height: 22, width: 120 }} defaultValue={s.name} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') { const v = (e.target as HTMLInputElement).value.trim(); if (v) editor.dispatch(sch.renameSheet(s.id, v)); setRenaming(null); } if (e.key === 'Escape') setRenaming(null); }} onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== s.name) editor.dispatch(sch.renameSheet(s.id, v)); setRenaming(null); }} />
-                      : <>{s.name}<span className="dim xs">{s.components.filter((c) => !getSymbol(c.symbolId).power).length}</span></>}
+                      : <><span data-no-translate>{sheetDisplayName(s.name, locale)}</span><span className="dim xs">{s.components.filter((c) => !getSymbol(c.symbolId).power).length}</span></>}
                     {sheets.length > 1 && s.id === sheet.id && renaming !== s.id && <span className="dim" style={{ marginLeft: 2 }} title="删除图纸" onClick={(e) => { e.stopPropagation(); removeSheet(s.id); }}>✕</span>}
                   </span>
                 ))}

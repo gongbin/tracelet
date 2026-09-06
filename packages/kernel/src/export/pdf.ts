@@ -5,7 +5,7 @@
  */
 import type { Project } from '../model/project.js';
 import type { Sheet } from '../model/schematic.js';
-import { paperSize, titleBlockSize } from '../model/schematic.js';
+import { paperSize, titleBlockSize, frameLabels, sheetDisplayName } from '../model/schematic.js';
 import { getSymbol } from '../library/symbols.js';
 import { SCH_COLORS, componentStrokes, crossSheetLabelNames, netLabelLayout } from '../schematic/render.js';
 import { allPads, footprintBody, boardBounds } from '../board/geometry.js';
@@ -88,7 +88,7 @@ const MIL_PT = 0.072; // 1 mil = 0.072 pt
 const MM_PT = 72 / 25.4;
 
 /** 画一页原理图（边框 + 标题栏 + 内容）。 */
-export function paintSheet(project: Project, sheet: Sheet, index: number): { w: number; h: number; content: string } {
+export function paintSheet(project: Project, sheet: Sheet, index: number, opts: { locale?: string } = {}): { w: number; h: number; content: string } {
   const paper = paperSize(sheet.frame);
   // 无边框：按内容外接框
   let W: number, H: number, ox = 0, oy = 0;
@@ -113,9 +113,9 @@ export function paintSheet(project: Project, sheet: Sheet, index: number): { w: 
     P.rect(tx, ty, tbW, tbH, 12); P.polyline([{ x: tx, y: Y(300) }, { x: tx + tbW, y: Y(300) }], 12); P.polyline([{ x: tx, y: Y(600) }, { x: tx + tbW, y: Y(600) }], 12);
     P.polyline([{ x: X(2600), y: Y(600) }, { x: X(2600), y: ty + tbH }], 12); P.polyline([{ x: X(3500), y: Y(600) }, { x: X(3500), y: ty + tbH }], 12);
     P.color('#3A3835', false);
-    const L = fr.labels;
+    const L = frameLabels(fr, opts.locale);
     P.text(X(80), Y(110), fr.company || 'Tracelet', 100); P.text(X(80), Y(240), fr.title || project.name, Math.min(170, 170 * sy), 'start', { bold: true });
-    P.text(X(80), Y(410), L.sheet, 100); P.text(X(80), Y(540), sheet.name, 140);
+    P.text(X(80), Y(410), L.sheet, 100); P.text(X(80), Y(540), sheetDisplayName(sheet.name, opts.locale), 140);
     P.text(X(80), Y(700), L.date, 100); P.text(X(80), Y(840), fr.date || project.updatedAt.slice(0, 10), 130);
     P.text(X(2680), Y(700), L.revision, 100); P.text(X(2680), Y(840), fr.revision, 130);
     P.text(X(3580), Y(700), L.page, 100); P.text(X(3580), Y(840), `${index + 1} / ${project.schematic.sheets.length}`, 130);
@@ -152,9 +152,9 @@ export function paintSheet(project: Project, sheet: Sheet, index: number): { w: 
 }
 
 /** 全部图纸 → PDF（ASCII 字符串）。 */
-export function exportSchematicPdf(project: Project): string {
+export function exportSchematicPdf(project: Project, opts: { locale?: string } = {}): string {
   const doc = new PdfDoc({ title: project.name, author: project.schematic.sheets[0]?.frame.author });
-  project.schematic.sheets.forEach((sheet, i) => { const p = paintSheet(project, sheet, i); doc.addPage(p.w, p.h, p.content); });
+  project.schematic.sheets.forEach((sheet, i) => { const p = paintSheet(project, sheet, i, opts); doc.addPage(p.w, p.h, p.content); });
   return doc.build();
 }
 

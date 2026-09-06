@@ -1,6 +1,6 @@
 import { usePrefs } from '../i18n/index.js';
 import { useState } from 'react';
-import { RULE_SETS, PROJECT_TEMPLATES, createFromTemplate } from '@tracelet/kernel';
+import { RULE_SETS, PROJECT_TEMPLATES, createFromTemplate, MAIN_SHEET_NAME } from '@tracelet/kernel';
 import { useApp } from '../store/app.js';
 
 const FABS = [
@@ -11,7 +11,8 @@ const FABS = [
 
 export function Wizard() {
   const { set, openProjectObject } = useApp();
-  const [name, setName] = useState('LED 闪灯板');
+  const DEFAULT_NAME = usePrefs.getState().locale === 'en' ? 'LED blinker' : 'LED 闪灯板';
+  const [name, setName] = useState(DEFAULT_NAME);
   const [layers, setLayers] = useState<2 | 4>(2);
   const [fab, setFab] = useState('jlc');
   const [unit, setUnit] = useState<'mm' | 'mil'>('mm');
@@ -22,6 +23,7 @@ export function Wizard() {
     const fabName = RULE_SETS.find((r) => r.id === fab)?.name ?? '嘉立创';
     const author = usePrefs.getState().userName;
     const made = createFromTemplate(tpl, { name: name || undefined, copperCount: layers, unit, ruleSetId: fab, fab: fabName });
+    if (usePrefs.getState().locale === 'en') for (const sh of made.schematic.sheets) if (sh.name === MAIN_SHEET_NAME) sh.name = 'Main';
     if (author) for (const sh of made.schematic.sheets) if (!sh.frame.author) sh.frame.author = author;
     openProjectObject(made);
   };
@@ -52,7 +54,7 @@ export function Wizard() {
           <span className="k">模板</span>
           <div className="col" style={{ gap: 6 }}>
             <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-              {PROJECT_TEMPLATES.map((t) => <span key={t.id} className={`chip${tpl === t.id ? ' on' : ''}`} style={{ padding: '5px 10px' }} onClick={() => { setTpl(t.id); if (t.id !== 'blank' && (name === '' || name === 'LED 闪灯板' || PROJECT_TEMPLATES.some((x) => x.name === name))) setName(t.name); }}>{t.name}</span>)}
+              {PROJECT_TEMPLATES.map((t) => <span key={t.id} className={`chip${tpl === t.id ? ' on' : ''}`} style={{ padding: '5px 10px' }} onClick={() => { setTpl(t.id); if (t.id !== 'blank' && (name === '' || name === DEFAULT_NAME || PROJECT_TEMPLATES.some((x) => x.name === name))) setName(t.name); }}>{t.name}</span>)}
             </div>
             {tplInfo && tplInfo.id !== 'blank' && <div className="small muted">{tplInfo.description} · 生成后可自由修改</div>}
           </div>

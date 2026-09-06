@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { create } from 'zustand';
 import type Anthropic from '@anthropic-ai/sdk';
-import { searchParts, allParts, generateSchematic, sch, type ReviewSuggestion, type ExtractedSchematic } from '@tracelet/kernel';
+import { searchParts, allParts, generateSchematic, sch, type ReviewSuggestion, type ExtractedSchematic, sheetDisplayName } from '@tracelet/kernel';
+import { usePrefs } from '../i18n/index.js';
 import { useApp, useEditor, useProject, useSheet } from '../store/app.js';
 import { getAnalysis } from '../store/analysis.js';
 import { locateItem } from './CheckPanel.js';
@@ -75,7 +76,7 @@ export function AiPanel() {
     ai.set({ busy: true });
     const liveSteps: string[] = [];
     try {
-      const ctxText = `当前：${app.screen === 'pcb' ? 'PCB' : `原理图「${sheet.name}」`}${selRef ? `，选中 ${selRef}` : ''}。`;
+      const ctxText = `当前：${app.screen === 'pcb' ? 'PCB' : `原理图「${sheetDisplayName(sheet.name, usePrefs.getState().locale)}」`}${selRef ? `，选中 ${selRef}` : ''}。`;
       const content: Anthropic.Beta.BetaMessageParam['content'] = attached.length
         ? [...attached.map((f, i) => blockOf(f, i === attached.length - 1)), { type: 'text', text: `${ctxText}\n${text}` }]
         : `${ctxText}\n${text}`;
@@ -100,7 +101,7 @@ export function AiPanel() {
           </div>
           <span className="ml-auto field muted" style={{ height: 24, cursor: 'pointer' }} onClick={() => setShowCfg(!showCfg)}>{configured ? cfg.model : '未配置模型'} ▾</span>
         </div>
-        <div className="muted" style={{ fontSize: 11.5 }}>正在看：<span style={{ color: 'var(--text)' }}>{app.screen === 'pcb' ? 'PCB' : `原理图 · ${sheet.name}`}</span> · 选中 <span className="mono" style={{ color: 'var(--text)' }}>{selRef || '无'}</span></div>
+        <div className="muted" style={{ fontSize: 11.5 }}>正在看：<span style={{ color: 'var(--text)' }}>{app.screen === 'pcb' ? 'PCB' : `原理图 · ${sheetDisplayName(sheet.name, usePrefs.getState().locale)}`}</span> · 选中 <span className="mono" style={{ color: 'var(--text)' }}>{selRef || '无'}</span></div>
         {showCfg && (
           <div className="col" style={{ gap: 6, marginTop: 4 }}>
             <input className="input mono" placeholder="API Key（只存在本机浏览器，直连 Anthropic）" type="password" value={cfg.apiKey} onChange={(e) => setCfg({ apiKey: e.target.value })} />

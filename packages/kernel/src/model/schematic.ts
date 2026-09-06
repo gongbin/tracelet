@@ -136,6 +136,20 @@ export type SheetFrame = z.infer<typeof SheetFrameSchema>;
 export const TITLE_BLOCK = { w: 4400, h: 900 };
 /** 实际标题栏尺寸（受页面宽度限制）。 */
 export function titleBlockSize(frame: SheetFrame, pageW: number): { w: number; h: number } { return { w: Math.max(2600, Math.min(frame.titleBlockWidth ?? TITLE_BLOCK.w, pageW - 600)), h: Math.max(600, Math.min(frame.titleBlockHeight ?? TITLE_BLOCK.h, 2000)) }; }
+/** 默认主图名（中文）；英文界面显示为 Main，见 sheetDisplayName。 */
+export const MAIN_SHEET_NAME = '主图';
+export const FRAME_LABELS_ZH = { sheet: '图纸', date: '日期', revision: '版本', page: '页', author: '作者' } as const;
+export const FRAME_LABELS_EN = { sheet: 'Sheet', date: 'Date', revision: 'Rev', page: 'Page', author: 'Author' } as const;
+/** 标题栏标签：用户没改过（仍是中文默认）且 locale 为英文时，显示英文标签；用户自定义的原样返回。 */
+export function frameLabels(frame: SheetFrame, locale?: string): { sheet: string; date: string; revision: string; page: string; author: string } {
+  const L = frame.labels;
+  if (!locale?.startsWith('en')) return L;
+  const out = { ...L } as { sheet: string; date: string; revision: string; page: string; author: string };
+  for (const k of Object.keys(FRAME_LABELS_ZH) as (keyof typeof FRAME_LABELS_ZH)[]) if (L[k] === FRAME_LABELS_ZH[k]) out[k] = FRAME_LABELS_EN[k];
+  return out;
+}
+/** 图纸显示名：默认的「主图」在英文界面显示为 Main，其余原样。 */
+export function sheetDisplayName(name: string, locale?: string): string { return locale?.startsWith('en') && name === MAIN_SHEET_NAME ? 'Main' : name; }
 export const DEFAULT_FRAME: SheetFrame = { size: 'A4', landscape: true, title: '', revision: '1.0', company: '', author: '', date: '', comment: '', labels: { sheet: '图纸', date: '日期', revision: '版本', page: '页', author: '作者' } };
 /** 纸张尺寸（mil，横向）。 */
 export const PAPER_SIZES: Record<'A5' | 'A4' | 'A3' | 'A2' | 'A1', { w: number; h: number }> = { A5: { w: 8268, h: 5827 }, A4: { w: 11693, h: 8268 }, A3: { w: 16535, h: 11693 }, A2: { w: 23386, h: 16535 }, A1: { w: 33071, h: 23386 } };
