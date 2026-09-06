@@ -29,5 +29,13 @@ with tempfile.TemporaryDirectory() as tmp:
    text=(models/e['path']).read_text(errors='replace');notices.append('Source: https://gitlab.com/kicad/libraries/kicad-packages3D/-/blob/master/'+e['path']+'\n'+text[:text.index('FILE_DESCRIPTION') if 'FILE_DESCRIPTION'in text else 3000])
   (out/(name+'.notice.txt')).write_text('\n'.join(notices))
   manifest[name]={'file':name+'.glb','source':entries[0]['path']}
+  # 同名标准封装的焊盘区中心 / 尺寸：给"同系列近似"匹配对齐用
+  mods=list((models.parent/'footprints').glob(f'*.pretty/{name}.kicad_mod'))
+  if mods:
+   import re
+   pads=re.findall(r'\(pad "[^"]*" (\w+) (\w+)\s*\(at ([-\d.]+) ([-\d.]+)(?: [-\d.]+)?\)\s*\(size ([-\d.]+) ([-\d.]+)\)',mods[0].read_text())
+   if pads:
+    xs1=[float(p[2])-float(p[4])/2 for p in pads];xs2=[float(p[2])+float(p[4])/2 for p in pads];ys1=[float(p[3])-float(p[5])/2 for p in pads];ys2=[float(p[3])+float(p[5])/2 for p in pads]
+    manifest[name]['padCenter']=[round((min(xs1)+max(xs2))/2,3),round((min(ys1)+max(ys2))/2,3)];manifest[name]['padBox']=[round(max(xs2)-min(xs1),2),round(max(ys2)-min(ys1),2)]
 (out/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
 print('Converted',len(manifest),'models')

@@ -3,7 +3,13 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { footprintDef, type Board, type BoardFootprint, type Model3d } from '@tracelet/kernel';
 import manifest from '../../../public/models3d/kicad/manifest.json';
 
-export const MODEL_CATALOG = manifest as Record<string, { file: string; source: string }>;
+export const MODEL_CATALOG = manifest as unknown as Record<string, { file: string; source: string; /** 该标准封装焊盘包围盒中心（封装局部 mm，KiCad y 向下） */ padCenter?: [number, number]; padBox?: [number, number] }>;
+/** 封装焊盘包围盒中心（局部坐标，y 向下）。 */
+export function padCenterOf(def: { pads: { x: number; y: number; w: number; h: number }[] }): [number, number] | undefined {
+  if (!def.pads.length) return undefined;
+  const x1 = Math.min(...def.pads.map((p) => p.x - p.w / 2)), x2 = Math.max(...def.pads.map((p) => p.x + p.w / 2)), y1 = Math.min(...def.pads.map((p) => p.y - p.h / 2)), y2 = Math.max(...def.pads.map((p) => p.y + p.h / 2));
+  return [(x1 + x2) / 2, (y1 + y2) / 2];
+}
 export function needsModel(f: BoardFootprint): boolean {
   const d = footprintDef(f);
   return !(d.pads.length > 0 && d.pads.every(p => p.npth)) && !(/^TestPoint_Pad_/i.test(d.name.replace(/^.*:/, '')) || (/^TP\d/i.test(f.ref) && d.pads.length === 1 && d.pads[0].drill === 0));
@@ -28,7 +34,12 @@ export function modelFor(f: BoardFootprint, board: Board): Model3d | undefined {
   const key = f.footprintId.split(':').pop()!;
   if (MODEL_CATALOG[key]) return { name: key, source: `catalog:${key}`, scale: 1000, offset: [0, 0, 0], rotation: [0, 0, 0] };
   const approx = approximateCatalogKey(key);
-  if (approx) return { name: `${approx}（同系列近似）`, source: `catalog:${approx}`, scale: 1000, offset: [0, 0, 0], rotation: [0, 0, 0] };
+  if (approx) {
+    // 近似模型的原点约定可能不同：把它的焊盘区中心对到本封装的焊盘区中心（场景 y 轴与 KiCad 相反）
+    const mine = padCenterOf(footprintDef(f)), theirs = MODEL_CATALOG[approx].padCenter;
+    const offset: [number, number, number] = mine && theirs ? [Math.round((mine[0] - theirs[0]) * 1000) / 1000, Math.round(-(mine[1] - theirs[1]) * 1000) / 1000, 0] : [0, 0, 0];
+    return { name: `${approx}（同系列近似）`, source: `catalog:${approx}`, scale: 1000, offset, rotation: [0, 0, 0] };
+  }
   return undefined;
 }
 /** GLB imports must be self-contained; never fetch external buffers/images from uploaded files. */
