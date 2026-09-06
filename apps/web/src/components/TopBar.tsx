@@ -32,7 +32,7 @@ export function TopBar() {
   const editor = useEditor();
   const t = useT();
   const fileRef = useRef<HTMLInputElement>(null);
-  const { screen, go, projMenuOpen, set, projects, openProject, closeProject, lastSavedAt, saving, toast, guideOpen } = useApp();
+  const { screen, go, projMenuOpen, set, projects, openProject, closeProject, lastSavedAt, saving, toast, guideOpen, saveError } = useApp();
   const bridgeStatus = useBridge((b) => b.status);
   const pendingSync = screen === 'pcb' && (() => { const d = diffBoardFromSchematic(project); return d.added.length + d.removed.length > 0; })();
 
@@ -99,7 +99,7 @@ export function TopBar() {
       </div>
       <span className="row xs muted" style={{ gap: 5, whiteSpace: 'nowrap', flex: 'none' }}>
         {bridgeStatus !== 'off' && <span className="xs mono" title="本地 Agent（MCP）连接状态" style={{ color: bridgeStatus === 'connected' ? 'var(--ai)' : 'var(--text-3)', marginRight: 8 }}>{bridgeStatus === 'connected' ? '✨ Agent 已连接' : '✨ Agent 连接中'}</span>}
-        <Icon d={I.cloud} size={13} stroke={2} color={saving ? 'var(--text-3)' : 'var(--success)'} />{saving ? t('ws.saving') : `${t('ws.saved')} · ${timeAgo(lastSavedAt)}`}
+        {saveError ? <span title={saveError} style={{ color: 'var(--error)', cursor: 'pointer', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis' }} onClick={() => toast(saveError, 'error')}>● 未保存：{saveError.replace(/^保存失败：/, '')}</span> : <><Icon d={I.cloud} size={13} stroke={2} color={saving ? 'var(--text-3)' : 'var(--success)'} />{saving ? t('ws.saving') : `${t('ws.saved')} · ${timeAgo(lastSavedAt)}`}</>}
       </span>
       <PrefsMenu />
     </div>

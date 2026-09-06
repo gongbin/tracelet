@@ -25,6 +25,8 @@ export interface AppState {
   paletteOpen: boolean;
   /** 顶栏向导弹层 */
   guideOpen: boolean;
+  /** 最近一次保存失败原因（顶栏常显，直到保存成功） */
+  saveError: string | null;
   /** PCB 中临时隐藏的封装 id（不渲染、不可选，方便选到被遮住的元件；不入库） */
   hiddenFootprints: string[];
   focusMode: boolean;
@@ -106,6 +108,14 @@ function loadFavorites(): string[] { try { return JSON.parse(localStorage.getIte
 let toastSeq = 0;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let unsubscribe: (() => void) | null = null;
+let pendingFlush: (() => Promise<void>) | null = null;
+// 页面隐藏 / 关闭前把还在防抖里的修改立刻写盘，避免"识别完就刷新"丢内容
+if (typeof window !== 'undefined') {
+  const onHide = () => { if (saveTimer && pendingFlush) void pendingFlush(); };
+  window.addEventListener('pagehide', onHide);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') onHide(); });
+  window.addEventListener('beforeunload', (e) => { if (saveTimer) { onHide(); e.preventDefault(); } });
+}
 
 export const useApp = create<AppState>((set, get) => ({
   store: createProjectStore(),
@@ -116,6 +126,7 @@ export const useApp = create<AppState>((set, get) => ({
   projMenuOpen: false,
   paletteOpen: false,
   guideOpen: false,
+  saveError: null,
   hiddenFootprints: [],
   focusMode: false,
   bottomExpanded: false,
@@ -178,18 +189,22 @@ export const useApp = create<AppState>((set, get) => ({
   openProjectObject(p) {
     unsubscribe?.();
     const editor = new ProjectEditor(p);
+    const flush = async () => {
+      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+      try { await get().store.save(editor.project); set({ lastSavedAt: Date.now(), saving: false, saveError: null }); }
+      catch (e) { const msg = (e as Error).message; const quota = /quota|exceeded|QuotaExceeded/i.test(msg) || (e as { name?: string }).name === 'QuotaExceededError'; set({ saving: false, saveError: quota ? '浏览器存储空间已满，修改没有保存：请导出备份 / 删除不用的项目或 3D 模型' : `保存失败：${msg}` }); get().toast(get().saveError!, 'error'); }
+    };
+    pendingFlush = flush;
     unsubscribe = editor.subscribe(() => {
       if (saveTimer) clearTimeout(saveTimer);
       set({ saving: true });
-      saveTimer = setTimeout(async () => {
-        try { await get().store.save(editor.project); set({ lastSavedAt: Date.now(), saving: false }); } catch (e) { set({ saving: false }); get().toast(`保存失败：${(e as Error).message}`, 'error'); }
-      }, 600);
+      saveTimer = setTimeout(() => { void flush(); }, 600);
     });
     set({ editor, autoroute: { status: 'idle', result: null }, placement: { status: 'idle', result: null }, guideOpen: false, hiddenFootprints: [], screen: 'sch', rightTab: null, selection: [], pcbSelection: [], placing: null, pendingPin: null, routing: null, schTool: 'select', pcbTool: 'select', lastSavedAt: Date.now(), projMenuOpen: false, wizardOpen: false, highlightNet: null, checkHighlight: null, sheetId: p.schematic.sheets[0].id, wireDraft: null, busDraft: null, drawDraft: null, pasting: null });
     void get().store.save(p).then(() => get().refreshProjects());
   },
   closeProject() {
-    unsubscribe?.(); unsubscribe = null;
+    unsubscribe?.(); unsubscribe = null; pendingFlush = null;
     set({ editor: null, autoroute: { status: 'idle', result: null }, screen: 'home', projMenuOpen: false });
     void get().refreshProjects();
   },

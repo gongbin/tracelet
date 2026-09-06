@@ -91,7 +91,53 @@ export class RemoteProjectStore implements ProjectStore {
   setMe(name: string) { return this.req<void>('/api/me', { method: 'PUT', body: JSON.stringify({ name }) }); }
 }
 
+/**
+ * IndexedDB 本地存储：localStorage 整站只有约 5MB，带 3D 模型 / 导入库的工程很容易超限导致"保存失败"。
+ * 首次使用时把 localStorage 里的旧工程迁移过来（迁移成功后删除旧副本，索引保留在 IDB）。
+ */
+export class IdbProjectStore implements ProjectStore {
+  readonly kind = 'local' as const;
+  private dbp: Promise<IDBDatabase> | null = null;
+  private legacy = new LocalProjectStore();
+  private migrated = false;
+  private db(): Promise<IDBDatabase> {
+    if (!this.dbp) this.dbp = new Promise((res, rej) => {
+      const req = indexedDB.open('tracelet', 1);
+      req.onupgradeneeded = () => { const d = req.result; if (!d.objectStoreNames.contains('projects')) d.createObjectStore('projects', { keyPath: 'id' }); };
+      req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error ?? new Error('IndexedDB 打开失败'));
+    });
+    return this.dbp;
+  }
+  private tx<T>(mode: IDBTransactionMode, fn: (st: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+    return this.db().then((d) => new Promise<T>((res, rej) => { const t = d.transaction('projects', mode); const r = fn(t.objectStore('projects')); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error ?? new Error('IndexedDB 操作失败')); }));
+  }
+  private async migrate() {
+    if (this.migrated) return; this.migrated = true;
+    try {
+      const keys: string[] = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('tracelet:project:')) keys.push(k); }
+      for (const k of keys) { const raw = localStorage.getItem(k); if (!raw) continue; try { const p = parseProject(raw); const existing = await this.tx<{ id: string; updatedAt: string } | undefined>('readonly', (st) => st.get(p.id) as IDBRequest<{ id: string; updatedAt: string } | undefined>); if (!existing || existing.updatedAt < p.updatedAt) await this.putRaw(p); localStorage.removeItem(k); } catch { /* 损坏的旧工程留在原处 */ } }
+      if (keys.length) { localStorage.removeItem('tracelet:projects'); localStorage.setItem('tracelet:seeded', '1'); }
+    } catch { /* 无 localStorage 时忽略 */ }
+  }
+  private putRaw(p: Project) { return this.tx('readwrite', (st) => st.put({ id: p.id, meta: metaOf(p), updatedAt: p.updatedAt, text: serializeProject(p, false) })); }
+  async list() {
+    await this.migrate();
+    const rows = await this.tx<{ meta: ProjectMeta }[]>('readonly', (st) => st.getAll() as IDBRequest<{ meta: ProjectMeta }[]>);
+    let list = rows.map((r) => r.meta);
+    if (list.length === 0 && !localStorage.getItem('tracelet:seeded')) { const demo = createDemoProject(); await this.save(demo); localStorage.setItem('tracelet:seeded', '1'); list = [metaOf(demo)]; }
+    return list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+  async load(id: string) {
+    await this.migrate();
+    const row = await this.tx<{ text: string } | undefined>('readonly', (st) => st.get(id) as IDBRequest<{ text: string } | undefined>);
+    if (!row) return this.legacy.load(id);
+    try { return parseProject(row.text); } catch (e) { console.error(e); return null; }
+  }
+  async save(project: Project) { await this.migrate(); await this.putRaw(project); }
+  async remove(id: string) { await this.migrate(); await this.tx('readwrite', (st) => st.delete(id)); try { localStorage.removeItem(`tracelet:project:${id}`); } catch { /* ignore */ } }
+}
+
 export function createProjectStore(cfg: StoreConfig = loadStoreConfig()): ProjectStore {
   if (cfg.mode === 'remote' && cfg.url) return new RemoteProjectStore(cfg.url, cfg.token);
-  return new LocalProjectStore();
+  return typeof indexedDB !== 'undefined' ? new IdbProjectStore() : new LocalProjectStore();
 }
