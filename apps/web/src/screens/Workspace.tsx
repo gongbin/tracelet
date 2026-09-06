@@ -45,7 +45,8 @@ const PCB_TOOLS: ToolDef[] = [
   { id: 'align', name: '对齐 / 分布', key: 'L', d: I.align, desc: '框选 2 个以上元件后：左/右/上/下对齐、居中、等距分布。' },
   { id: 'placement', name: '布局优化', key: '', d: I.layout, desc: '布线前检查并整理元件布局：去耦电容靠近芯片、最小间距、对齐、飞线更短；用试布线验证不变差。结果先预览，接受后才生效，可 Undo。' },
   { id: 'autoroute', name: '自动布线', key: '', d: I.auto, desc: '内置网格 A* 布线器布完剩余飞线（支持过孔换层），结果先以"建议"预览，接受后才生效，可 Undo。' },
-  { id: 'refill', name: '重填铺铜', key: 'B', d: I.refill, desc: '移动元件后重新计算铺铜区域。' }
+  { id: 'refill', name: '重填铺铜', key: 'B', d: I.refill, desc: '移动元件后重新计算铺铜区域。' },
+  { id: 'clearroute', name: '撤销布线 / 铺铜', key: '', d: I.clearroute, desc: '清空全部走线、过孔和铺铜，回到只有元件的状态；可先人工调整有警告的位置，再重新自动布线。可 Undo。', sep: true }
 ];
 let clipboard: Clipboard | null = null;
 const DRAW_MODES: ['line' | 'rect' | 'text', string, string][] = [['line', '线条', '点击加点 · 双击结束'], ['rect', '矩形', '点两个对角'], ['text', '文字', '点击放置注释']];
@@ -173,6 +174,17 @@ export function Workspace() {
   const removeSheet = (id: string) => { if (sheets.length <= 1) return; const sh = sheets.find((x) => x.id === id)!; if (sh.components.length && !confirm(`删除图纸「${sh.name}」及其中 ${sh.components.length} 个元件？`)) return; editor.dispatch(sch.deleteSheet(id)); app.patch({ sheetId: sheets.find((x) => x.id !== id)!.id, selection: [] }); };
   const onPcbTool = (id: string) => {
     if (id === 'refill') { app.toast('铺铜实时计算，无需重填'); return; }
+    if (id === 'clearroute') {
+      const b = project.board; const n = { t: b.traces.length, v: b.vias.length, z: b.zones.length };
+      if (!n.t && !n.v && !n.z) { app.toast('板上还没有走线 / 过孔 / 铺铜'); return; }
+      const keepZones = n.z > 0 && !confirm(`清除 ${n.t} 段走线、${n.v} 个过孔和 ${n.z} 块铺铜？\n\n点「取消」则只清走线和过孔、保留铺铜。`);
+      if (keepZones && !n.t && !n.v) return;
+      if (!keepZones && !n.z && !confirm(`清除 ${n.t} 段走线和 ${n.v} 个过孔？`)) return;
+      editor.dispatch(pcb.clearRouting({ traces: true, vias: true, zones: !keepZones }));
+      app.patch({ autoroute: { status: 'idle', result: null }, placement: { status: 'idle', result: null }, routing: null, pcbSelection: [] });
+      app.toast(`已清除走线 / 过孔${keepZones ? '（保留铺铜）' : ' / 铺铜'}，调整好位置后可重新自动布线（可 Undo）`, 'success');
+      return;
+    }
     if (id === 'placement') { if (!project.board.footprints.length) { app.toast('板上还没有元件，先在原理图里「同步到 PCB」'); return; } app.patch({ placementSeq: app.placementSeq + 1, routing: null, zoneDraft: null, outlineDraft: null, measure: null }); return; }
     if (id === 'autoroute') { if (a.ratsnest.unrouted === 0) { app.toast('没有未布线的连接'); return; } app.patch({ pcbTool: 'autoroute', routing: null, zoneDraft: null, outlineDraft: null, measure: null }); return; }
     app.setPcbTool(id as typeof app.pcbTool);

@@ -147,6 +147,8 @@ export const BoardSchema = z.object({
   copperCount: z.union([z.literal(2), z.literal(4)]).default(2),
   thickness: z.number().default(1.6),
   outline: z.array(VecSchema),
+  /** 矩形板框的圆角半径（mm）；outline 里已经是展开后的圆角折线，此值用于改长宽时保持圆角 */
+  outlineRadius: z.number().optional(),
   footprints: z.array(BoardFootprintSchema),
   traces: z.array(TraceSchema),
   vias: z.array(ViaSchema),

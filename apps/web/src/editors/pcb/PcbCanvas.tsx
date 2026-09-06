@@ -432,7 +432,7 @@ export function PcbCanvas() {
   const cursor = tool === 'route' || tool === 'zone' || tool === 'measure' || tool === 'via' || tool === 'edge' || tool === 'hole' ? 'crosshair' : view.panning ? 'grabbing' : view.spaceDown ? 'grab' : 'default';
   const hlItem = app.checkHighlight ? analysis.drc.items.find((i) => i.id === app.checkHighlight) : null;
   const selTrace = app.pcbSelection.length === 1 ? board.traces.find((t) => t.id === app.pcbSelection[0]) : undefined;
-  const showOutlineHandles = tool === 'edge' && !app.outlineDraft;
+  const showOutlineHandles = tool === 'edge' && !app.outlineDraft && !(board.outlineRadius && board.outlineRadius > 0);
   const hs = 6 / vp.k; // 手柄尺寸（屏幕 6px）
   const ar = app.autoroute;
 
@@ -615,6 +615,7 @@ export function PcbCanvas() {
             <input className="input mono" key={`w${bb.w}`} style={{ width: 64, height: 22 }} defaultValue={fmt(bb.w)} title="板宽 mm（左上角不动）" onBlur={(e) => resizeBoard(Number(e.target.value), bb.h)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />×
             <input className="input mono" key={`h${bb.h}`} style={{ width: 64, height: 22 }} defaultValue={fmt(bb.h)} title="板高 mm（左上角不动）" onBlur={(e) => resizeBoard(bb.w, Number(e.target.value))} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} /> mm
           </span>
+          <span className="row mono" style={{ gap: 4 }} title="矩形板框圆角半径 mm（0 = 直角）">圆角 <input className="input mono" key={`r${board.outlineRadius ?? 0}`} style={{ width: 48, height: 22 }} defaultValue={fmt(board.outlineRadius ?? 0)} onBlur={(e) => { const r = Number(e.target.value); if (Number.isFinite(r) && r >= 0 && Math.abs(r - (board.outlineRadius ?? 0)) > 1e-6) editor.dispatch(pcb.setOutlineRadius(r)); }} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} /></span>
           <button className="btn sm" title="板框自动包住所有元件 / 走线（四周留 2mm）" onClick={() => { editor.dispatch(pcb.fitOutlineToContent(2)); app.toast('板框已包住全部内容（留 2mm），可 Undo', 'success'); }}>适配内容</button>
           <button className="btn sm" title="把整板（含内容）移到原点 (0,0)" onClick={() => editor.dispatch(pcb.normalizeBoardOrigin())}>归零</button>
           <span className={`chip${moveWithContents ? ' on' : ''}`} title="拖动板框时元件、走线、铺铜一起移动" onClick={() => setMoveWithContents(!moveWithContents)}>{moveWithContents ? '✓ 连同内容移动' : '仅移动板框'}</span>

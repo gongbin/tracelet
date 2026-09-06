@@ -4,7 +4,7 @@ import { DEFAULT_STACKUP } from '../model/board.js';
 import { findFootprint, BUILTIN_FOOTPRINTS } from '../library/footprints.js';
 import { registeredFootprint } from '../library/registry.js';
 import { ensureFootprintDef } from '../board/footprintResolve.js';
-import { boardBounds, footprintBody, allPads } from '../board/geometry.js';
+import { boardBounds, footprintBody, allPads, rectOutline } from '../board/geometry.js';
 import type { Vec } from '../geometry.js';
 import { newId } from '../ids.js';
 import { command, type Command } from './types.js';
@@ -85,7 +85,18 @@ export function deleteTexts(ids: string[]): Command {
 
 /** 设置任意多边形板框（至少 3 点）。 */
 export function setOutline(points: Vec[]): Command {
-  return command('板框', (proj) => (points.length < 3 ? proj : updateBoard(proj, (b) => ({ ...b, outline: points }))));
+  return command('板框', (proj) => (points.length < 3 ? proj : updateBoard(proj, (b) => ({ ...b, outline: points, outlineRadius: 0 }))));
+}
+
+/** 设置矩形板框的圆角半径（按当前外接矩形重建板框）。 */
+export function setOutlineRadius(r: number): Command {
+  return command(r > 0 ? `板框圆角 ${r}mm` : '板框直角', (proj) => updateBoard(proj, (b) => { const o = boardBounds(b); return { ...b, outlineRadius: Math.max(0, r), outline: rectOutline(o.x, o.y, o.w, o.h, r) }; }));
+}
+
+/** 撤销布线 / 铺铜：清空走线、过孔、铺铜中的任意组合，方便重新布局后再布线（可 undo）。 */
+export function clearRouting(what: { traces?: boolean; vias?: boolean; zones?: boolean } = { traces: true, vias: true, zones: true }): Command {
+  const parts = [what.traces ? '走线' : '', what.vias ? '过孔' : '', what.zones ? '铺铜' : ''].filter(Boolean).join(' / ');
+  return command(`清除${parts}`, (proj) => updateBoard(proj, (b) => ({ ...b, traces: what.traces ? [] : b.traces, vias: what.vias ? [] : b.vias, zones: what.zones ? [] : b.zones })));
 }
 
 /** 批量移动封装（对齐 / 分布）。 */
@@ -108,7 +119,7 @@ export function applyRoutes(traces: Omit<Trace, 'id'>[], vias: Omit<Via, 'id'>[]
 export function setOutlineRect(w: number, h: number, origin?: Vec): Command {
   return command('板框尺寸', (proj) => updateBoard(proj, (b) => {
     const o = origin ?? (b.outline.length >= 3 ? boardBounds(b) : { x: 0, y: 0 });
-    return { ...b, outline: [{ x: o.x, y: o.y }, { x: o.x + w, y: o.y }, { x: o.x + w, y: o.y + h }, { x: o.x, y: o.y + h }] };
+    return { ...b, outline: rectOutline(o.x, o.y, w, h, b.outlineRadius ?? 0) };
   }));
 }
 
@@ -153,7 +164,7 @@ export function fitOutlineToContent(margin = 2): Command {
     const c = contentBounds(b); if (!c) return b;
     const r = (v: number) => Math.round(v * 2) / 2;
     const x = r(c.x - margin), y = r(c.y - margin), w = Math.max(5, r(c.w + 2 * margin)), h = Math.max(5, r(c.h + 2 * margin));
-    return { ...b, outline: [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }] };
+    return { ...b, outline: rectOutline(x, y, w, h, b.outlineRadius ?? 0) };
   }));
 }
 

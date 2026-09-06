@@ -63,6 +63,16 @@ export function boardBounds(board: Board): Rect {
   return polygonBounds(board.outline);
 }
 
+/** 矩形（可圆角）板框折线：r=0 为 4 个顶点；r>0 每个圆角用 8 段折线逼近，半径自动限制在短边一半以内。 */
+export function rectOutline(x: number, y: number, w: number, h: number, r = 0): Vec[] {
+  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+  if (rr < 1e-6) return [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }];
+  const N = 8, pts: Vec[] = [];
+  const corner = (cx: number, cy: number, a0: number) => { for (let i = 0; i <= N; i++) { const a = a0 + (Math.PI / 2) * (i / N); pts.push({ x: +(cx + rr * Math.cos(a)).toFixed(4), y: +(cy + rr * Math.sin(a)).toFixed(4) }); } };
+  corner(x + rr, y + rr, Math.PI); corner(x + w - rr, y + rr, -Math.PI / 2); corner(x + w - rr, y + h - rr, 0); corner(x + rr, y + h - rr, Math.PI / 2);
+  return pts;
+}
+
 export function netClassFor(board: Board, net: string) {
   return board.netClasses.find((nc) => nc.nets.includes(net)) ?? board.netClasses.find((nc) => nc.name === 'Default') ?? board.netClasses[0];
 }
