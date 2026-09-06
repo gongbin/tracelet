@@ -886,6 +886,8 @@ export function autoroute(board: Board, rules: RuleSet = RULE_SETS[0], opts: Aut
   opts.debug?.({ afterChamfer: true, remaining: remainingLines().length });
   // ---------- 汇总 ----------
   for (const nr of nets.values()) for (const r of nr.routes) { result.traces.push(...r.traces); result.vias.push(...r.vias); }
+  // 同一网络的多条路线可能在同一点各放一个过孔：去重（孔到孔 DRC 会把重叠过孔报成孔边距 0）
+  result.vias = result.vias.filter((v, i, arr) => arr.findIndex((w) => w.net === v.net && Math.abs(w.x - v.x) < 1e-6 && Math.abs(w.y - v.y) < 1e-6) === i);
   const remaining = remainingLines();
   const unresolved = new Set(remaining.map((l) => l.net));
   for (const nr of nets.values()) {
