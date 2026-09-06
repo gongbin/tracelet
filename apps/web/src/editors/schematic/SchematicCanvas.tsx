@@ -459,12 +459,11 @@ export function SchematicCanvas() {
           {/* 标签 */}
           {sheet.labels.map((l) => (
             <g key={l.id} onPointerDown={onLabelDown(l.id)} style={{ cursor: editable ? 'move' : 'pointer' }}>
-              {/* 标准网络标签：端头红色空心小圆点 + 红色文字，文字在导线另一侧 */}
+              {/* 标准网络标签：红色纯文字贴在导线末端上方 */}
               {(() => { const lay = netLabelLayout(sheet, l, crossSheet); const sel = app.selection.includes(l.id); const tw = l.text.length * 62;
                 const hx = lay.text.anchor === 'middle' ? lay.text.x - tw / 2 - 20 : lay.text.anchor === 'end' ? lay.text.x - tw - 20 : lay.text.x - 20;
                 return <>
                   <rect x={Math.min(hx, l.x - 60)} y={Math.min(lay.text.y - 110, l.y - 60)} width={Math.max(hx + tw + 40, l.x + 60) - Math.min(hx, l.x - 60)} height={Math.max(lay.text.y + 40, l.y + 60) - Math.min(lay.text.y - 110, l.y - 60)} rx={20} fill={sel ? 'rgba(255,216,77,.35)' : 'transparent'} stroke={sel ? '#E5B800' : 'none'} strokeWidth={12} />
-                  <circle cx={l.x} cy={l.y} r={lay.r} fill={SCH_COLORS.fill} stroke={SCH_COLORS.netLabel} strokeWidth={14} />
                   <text x={lay.text.x} y={lay.text.y} fontSize={100} fontFamily="'JetBrains Mono',monospace" fill={SCH_COLORS.netLabel} textAnchor={lay.text.anchor}>{l.text}</text>
                 </>; })()}
             </g>
@@ -497,7 +496,7 @@ export function SchematicCanvas() {
             <g transform={`translate(${pasteOffset.x} ${pasteOffset.y})`} pointerEvents="none">
               {app.pasting.clip.wires.map((w, i) => <path key={i} d={pathD(w.points)} stroke="#3D8BFF" strokeWidth={16} strokeDasharray="50 40" fill="none" />)}
               {app.pasting.clip.components.map((c) => <SymbolGlyph key={c.id} comp={c} sym={getSymbol(c.symbolId)} ghost />)}
-              {app.pasting.clip.labels.map((l) => <g key={l.id}><circle cx={l.x} cy={l.y} r={40} fill="none" stroke="#3D8BFF" strokeWidth={14} /><text x={l.x + 80} y={l.y + 35} fontSize={100} fill="#3D8BFF" fontFamily="'JetBrains Mono',monospace">{l.text}</text></g>)}
+              {app.pasting.clip.labels.map((l) => <text key={l.id} x={l.x + 20} y={l.y - 40} fontSize={100} fill="#3D8BFF" fontFamily="'JetBrains Mono',monospace">{l.text}</text>)}
             </g>
           )}
         </g>

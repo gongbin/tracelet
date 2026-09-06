@@ -37,12 +37,11 @@ export function crossSheetLabelNames(schematic: Schematic): Set<string> {
   return new Set([...count].filter(([, sheets]) => sheets.size > 1).map(([n]) => n));
 }
 /**
- * 网络标签布局：标准画法是端头一个红色空心小圆点 + 红色文字（同名标签相连，跨页同理）。
- * 文字放在导线的另一侧：导线从下方接来 → 文字居上；从上方接来 → 居下；水平接来 → 文字在远离导线的一侧。
+ * 网络标签布局：红色纯文字贴在导线末端（芯片引脚引出一根线 + 文字）。
+ * 文字放在导线上方并朝导线延伸方向排：导线在右 → 文字从锚点向右；导线在左 → 向左；竖直导线 → 文字在远离导线的一端居中。
  */
 export function netLabelLayout(sheet: Sheet, label: NetLabel, _crossSheet?: Set<string>): { port: boolean; text: { x: number; y: number; anchor: 'start' | 'middle' | 'end' }; r: number } {
   void label.kind; void _crossSheet;
-  const r = 40;
   let dir: 'up' | 'down' | 'left' | 'right' | null = null;
   for (const w of sheet.wires) {
     const n = w.points.length; if (n < 2) continue;
@@ -50,15 +49,14 @@ export function netLabelLayout(sheet: Sheet, label: NetLabel, _crossSheet?: Set<
     for (const [e, q] of ends) if (Math.abs(e.x - label.x) < 1e-6 && Math.abs(e.y - label.y) < 1e-6) { const dx = q.x - e.x, dy = q.y - e.y; dir = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'); }
     if (dir) break;
   }
-  // 导线在下方（dir=down）→ 文字在上；导线在上方 → 文字在下；导线在右 → 文字在左；导线在左 / 无导线 → 文字在右
-  const text = dir === 'down' ? { x: label.x, y: label.y - r - 40, anchor: 'middle' as const }
-    : dir === 'up' ? { x: label.x, y: label.y + r + 110, anchor: 'middle' as const }
-    : dir === 'right' ? { x: label.x - r - 40, y: label.y + 35, anchor: 'end' as const }
-    : { x: label.x + r + 40, y: label.y + 35, anchor: 'start' as const };
-  return { port: true, text, r };
+  const text = dir === 'left' ? { x: label.x - 20, y: label.y - 40, anchor: 'end' as const }
+    : dir === 'down' ? { x: label.x, y: label.y - 40, anchor: 'middle' as const }
+    : dir === 'up' ? { x: label.x, y: label.y + 110, anchor: 'middle' as const }
+    : { x: label.x + 20, y: label.y - 40, anchor: 'start' as const };
+  return { port: false, text, r: 0 };
 }
 /** 地符号 4 条横线的相对宽度（从接线端起）。 */
-export const GND_BARS = [1, 0.7, 0.42, 0.16];
+export const GND_BARS = [1, 0.66, 0.33];
 /** 电阻折线（竖直方向，6 个半周期）。 */
 export function resistorZigzag(w: number, h: number): Vec[] {
   const y0 = h * 0.08, y1 = h * 0.92, s = (y1 - y0) / 6;
@@ -80,7 +78,7 @@ export function symbolTextPositions(comp: SchComponent, sym: SymbolDef): { ref: 
     const up = rot === 0; // 圆点朝上：文字居上；朝下：文字居下
     value = rot === 90 || rot === 270 ? { x: b.x + b.w + 60, y: b.y + b.h / 2 + 40, anchor: 'start' } : up ? { x: cx, y: b.y - 50, anchor: 'middle' } : { x: cx, y: b.y + b.h + 120, anchor: 'middle' };
   }
-  if (sym.graphic === 'gnd') value = rot === 90 || rot === 270 ? { x: cx, y: b.y + b.h + 120, anchor: 'middle' } : { x: b.x + b.w + 60, y: b.y + b.h / 2 + 40, anchor: 'start' }; // 地：GND 文字在符号旁边
+  if (sym.graphic === 'gnd') value = rot === 90 || rot === 270 ? { x: cx, y: b.y + b.h + 120, anchor: 'middle' } : rot === 180 ? { x: cx, y: b.y - 50, anchor: 'middle' } : { x: cx, y: b.y + b.h + 120, anchor: 'middle' }; // 地：GND 文字居中放在远离导线的一侧（朝下在下方，朝上在上方）
   return { ref, value };
 }
 /** 符号本体（局部坐标，不含引脚）。 */
@@ -110,7 +108,7 @@ export function symbolLocalStrokes(sym: SymbolDef): StrokeSet {
       out.lines.push({ points: [{ x: w * 0.55, y: h * 0.05 }, { x: w * 0.55 + 60, y: h * 0.05 - 70 }], width: SW * 0.7 }, { points: [{ x: w * 0.7, y: h * 0.12 }, { x: w * 0.7 + 60, y: h * 0.12 - 70 }], width: SW * 0.7 });
       break;
     case 'gnd':
-      // 标准地符号：4 条横线一条比一条短，呈金字塔 / 箭头状接在导线末端（旋转 180° 即朝上）
+      // 标准地符号：3 条横线一条比一条短，接在导线末端（旋转 180° 即朝上）
       for (const [k, f] of GND_BARS.entries()) out.lines.push({ points: [{ x: (w * (1 - f)) / 2, y: k * 50 }, { x: (w * (1 + f)) / 2, y: k * 50 }], width: SW });
       break;
     case 'power':

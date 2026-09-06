@@ -142,7 +142,6 @@ export function paintSheet(project: Project, sheet: Sheet, index: number): { w: 
   const cross = crossSheetLabelNames(project.schematic);
   for (const l of sheet.labels) {
     const lay = netLabelLayout(sheet, l, cross);
-    P.color(SCH_COLORS.netLabel); P.color(SCH_COLORS.fill, false); P.circle({ x: l.x, y: l.y }, lay.r, 12, true);
     P.color(SCH_COLORS.netLabel, false); P.text(lay.text.x, lay.text.y, l.text, 100, lay.text.anchor);
   }
   return { w: pw, h: ph, content: P.content() };
