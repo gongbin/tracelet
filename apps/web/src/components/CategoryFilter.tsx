@@ -1,10 +1,10 @@
-import { PART_CATEGORIES, BUILTIN_PARTS } from '@tracelet/kernel';
+import { PART_CATEGORIES, allParts } from '@tracelet/kernel';
 
 export const iconUrl = (id: string, style: 'linear' | 'solid-45' = 'linear') => `${import.meta.env.BASE_URL}component-icons/${style}/${id}.svg`;
 
 /** 元器件分类筛选：线性图标 chip（面板）或立体图标卡片（库页）。 */
 export function CategoryFilter({ value, onChange, variant = 'chips', onlyUsed = true }: { value: string | null; onChange: (id: string | null) => void; variant?: 'chips' | 'cards'; onlyUsed?: boolean }) {
-  const used = new Set(BUILTIN_PARTS.map((p) => p.category));
+  const used = new Set(allParts().map((p) => p.category));
   const cats = PART_CATEGORIES.filter((c) => !onlyUsed || used.has(c.id));
   if (variant === 'cards') {
     return (

@@ -1,4 +1,4 @@
-import { buildBom, exportBomCsv, BUILTIN_PARTS } from '@tracelet/kernel';
+import { buildBom, exportBomCsv, allParts } from '@tracelet/kernel';
 import { useApp, useProject } from '../store/app.js';
 
 export function BomPage() {
@@ -6,7 +6,7 @@ export function BomPage() {
   const app = useApp();
   const rows = buildBom(project);
   const total = rows.reduce((n, r) => n + r.qty, 0);
-  const priceOf = (r: (typeof rows)[number]) => { const p = BUILTIN_PARTS.find((x) => x.mpn === r.mpn || x.value === r.value); return p?.price ? Number(p.price.replace(/[^\d.]/g, '')) : null; };
+  const priceOf = (r: (typeof rows)[number]) => { const p = allParts().find((x) => x.mpn === r.mpn || x.value === r.value); return p?.price ? Number(p.price.replace(/[^\d.]/g, '')) : null; };
   const sum = rows.reduce((n, r) => { const p = priceOf(r); return p == null ? n : n + p * r.qty; }, 0);
   return (
     <div className="page">

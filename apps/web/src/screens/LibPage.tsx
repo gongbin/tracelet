@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BUILTIN_PARTS, searchParts, findFootprint } from '@tracelet/kernel';
+import { allParts, searchParts, findFootprint } from '@tracelet/kernel';
 import { useApp } from '../store/app.js';
 import { CategoryFilter, iconUrl } from '../components/CategoryFilter.js';
 import { useT } from '../i18n/index.js';
@@ -9,11 +9,11 @@ export function LibPage() {
   const [q, setQ] = useState('');
   const [cat, setCat] = useState<string | null>(null);
   const t = useT();
-  const results = searchParts(q, BUILTIN_PARTS, cat ?? undefined);
+  const results = searchParts(q, allParts(), cat ?? undefined);
   return (
     <div className="page">
       <div className="page-inner" style={{ maxWidth: 1100 }}>
-        <div className="row"><h1>{t('lib.title')}</h1><span className="muted small">内置 {BUILTIN_PARTS.length} 个零件 · 导入 KiCad 工程会把其中的符号 / 封装带入项目库</span></div>
+        <div className="row"><h1>{t('lib.title')}</h1><span className="muted small">内置 {allParts().length} 个零件 · 导入 KiCad 工程会把其中的符号 / 封装带入项目库</span></div>
         <input className="input lg" style={{ maxWidth: 420 }} placeholder="搜索型号、参数、关键字（例如 0402 100nF、esp32、ldo）" value={q} onChange={(e) => setQ(e.target.value)} />
         <CategoryFilter value={cat} onChange={setCat} onlyUsed={false} />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>

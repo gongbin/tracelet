@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { BUILTIN_PARTS, searchParts, getSymbol, findFootprint, BUILTIN_FOOTPRINTS, importLibraryFile, lib, LIBRARY_FILE_HINT, type Part, type SymbolDef, type FootprintDef } from '@tracelet/kernel';
+import { allParts, searchParts, getSymbol, findFootprint, BUILTIN_FOOTPRINTS, importLibraryFile, lib, LIBRARY_FILE_HINT, type Part, type SymbolDef, type FootprintDef } from '@tracelet/kernel';
 import { useApp, useProject, useEditor } from '../store/app.js';
 import { readFileText } from '../store/backup.js';
 import { Icon } from '../components/Icon.js';
@@ -7,17 +7,18 @@ import { I } from '../icons.js';
 import { CategoryFilter } from '../components/CategoryFilter.js';
 import { SymbolThumb, FootprintThumb } from '../components/Thumbs.js';
 import { FootprintGenerator } from '../components/FootprintGenerator.js';
+import { usePartsStore, DEFAULT_PARTS_URL } from '../store/partsStore.js';
 import { useInventory, type InventoryItem } from '../store/inventory.js';
 import { downloadFile } from '../store/backup.js';
 
 const QUICK = [['R', '电阻', 'sym:R', '10kΩ', 'fp:R_0402'], ['C', '电容', 'sym:C', '100nF', 'fp:C_0402'], ['D', 'LED', 'sym:LED', '红 0603', 'fp:LED_0603']] as const;
 type Tab = 'all' | 'project' | 'fav' | 'builtin' | 'inv';
-const TABS: [Tab, string][] = [['all', '全部'], ['project', '项目库'], ['fav', '收藏'], ['inv', '我的库存'], ['builtin', '官方库']];
+const TABS: [Tab, string][] = [['all', '全部'], ['project', '项目库'], ['fav', '收藏'], ['inv', '我的库存'], ['builtin', '零件库']];
 
 /** 统一的库条目：内置零件 / 项目内符号 / 仅封装。 */
 interface Entry { id: string; name: string; maker: string; kind: string; description: string; symbolId?: string; footprintId: string; value: string; params: string; part?: Part; inv?: InventoryItem; source: 'builtin' | 'project' | 'footprint' | 'generated' | 'inventory' }
 
-const partEntry = (p: Part): Entry => ({ id: p.id, name: p.mpn, maker: p.maker, kind: p.kind, description: p.description, symbolId: p.symbolId, footprintId: p.footprintId, value: p.value, params: p.params, part: p, source: 'builtin' });
+const partEntry = (p: Part): Entry => ({ id: p.id, name: p.mpn, maker: p.source === 'user' ? `我的 · ${p.maker}` : p.source === 'community' ? `社区 · ${p.maker}` : p.maker, kind: p.kind, description: p.description, symbolId: p.symbolId, footprintId: p.footprintId, value: p.value, params: p.params, part: p, source: 'builtin' });
 const symEntry = (s: SymbolDef): Entry => ({ id: s.id, name: s.name, maker: s.source?.startsWith('kicad') ? 'KiCad' : s.source === 'ai-extract' ? 'AI 识别' : '项目', kind: s.kind, description: s.description, symbolId: s.id, footprintId: s.defaultFootprint, value: s.defaultValue || s.name, params: `${s.pins.length} 引脚${s.defaultFootprint ? ` · 封装 ${s.defaultFootprint.replace(/^fp:(kicad:|gen:)?/, '')}` : ''}`, source: 'project' });
 const invEntry = (i: InventoryItem): Entry => ({ id: i.id, name: i.name, maker: i.location ? `库存 · ${i.location}` : '我的库存', kind: i.value || '元件', description: i.note ?? '', symbolId: i.symbolId || undefined, footprintId: i.footprintId, value: i.value || i.name, params: `数量 ${i.qty}${i.lcsc ? ` · LCSC ${i.lcsc}` : ''}${findFootprint(i.footprintId) ? ` · 封装 ${findFootprint(i.footprintId)!.name}` : i.footprintId ? ` · 封装 ${i.footprintId}` : ''}`, inv: i, source: 'inventory' });
 const fpEntry = (f: FootprintDef, source: Entry['source']): Entry => ({ id: f.id, name: f.name, maker: source === 'generated' ? '参数化' : f.id.startsWith('fp:kicad') ? 'KiCad' : source === 'footprint' ? '项目' : '内置', kind: '封装', description: f.description, footprintId: f.id, value: f.name, params: `${f.pads.length} 焊盘 · ${f.body.w}×${f.body.h} mm`, source });
@@ -36,7 +37,7 @@ export function LibraryPanel() {
   const onPcb = app.screen === 'pcb';
 
   const entries = useMemo(() => {
-    const builtin = searchParts(app.libQuery, BUILTIN_PARTS, cat ?? undefined).map(partEntry);
+    const builtin = searchParts(app.libQuery, allParts(), cat ?? undefined).map(partEntry);
     const match = (e: Entry) => !q || `${e.name} ${e.kind} ${e.description} ${e.params} ${e.maker}`.toLowerCase().includes(q);
     const projSyms = cat ? [] : project.library.symbols.filter((s) => !s.power || !s.id.startsWith('sym:kicad')).map(symEntry).filter(match);
     const projFps = cat ? [] : project.library.footprints.map((f) => fpEntry(f, f.id.startsWith('fp:gen:') ? 'generated' : 'footprint')).filter(match);
@@ -102,6 +103,7 @@ export function LibraryPanel() {
           <button className="btn sm" onClick={() => fileRef.current?.click()} title={LIBRARY_FILE_HINT}>⇪ 导入库（KiCad / 立创）</button>
           <button className="btn sm" onClick={() => setGen(true)}>⚙ 参数化封装</button>
           <input ref={fileRef} type="file" accept=".kicad_sym,.kicad_mod,.json" multiple hidden onChange={(e) => { const fs = e.target.files ? Array.from(e.target.files) : []; if (fs.length) void importFiles(fs); e.target.value = ''; }} />
+          {tab === 'builtin' && <PartsTools />}
           {tab === 'inv' && <>
             <button className="btn sm" onClick={() => { const name = prompt('型号 / 名称（如 0603WAF1002T5E 或 10k 电阻）'); if (!name) return; const value = prompt('值（如 10kΩ）', '') ?? ''; const qty = Number(prompt('数量', '10') ?? 0) || 0; inventory.add({ name, value, symbolId: /电阻|res|\d+k|Ω/i.test(name + value) ? 'sym:R' : /电容|cap|[num]f/i.test(name + value) ? 'sym:C' : /led/i.test(name) ? 'sym:LED' : '', footprintId: '', qty, location: prompt('存放位置（可空）', '') ?? undefined }); }}>+ 手动添加</button>
             <button className="btn sm" onClick={() => csvRef.current?.click()} title="CSV 列：型号,值,符号,封装,LCSC,数量,位置,备注">⇪ 导入 CSV</button>
@@ -157,6 +159,54 @@ export function LibraryPanel() {
         </div>
       )}
       {gen && <FootprintGenerator close={() => setGen(false)} />}
+    </div>
+  );
+}
+
+
+/** 零件库工具条：导入 CSV / JSON、手动录入、从网络更新、导出我的零件。 */
+function PartsTools() {
+  const app = useApp();
+  const parts = usePartsStore();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ mpn: '', maker: '', description: '', package: '', pins: '', lcsc: '', value: '' });
+  const [urlEdit, setUrlEdit] = useState(false);
+  const download = (name: string, text: string) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' })); a.download = name; a.click(); };
+  const onFile = async (f: File) => {
+    const text = await f.text(); const kind = /\.json$/i.test(f.name) ? 'json' : 'csv';
+    const r = parts.importText(text, kind);
+    app.toast(r.added ? `已导入 ${r.added} 个零件到「我的」${r.errors.length ? `，${r.errors.length} 行跳过` : ''}` : `没有导入：${r.errors[0] ?? '文件为空'}`, r.added ? 'success' : 'error');
+  };
+  const submit = () => {
+    if (!form.mpn.trim()) { app.toast('型号不能为空', 'error'); return; }
+    const r = parts.importText(JSON.stringify([{ mpn: form.mpn, maker: form.maker, description: form.description, package: form.package, pins: form.pins, lcsc: form.lcsc, value: form.value }]), 'json');
+    if (r.added) { app.toast(`已录入 ${form.mpn}`, 'success'); setAdding(false); setForm({ mpn: '', maker: '', description: '', package: '', pins: '', lcsc: '', value: '' }); } else app.toast(r.errors[0] ?? '录入失败', 'error');
+  };
+  return (
+    <div className="col" style={{ gap: 6, padding: '6px 0' }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) void onFile(f); }}>
+      <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+        <button className="btn sm" onClick={() => fileRef.current?.click()} title="CSV 列：mpn/型号, maker/厂商, description/描述, package/封装, pins/引脚(数量或 1:VCC;2:GND), lcsc, value；也支持嘉立创 / LCSC 导出的表格">导入 CSV / JSON</button>
+        <button className="btn sm" onClick={() => setAdding(!adding)}>+ 录入</button>
+        <button className="btn sm" disabled={parts.busy} onClick={() => void parts.updateFromUrl().then((r) => app.toast(`社区零件库已更新：${r.count} 个零件${r.version ? ` · ${r.version}` : ''}`, 'success')).catch((e) => app.toast(`更新失败：${(e as Error).message}`, 'error'))}>{parts.busy ? '更新中…' : '从网络更新'}</button>
+        {parts.user.length > 0 && <button className="btn sm quiet" onClick={() => download('my-parts.csv', parts.exportUser('csv'))}>导出我的（{parts.user.length}）</button>}
+        <input ref={fileRef} type="file" accept=".csv,.json,text/csv,application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void onFile(f); }} />
+      </div>
+      <div className="dim xs" style={{ lineHeight: 1.6 }}>
+        内置 {allParts().filter((p) => p.source === 'builtin').length} · 社区 {parts.community.length}{parts.meta.updatedAt ? `（${parts.meta.version ?? ''} ${new Date(parts.meta.updatedAt).toLocaleDateString()}）` : '（未更新）'} · 我的 {parts.user.length}
+        <span style={{ cursor: 'pointer', marginLeft: 6, color: 'var(--accent)' }} onClick={() => setUrlEdit(!urlEdit)}>更新源</span>
+        {parts.meta.lastError && <span style={{ color: 'var(--error)' }}> · 上次更新失败：{parts.meta.lastError}</span>}
+      </div>
+      {urlEdit && <div className="row" style={{ gap: 6 }}><input className="input mono xs" style={{ flex: 1 }} defaultValue={parts.meta.url} placeholder={DEFAULT_PARTS_URL} onBlur={(e) => parts.setUrl(e.target.value.trim() || DEFAULT_PARTS_URL)} /><span className="dim xs">JSON：{'{ version, parts: [...] }'}</span></div>}
+      {adding && (
+        <div className="col" style={{ gap: 4, padding: 8, border: '1px solid var(--border)', borderRadius: 6 }}>
+          <div className="row" style={{ gap: 4 }}><input className="input xs" placeholder="型号 *（如 STM32G030F6P6）" value={form.mpn} onChange={(e) => setForm({ ...form, mpn: e.target.value })} /><input className="input xs" style={{ width: 90 }} placeholder="厂商" value={form.maker} onChange={(e) => setForm({ ...form, maker: e.target.value })} /></div>
+          <input className="input xs" placeholder="描述（用于自动分类：如 3.3V LDO / N-MOS / 电容 10uF）" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          <div className="row" style={{ gap: 4 }}><input className="input xs" placeholder="封装（0603 / SOT-23-5 / TSSOP-20 / LQFP-48）" value={form.package} onChange={(e) => setForm({ ...form, package: e.target.value })} /><input className="input xs" style={{ width: 90 }} placeholder="值" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} /></div>
+          <div className="row" style={{ gap: 4 }}><input className="input xs" placeholder="引脚：数量（20）或 1:VDD;2:GND;3:PA0…（IC / 连接器需要）" value={form.pins} onChange={(e) => setForm({ ...form, pins: e.target.value })} /><input className="input xs mono" style={{ width: 90 }} placeholder="LCSC" value={form.lcsc} onChange={(e) => setForm({ ...form, lcsc: e.target.value })} /></div>
+          <div className="row" style={{ gap: 6 }}><button className="btn sm primary" onClick={submit}>保存到「我的」</button><button className="btn sm" onClick={() => setAdding(false)}>取消</button><span className="dim xs">符号按类别 / 引脚自动生成，封装按名字参数化生成</span></div>
+        </div>
+      )}
     </div>
   );
 }

@@ -87,6 +87,85 @@ export const BUILTIN_SYMBOLS: SymbolDef[] = [
     id: 'sym:MountingHole', name: '定位孔', kind: '机械', prefix: 'H', width: 300, height: 300, graphic: 'box', showPinNames: false, power: false,
     defaultValue: 'M3', defaultFootprint: 'fp:MountingHole_3.2mm', description: '定位孔（无电气连接）',
     pins: []
+  },
+  // ---- 常用分立器件（矢量图形，单位 mil，栅格 100）----
+  {
+    id: 'sym:L', name: '电感', kind: '电感', prefix: 'L', width: 200, height: 600, graphic: 'shapes', showPinNames: false, power: false,
+    defaultValue: '10uH', defaultFootprint: 'fp:gen:L_0805_2012Metric', description: '电感 / 磁珠',
+    shapes: [{ kind: 'arc', start: { x: 100, y: 0 }, mid: { x: 175, y: 75 }, end: { x: 100, y: 150 }, width: 12 }, { kind: 'arc', start: { x: 100, y: 150 }, mid: { x: 175, y: 225 }, end: { x: 100, y: 300 }, width: 12 }, { kind: 'arc', start: { x: 100, y: 300 }, mid: { x: 175, y: 375 }, end: { x: 100, y: 450 }, width: 12 }, { kind: 'arc', start: { x: 100, y: 450 }, mid: { x: 175, y: 525 }, end: { x: 100, y: 600 }, width: 12 }],
+    pins: [{ number: '1', name: '1', side: 'T', offset: 100, length: 200, type: 'passive' }, { number: '2', name: '2', side: 'B', offset: 100, length: 200, type: 'passive' }]
+  },
+  {
+    id: 'sym:D', name: '二极管', kind: '二极管', prefix: 'D', width: 400, height: 300, graphic: 'shapes', showPinNames: false, power: false,
+    defaultValue: '1N4148W', defaultFootprint: 'fp:gen:SOD-123', description: '通用二极管（A 阳极 → K 阴极）',
+    shapes: [{ kind: 'polyline', fill: 'none', points: [{ x: 0, y: 150 }, { x: 120, y: 150 }], width: 12 }, { kind: 'polyline', points: [{ x: 120, y: 50 }, { x: 280, y: 150 }, { x: 120, y: 250 }, { x: 120, y: 50 }], fill: 'background', width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 280, y: 50 }, { x: 280, y: 250 }], width: 14 }, { kind: 'polyline', fill: 'none', points: [{ x: 280, y: 150 }, { x: 400, y: 150 }], width: 12 }],
+    pins: [{ number: '1', name: 'K', side: 'R', offset: 150, length: 200, type: 'passive' }, { number: '2', name: 'A', side: 'L', offset: 150, length: 200, type: 'passive' }]
+  },
+  {
+    id: 'sym:D_Schottky', name: '肖特基二极管', kind: '二极管', prefix: 'D', width: 400, height: 300, graphic: 'shapes', showPinNames: false, power: false,
+    defaultValue: 'SS34', defaultFootprint: 'fp:gen:SMA', description: '肖特基二极管（A → K）',
+    shapes: [{ kind: 'polyline', fill: 'none', points: [{ x: 0, y: 150 }, { x: 120, y: 150 }], width: 12 }, { kind: 'polyline', points: [{ x: 120, y: 50 }, { x: 280, y: 150 }, { x: 120, y: 250 }, { x: 120, y: 50 }], fill: 'background', width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 240, y: 80 }, { x: 240, y: 50 }, { x: 280, y: 50 }, { x: 280, y: 250 }, { x: 320, y: 250 }, { x: 320, y: 220 }], width: 14 }, { kind: 'polyline', fill: 'none', points: [{ x: 280, y: 150 }, { x: 400, y: 150 }], width: 12 }],
+    pins: [{ number: '1', name: 'K', side: 'R', offset: 150, length: 200, type: 'passive' }, { number: '2', name: 'A', side: 'L', offset: 150, length: 200, type: 'passive' }]
+  },
+  {
+    id: 'sym:D_Zener', name: '稳压二极管', kind: '二极管', prefix: 'D', width: 400, height: 300, graphic: 'shapes', showPinNames: false, power: false,
+    defaultValue: '5.1V', defaultFootprint: 'fp:gen:SOD-123', description: '稳压（齐纳）二极管',
+    shapes: [{ kind: 'polyline', fill: 'none', points: [{ x: 0, y: 150 }, { x: 120, y: 150 }], width: 12 }, { kind: 'polyline', points: [{ x: 120, y: 50 }, { x: 280, y: 150 }, { x: 120, y: 250 }, { x: 120, y: 50 }], fill: 'background', width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 250, y: 50 }, { x: 280, y: 50 }, { x: 280, y: 250 }, { x: 310, y: 250 }], width: 14 }, { kind: 'polyline', fill: 'none', points: [{ x: 280, y: 150 }, { x: 400, y: 150 }], width: 12 }],
+    pins: [{ number: '1', name: 'K', side: 'R', offset: 150, length: 200, type: 'passive' }, { number: '2', name: 'A', side: 'L', offset: 150, length: 200, type: 'passive' }]
+  },
+  {
+    id: 'sym:Q_NPN', name: 'NPN 三极管', kind: '三极管', prefix: 'Q', width: 400, height: 500, graphic: 'shapes', showPinNames: true, power: false,
+    defaultValue: 'SS8050', defaultFootprint: 'fp:gen:SOT-23', description: 'NPN（B 基极 / C 集电极 / E 发射极），SOT-23 脚序 1B 2E 3C',
+    shapes: [{ kind: 'circle', fill: 'none', c: { x: 220, y: 250 }, r: 180, width: 10 }, { kind: 'polyline', fill: 'none', points: [{ x: 0, y: 250 }, { x: 140, y: 250 }], width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 140, y: 130 }, { x: 140, y: 370 }], width: 20 }, { kind: 'polyline', fill: 'none', points: [{ x: 140, y: 200 }, { x: 320, y: 60 }, { x: 320, y: 0 }], width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 140, y: 300 }, { x: 320, y: 440 }, { x: 320, y: 500 }], width: 12 }, { kind: 'polyline', points: [{ x: 320, y: 440 }, { x: 250, y: 430 }, { x: 290, y: 380 }, { x: 320, y: 440 }], fill: 'outline', width: 8 }],
+    pins: [{ number: '1', name: 'B', side: 'L', offset: 250, length: 200, type: 'input' }, { number: '2', name: 'E', side: 'B', offset: 320, length: 200, type: 'passive' }, { number: '3', name: 'C', side: 'T', offset: 320, length: 200, type: 'passive' }]
+  },
+  {
+    id: 'sym:Q_PNP', name: 'PNP 三极管', kind: '三极管', prefix: 'Q', width: 400, height: 500, graphic: 'shapes', showPinNames: true, power: false,
+    defaultValue: 'SS8550', defaultFootprint: 'fp:gen:SOT-23', description: 'PNP，SOT-23 脚序 1B 2E 3C',
+    shapes: [{ kind: 'circle', fill: 'none', c: { x: 220, y: 250 }, r: 180, width: 10 }, { kind: 'polyline', fill: 'none', points: [{ x: 0, y: 250 }, { x: 140, y: 250 }], width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 140, y: 130 }, { x: 140, y: 370 }], width: 20 }, { kind: 'polyline', fill: 'none', points: [{ x: 140, y: 200 }, { x: 320, y: 60 }, { x: 320, y: 0 }], width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 140, y: 300 }, { x: 320, y: 440 }, { x: 320, y: 500 }], width: 12 }, { kind: 'polyline', points: [{ x: 140, y: 300 }, { x: 210, y: 310 }, { x: 170, y: 360 }, { x: 140, y: 300 }], fill: 'outline', width: 8 }],
+    pins: [{ number: '1', name: 'B', side: 'L', offset: 250, length: 200, type: 'input' }, { number: '2', name: 'E', side: 'B', offset: 320, length: 200, type: 'passive' }, { number: '3', name: 'C', side: 'T', offset: 320, length: 200, type: 'passive' }]
+  },
+  {
+    id: 'sym:Q_NMOS', name: 'N-MOS', kind: 'MOS 管', prefix: 'Q', width: 400, height: 500, graphic: 'shapes', showPinNames: true, power: false,
+    defaultValue: 'AO3400A', defaultFootprint: 'fp:gen:SOT-23', description: 'N 沟道 MOSFET（G 栅 / D 漏 / S 源），SOT-23 脚序 1G 2S 3D',
+    shapes: [{ kind: 'circle', fill: 'none', c: { x: 220, y: 250 }, r: 180, width: 10 }, { kind: 'polyline', fill: 'none', points: [{ x: 0, y: 250 }, { x: 110, y: 250 }, { x: 110, y: 130 }, { x: 110, y: 370 }], width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 150, y: 120 }, { x: 150, y: 190 }], width: 18 }, { kind: 'polyline', fill: 'none', points: [{ x: 150, y: 215 }, { x: 150, y: 285 }], width: 18 }, { kind: 'polyline', fill: 'none', points: [{ x: 150, y: 310 }, { x: 150, y: 380 }], width: 18 }, { kind: 'polyline', fill: 'none', points: [{ x: 150, y: 155 }, { x: 320, y: 155 }, { x: 320, y: 0 }], width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 150, y: 345 }, { x: 320, y: 345 }, { x: 320, y: 500 }], width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 150, y: 250 }, { x: 320, y: 250 }, { x: 320, y: 345 }], width: 12 }, { kind: 'polyline', points: [{ x: 150, y: 250 }, { x: 220, y: 215 }, { x: 220, y: 285 }, { x: 150, y: 250 }], fill: 'outline', width: 8 }],
+    pins: [{ number: '1', name: 'G', side: 'L', offset: 250, length: 200, type: 'input' }, { number: '2', name: 'S', side: 'B', offset: 320, length: 200, type: 'passive' }, { number: '3', name: 'D', side: 'T', offset: 320, length: 200, type: 'passive' }]
+  },
+  {
+    id: 'sym:Q_PMOS', name: 'P-MOS', kind: 'MOS 管', prefix: 'Q', width: 400, height: 500, graphic: 'shapes', showPinNames: true, power: false,
+    defaultValue: 'AO3401A', defaultFootprint: 'fp:gen:SOT-23', description: 'P 沟道 MOSFET，SOT-23 脚序 1G 2S 3D',
+    shapes: [{ kind: 'circle', fill: 'none', c: { x: 220, y: 250 }, r: 180, width: 10 }, { kind: 'polyline', fill: 'none', points: [{ x: 0, y: 250 }, { x: 110, y: 250 }, { x: 110, y: 130 }, { x: 110, y: 370 }], width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 150, y: 120 }, { x: 150, y: 190 }], width: 18 }, { kind: 'polyline', fill: 'none', points: [{ x: 150, y: 215 }, { x: 150, y: 285 }], width: 18 }, { kind: 'polyline', fill: 'none', points: [{ x: 150, y: 310 }, { x: 150, y: 380 }], width: 18 }, { kind: 'polyline', fill: 'none', points: [{ x: 150, y: 155 }, { x: 320, y: 155 }, { x: 320, y: 0 }], width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 150, y: 345 }, { x: 320, y: 345 }, { x: 320, y: 500 }], width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 150, y: 250 }, { x: 320, y: 250 }, { x: 320, y: 345 }], width: 12 }, { kind: 'polyline', points: [{ x: 220, y: 250 }, { x: 150, y: 215 }, { x: 150, y: 285 }, { x: 220, y: 250 }], fill: 'outline', width: 8 }],
+    pins: [{ number: '1', name: 'G', side: 'L', offset: 250, length: 200, type: 'input' }, { number: '2', name: 'S', side: 'B', offset: 320, length: 200, type: 'passive' }, { number: '3', name: 'D', side: 'T', offset: 320, length: 200, type: 'passive' }]
+  },
+  {
+    id: 'sym:SW', name: '轻触开关', kind: '开关', prefix: 'SW', width: 400, height: 200, graphic: 'shapes', showPinNames: false, power: false,
+    defaultValue: 'TS-1187A', defaultFootprint: 'fp:gen:SW_SMD_3x4', description: '轻触按键（两端）',
+    shapes: [{ kind: 'polyline', fill: 'none', points: [{ x: 0, y: 100 }, { x: 100, y: 100 }], width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 300, y: 100 }, { x: 400, y: 100 }], width: 12 }, { kind: 'circle', fill: 'none', c: { x: 100, y: 100 }, r: 20, width: 10 }, { kind: 'circle', fill: 'none', c: { x: 300, y: 100 }, r: 20, width: 10 }, { kind: 'polyline', fill: 'none', points: [{ x: 110, y: 90 }, { x: 290, y: 20 }], width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 200, y: 55 }, { x: 200, y: 0 }], width: 12 }],
+    pins: [{ number: '1', name: '1', side: 'L', offset: 100, length: 200, type: 'passive' }, { number: '2', name: '2', side: 'R', offset: 100, length: 200, type: 'passive' }]
+  },
+  {
+    id: 'sym:Y', name: '晶振', kind: '晶振', prefix: 'Y', width: 400, height: 300, graphic: 'shapes', showPinNames: false, power: false,
+    defaultValue: '8MHz', defaultFootprint: 'fp:gen:Crystal_SMD_3225-4Pin', description: '两脚晶振（四脚封装的 2/4 脚接地）',
+    shapes: [{ kind: 'polyline', fill: 'none', points: [{ x: 0, y: 150 }, { x: 120, y: 150 }], width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 120, y: 60 }, { x: 120, y: 240 }], width: 14 }, { kind: 'rect', a: { x: 160, y: 40 }, b: { x: 240, y: 260 }, fill: 'background', width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 280, y: 60 }, { x: 280, y: 240 }], width: 14 }, { kind: 'polyline', fill: 'none', points: [{ x: 280, y: 150 }, { x: 400, y: 150 }], width: 12 }],
+    pins: [{ number: '1', name: '1', side: 'L', offset: 150, length: 200, type: 'passive' }, { number: '2', name: '2', side: 'R', offset: 150, length: 200, type: 'passive' }]
+  },
+  {
+    id: 'sym:F', name: '保险丝', kind: '保护', prefix: 'F', width: 400, height: 200, graphic: 'shapes', showPinNames: false, power: false,
+    defaultValue: '1A', defaultFootprint: 'fp:gen:F_1206_3216Metric', description: '保险丝 / 自恢复保险丝',
+    shapes: [{ kind: 'rect', a: { x: 0, y: 60 }, b: { x: 400, y: 140 }, fill: 'background', width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 0, y: 100 }, { x: 400, y: 100 }], width: 12 }],
+    pins: [{ number: '1', name: '1', side: 'L', offset: 100, length: 200, type: 'passive' }, { number: '2', name: '2', side: 'R', offset: 100, length: 200, type: 'passive' }]
+  },
+  {
+    id: 'sym:FB', name: '磁珠', kind: '电感', prefix: 'FB', width: 400, height: 200, graphic: 'shapes', showPinNames: false, power: false,
+    defaultValue: '600Ω@100MHz', defaultFootprint: 'fp:gen:L_0603_1608Metric', description: '铁氧体磁珠',
+    shapes: [{ kind: 'rect', a: { x: 100, y: 40 }, b: { x: 300, y: 160 }, fill: 'background', width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 0, y: 100 }, { x: 100, y: 100 }], width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 300, y: 100 }, { x: 400, y: 100 }], width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 140, y: 140 }, { x: 260, y: 60 }], width: 10 }],
+    pins: [{ number: '1', name: '1', side: 'L', offset: 100, length: 200, type: 'passive' }, { number: '2', name: '2', side: 'R', offset: 100, length: 200, type: 'passive' }]
+  },
+  {
+    id: 'sym:C_POL', name: '电解电容', kind: '电容', prefix: 'C', width: 300, height: 400, graphic: 'shapes', showPinNames: false, power: false,
+    defaultValue: '100uF', defaultFootprint: 'fp:gen:CP_Elec_6.3x5.4', description: '有极性电容（1 正极 / 2 负极）',
+    shapes: [{ kind: 'polyline', fill: 'none', points: [{ x: 150, y: 0 }, { x: 150, y: 140 }], width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 30, y: 140 }, { x: 270, y: 140 }], width: 16 }, { kind: 'rect', a: { x: 30, y: 200 }, b: { x: 270, y: 260 }, fill: 'outline', width: 8 }, { kind: 'polyline', fill: 'none', points: [{ x: 150, y: 260 }, { x: 150, y: 400 }], width: 12 }, { kind: 'polyline', fill: 'none', points: [{ x: 40, y: 60 }, { x: 80, y: 60 }], width: 8 }, { kind: 'polyline', fill: 'none', points: [{ x: 60, y: 40 }, { x: 60, y: 80 }], width: 8 }],
+    pins: [{ number: '1', name: '+', side: 'T', offset: 150, length: 200, type: 'passive' }, { number: '2', name: '-', side: 'B', offset: 150, length: 200, type: 'passive' }]
   }
 ];
 

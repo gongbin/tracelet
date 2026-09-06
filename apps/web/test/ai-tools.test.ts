@@ -18,31 +18,32 @@ describe('AI 工具', () => {
     const out = JSON.parse(await runTool('generate_sheet_from_spec', spec as unknown as Record<string, unknown>, ctx));
     expect(out.components.length).toBe(3); expect(out.ok).toBe(true); expect(out.emptyNets).toEqual([]);
     const p = editor.project;
-    expect(p.schematic.sheets.length).toBe(1); // 原空图纸被替换
-    expect(p.schematic.sheets[0].name).toBe('升压');
-    const refs = p.schematic.sheets[0].components.filter((c) => !getSymbol(c.symbolId).power).map((c) => c.ref).sort();
+    expect(p.schematic.sheets.length).toBe(2); // 只新增，不删原图纸
+    expect(p.schematic.sheets[1].name).toBe("升压");
+    const gen = () => editor.project.schematic.sheets.find((sh) => sh.name === '升压')!;
+    const refs = gen().components.filter((c) => !getSymbol(c.symbolId).power).map((c) => c.ref).sort();
     expect(refs).toEqual(['C1', 'L1', 'U1']);
     expect(await runTool('set_component_footprint', { ref: 'L1', footprint: 'L_0805_2012Metric' }, ctx)).toContain('已设置封装');
-    expect(editor.project.schematic.sheets[0].components.find((c) => c.ref === 'L1')!.footprint).toBeTruthy();
+    expect(gen().components.find((c) => c.ref === 'L1')!.footprint).toBeTruthy();
     expect(await runTool('set_component_ref', { ref: 'C1', newRef: 'C10' }, ctx)).toBe('已改名');
     expect(await runTool('delete_components', { refs: ['C10', 'C99'] }, ctx)).toContain('已删除 1 个');
-    expect(editor.project.schematic.sheets[0].components.some((c) => c.ref === 'C10')).toBe(false);
+    expect(gen().components.some((c) => c.ref === 'C10')).toBe(false);
     editor.undo(); // 删除可撤销
-    expect(editor.project.schematic.sheets[0].components.some((c) => c.ref === 'C10')).toBe(true);
-    const sheets = JSON.parse(await runTool('list_sheets', {}, ctx)); expect(sheets.sheets.length).toBe(1);
+    expect(gen().components.some((c) => c.ref === 'C10')).toBe(true);
+    const sheets = JSON.parse(await runTool('list_sheets', {}, ctx)); expect(sheets.sheets.length).toBe(2);
     expect(await runTool('add_sheet', { name: '电源' }, ctx)).toContain('已新建');
-    expect(editor.project.schematic.sheets.length).toBe(2);
+    expect(editor.project.schematic.sheets.length).toBe(3);
     expect(await runTool('rename_sheet', { sheet: '电源', name: '电源页' }, ctx)).toBe('已重命名');
     expect(await runTool('delete_sheet', { sheet: '电源页' }, ctx)).toContain('已删除图纸');
-    expect(editor.project.schematic.sheets.length).toBe(1);
-    expect(await runTool('delete_sheet', { sheet: '升压' }, ctx)).toContain('至少要保留一张');
+    expect(editor.project.schematic.sheets.length).toBe(2);
+    expect(await runTool('switch_sheet', { sheet: '升压' }, ctx)).toContain('升压');
     // 悬空导线清理：加一条谁也不连的线，再清理
-    const sid = editor.project.schematic.sheets[0].id;
+    const sid = gen().id;
     const { sch } = await import('@tracelet/kernel');
-    const before = editor.project.schematic.sheets[0].wires.length;
+    const before = gen().wires.length;
     editor.dispatch(sch.addWire(sid, [{ x: 9000, y: 9000 }, { x: 9500, y: 9000 }]));
     expect(await runTool('delete_dangling', {}, ctx)).toContain('已删除 1 条悬空导线');
-    expect(editor.project.schematic.sheets[0].wires.length).toBe(before);
+    expect(gen().wires.length).toBe(before);
     // 生成结果自检字段
     const out2 = JSON.parse(await runTool('generate_sheet_from_spec', { title: '空', components: [{ ref: 'X1', pins: [] }] } as unknown as Record<string, unknown>, ctx));
     expect(out2).toBeTypeOf('object');

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { searchParts, BUILTIN_PARTS, pcb } from '@tracelet/kernel';
+import { searchParts, allParts, pcb } from '@tracelet/kernel';
 import { useApp, type Screen } from '../store/app.js';
 import { getAnalysis } from '../store/analysis.js';
 import { Icon } from './Icon.js';
@@ -46,7 +46,7 @@ export function CommandPalette() {
       { id: 'theme', label: `${t('settings.theme')}：${prefs.theme === 'dark' ? t('theme.light') : prefs.theme === 'light' ? t('theme.system') : t('theme.dark')}`, kind: 'cmd', run: () => { close(); prefs.setTheme(prefs.theme === 'dark' ? 'light' : prefs.theme === 'light' ? 'system' : 'dark'); } },
       { id: 'lang', label: `${t('settings.language')}：${LOCALES.filter((l) => l !== prefs.locale).map((l) => t(`lang.${l}` as 'lang.en')).join(' / ')}`, kind: 'cmd', run: () => { close(); prefs.setLocale(prefs.locale === 'zh-CN' ? 'en' : 'zh-CN'); } }
     );
-    const parts: Item[] = (q.startsWith('@') || q.length >= 2 ? searchParts(q.replace(/^@/, ''), BUILTIN_PARTS).slice(0, 6) : []).map((p) => ({
+    const parts: Item[] = (q.startsWith('@') || q.length >= 2 ? searchParts(q.replace(/^@/, ''), allParts()).slice(0, 6) : []).map((p) => ({
       id: p.id, label: p.mpn, hint: `${p.maker} · ${p.kind}`, kind: 'part' as const,
       run: () => { close(); if (!ed) return; if (app.screen !== 'sch') app.go('sch'); app.startPlacing({ symbolId: p.symbolId, value: p.value, footprint: p.footprintId, props: { mpn: p.mpn, lcsc: p.lcsc ?? '' }, rotation: 0, partLabel: p.mpn }); }
     }));

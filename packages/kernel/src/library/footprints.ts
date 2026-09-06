@@ -75,4 +75,12 @@ export function getFootprint(id: string): FootprintDef {
   if (!f) throw new Error(`未知封装: ${id}`);
   return f;
 }
-export function findFootprint(id: string): FootprintDef | undefined { return byId.get(id) ?? registeredFootprint(id); }
+let lazyResolver: ((id: string) => FootprintDef | undefined) | null = null;
+/** 由 generators 注册：按 fp:gen:<名字> 按需生成并注册封装（避免模块循环依赖）。 */
+export function setFootprintResolver(fn: (id: string) => FootprintDef | undefined): void { lazyResolver = fn; }
+export function findFootprint(id: string): FootprintDef | undefined {
+  const hit = byId.get(id) ?? registeredFootprint(id);
+  if (hit) return hit;
+  if (id.startsWith('fp:gen:') && lazyResolver) return lazyResolver(id);
+  return undefined;
+}

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { create } from 'zustand';
 import type Anthropic from '@anthropic-ai/sdk';
-import { searchParts, BUILTIN_PARTS, generateSchematic, sch, type ReviewSuggestion, type ExtractedSchematic } from '@tracelet/kernel';
+import { searchParts, allParts, generateSchematic, sch, type ReviewSuggestion, type ExtractedSchematic } from '@tracelet/kernel';
 import { useApp, useEditor, useProject, useSheet } from '../store/app.js';
 import { getAnalysis } from '../store/analysis.js';
 import { locateItem } from './CheckPanel.js';
@@ -53,7 +53,7 @@ export function AiPanel() {
       ai.push({ role: 'assistant', text: `${c.ref}（${c.value}）连接到 ${nets.length} 个网络：${nets.map((n) => `${n.name}（${n.pins.length} 引脚）`).join('、') || '尚未连线'}。`, steps: ['读取选中对象', '查询网表'] });
       return true;
     }
-    if (cmd === '/找元件') { const r = searchParts(arg, BUILTIN_PARTS).slice(0, 3); ai.push({ role: 'assistant', text: r.length ? `找到 ${r.length} 个候选：${r.map((p) => `${p.mpn}（${p.maker}，${p.price}）`).join('；')}。在「元件库」里搜「${arg}」即可放置。` : `内置库里没有「${arg}」。`, steps: [`搜索元件库 "${arg}"`] }); return true; }
+    if (cmd === '/找元件') { const r = searchParts(arg, allParts()).slice(0, 3); ai.push({ role: 'assistant', text: r.length ? `找到 ${r.length} 个候选：${r.map((p) => `${p.mpn}（${p.maker}，${p.price}）`).join('；')}。在「元件库」里搜「${arg}」即可放置。` : `内置库里没有「${arg}」。`, steps: [`搜索元件库 "${arg}"`] }); return true; }
     if (cmd === '/修复DRC' || cmd === '/修复ERC') {
       const rep = cmd === '/修复DRC' ? a.drc : a.erc;
       if (!rep.items.length) { ai.push({ role: 'assistant', text: '当前没有需要修复的问题。' }); return true; }

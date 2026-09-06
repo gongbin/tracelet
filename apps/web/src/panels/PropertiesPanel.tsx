@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { sch, pcb, getSymbol, BUILTIN_FOOTPRINTS, BUILTIN_PARTS, findFootprint, footprintPads, milToMm, formatLength, copperLayers, registeredFootprints, crossSheetLabelNames, traceLengthStats, polylineLength } from '@tracelet/kernel';
+import { sch, pcb, getSymbol, BUILTIN_FOOTPRINTS, allParts, findFootprint, footprintPads, milToMm, formatLength, copperLayers, registeredFootprints, crossSheetLabelNames, traceLengthStats, polylineLength } from '@tracelet/kernel';
 import { useApp, useEditor, useProject, useSheet } from '../store/app.js';
 import { getAnalysis } from '../store/analysis.js';
 
@@ -158,7 +158,7 @@ export function PropertiesPanel() {
     </div>
   );
   const sym = getSymbol(comp.symbolId);
-  const part = BUILTIN_PARTS.find((p) => p.mpn === (comp.props.mpn ?? comp.value));
+  const part = allParts().find((p) => p.mpn === (comp.props.mpn ?? comp.value));
   const pinNets = sym.pins.map((p) => ({ name: p.name, net: a.netlist.pinNet.get(`${comp.id}:${p.number}`) ?? '' }));
   const open = pinNets.filter((p) => !p.net).length;
   const pos = (v: number) => formatLength(milToMm(v), unit, unit === 'mm' ? 2 : 0);

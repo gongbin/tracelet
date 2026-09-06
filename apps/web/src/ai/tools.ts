@@ -3,7 +3,7 @@
  * 与 CLI / MCP 共用同一套内核命令，这里只是 JSON Schema 描述 + 执行映射。
  */
 import type Anthropic from '@anthropic-ai/sdk';
-import { sch, pcb, lib, searchParts, BUILTIN_PARTS, autoroute, getSymbol, findPin, pinGeoms, generateSchematic, registeredSymbols, registeredFootprints, footprintFromName, type Project, type ProjectEditor, type ExtractedSchematic } from '@tracelet/kernel';
+import { sch, pcb, lib, searchParts, allParts, autoroute, getSymbol, findPin, pinGeoms, generateSchematic, registeredSymbols, registeredFootprints, footprintFromName, type Project, type ProjectEditor, type ExtractedSchematic } from '@tracelet/kernel';
 import { getAnalysis } from '../store/analysis.js';
 import { useApp } from '../store/app.js';
 import { locateItem } from '../panels/CheckPanel.js';
@@ -29,7 +29,7 @@ export const TOOL_DEFS: Anthropic.Tool[] = [
   T('move_footprint', '移动 PCB 上的封装到指定坐标（mm）。', { ref: { type: 'string' }, x: { type: 'number' }, y: { type: 'number' } }, ['ref', 'x', 'y']),
   T('autoroute', '对未布线连接运行内置自动布线并直接应用（可 Undo）。', { nets: { type: 'array', items: { type: 'string' }, description: '可选，只布这些网络' } }),
   T('locate', '在界面里高亮并定位某个 ERC/DRC 问题（id 来自 run_erc / run_drc）。', { id: { type: 'string' } }, ['id']),
-  T('generate_sheet_from_spec', '把你从用户附件（原理图 PDF / 图片）或描述中抽取出的电路，生成为一张新的原理图图纸（自动生成符号、放置元件、按网络名连线）。用户上传原理图让你"识别 / 导入 / 画出来"时用这个。位号必须唯一；电源网络写 3V3 / 5V / VBUS，地写 GND；没有连接的引脚 net 写空串。当前图纸为空时会直接替换它。',
+  T('generate_sheet_from_spec', '把你从用户附件（原理图 PDF / 图片）或描述中抽取出的电路，生成为一张新的原理图图纸（自动生成符号、放置元件、按网络名连线）。用户上传原理图让你"识别 / 导入 / 画出来"时用这个。位号必须唯一；电源网络写 3V3 / 5V / VBUS，地写 GND；没有连接的引脚 net 写空串。始终新增一张图纸，不会删除或修改用户原有图纸。',
     { title: { type: 'string', description: '图纸名 / 电路名' }, components: { type: 'array', items: { type: 'object', properties: { ref: { type: 'string' }, value: { type: 'string' }, kind: { type: 'string', description: 'resistor / capacitor / inductor / diode / led / transistor / ic / module / connector / crystal / switch …' }, footprint: { type: 'string', description: '封装提示，如 0402、SOT-23、LQFP-48，未知写空串' }, pins: { type: 'array', items: { type: 'object', properties: { number: { type: 'string' }, name: { type: 'string' }, net: { type: 'string' } }, required: ['number', 'net'] } } }, required: ['ref', 'pins'] } }, notes: { type: 'array', items: { type: 'string' }, description: '不确定项' } }, ['components']),
   T('delete_components', '删除当前图纸上的元件（连同其连线端点），可 Undo。', { refs: { type: 'array', items: { type: 'string' } } }, ['refs']),
   T('move_component', '移动原理图元件到指定位置（mil，100 的倍数）。', { ref: { type: 'string' }, x: { type: 'number' }, y: { type: 'number' } }, ['ref', 'x', 'y']),
@@ -85,9 +85,9 @@ export async function runTool(name: string, input: Record<string, unknown>, ctx:
       const ok = applySuggestion(editor, s); ctx.log(ok ? `应用建议：${s.title}` : '建议无法自动应用');
       return ok ? `已应用：${s.title}` : '这条建议没有自动操作';
     }
-    case 'search_parts': { ctx.log(`搜索元件 ${input.query}`); return J(searchParts(String(input.query ?? ''), BUILTIN_PARTS, input.category ? String(input.category) : undefined).slice(0, 8).map((x) => ({ partId: x.id, mpn: x.mpn, maker: x.maker, description: x.description, symbol: x.symbolId, footprint: x.footprintId, price: x.price }))); }
+    case 'search_parts': { ctx.log(`搜索元件 ${input.query}`); return J(searchParts(String(input.query ?? ''), allParts(), input.category ? String(input.category) : undefined).slice(0, 8).map((x) => ({ partId: x.id, mpn: x.mpn, maker: x.maker, description: x.description, symbol: x.symbolId, footprint: x.footprintId, price: x.price }))); }
     case 'place_component': {
-      const key = String(input.symbol); const part = BUILTIN_PARTS.find((x) => x.id === key || x.mpn === key);
+      const key = String(input.symbol); const part = allParts().find((x) => x.id === key || x.mpn === key);
       const symbolId = part?.symbolId ?? key;
       try { getSymbol(symbolId); } catch { return `未知符号 ${key}`; }
       const cur = p().schematic.sheets.find((s) => s.id === sheetId)!;
@@ -132,12 +132,9 @@ export async function runTool(name: string, input: Record<string, unknown>, ctx:
       const spec = input as unknown as ExtractedSchematic;
       if (!Array.isArray(spec.components) || !spec.components.length) return '没有元件，无法生成';
       const r = generateSchematic(spec, { sheetName: (spec.title || '识别的原理图').slice(0, 24) });
-      const cur = p().schematic.sheets.find((sh) => sh.id === sheetId);
-      const replaceEmpty = !!cur && cur.components.length === 0 && cur.wires.length === 0;
-      editor.begin(`生成图纸 ${r.sheet.name}`);
+      // 只新增图纸，不动用户原有的任何图纸（是否删除由用户自己决定）
+      const replaceEmpty = false;
       editor.dispatch(sch.addGeneratedSheet(r.sheet, r.symbols));
-      if (replaceEmpty && p().schematic.sheets.length > 1) editor.dispatch(sch.deleteSheet(cur!.id));
-      editor.commit();
       useApp.getState().patch({ sheetId: r.sheet.id, selection: [] });
       if (useApp.getState().screen !== 'sch') useApp.getState().go('sch');
       ctx.log(`生成图纸「${r.sheet.name}」：${r.stats.components} 元件 · ${r.stats.nets} 网络`);
@@ -147,7 +144,7 @@ export async function runTool(name: string, input: Record<string, unknown>, ctx:
       const a = getAnalysis(p());
       const emptyNets = a.netlist.nets.filter((n) => n.pins.length === 0).map((n) => n.name);
       const skipped = spec.components.filter((c) => !c.ref || !c.pins?.length).map((c) => c.ref || '(无位号)');
-      return J({ sheet: r.sheet.name, sheetId: r.sheet.id, components: real.map((c) => `${c.ref} ${c.value}`), labeledPins: r.stats.labeledPins, nets: r.stats.nets, skipped, emptyNets, replacedEmptySheet: replaceEmpty, ok: real.length > 0 && emptyNets.length === 0, hint: real.length ? '已切换到新图纸；用 run_erc / review_schematic 复核；有出入用 place_component / connect_pins / set_component_value / delete_components 修改' : '没有元件落到图纸上：检查 components[].ref 与 pins 是否为空' });
+      return J({ sheet: r.sheet.name, sheetId: r.sheet.id, components: real.map((c) => `${c.ref} ${c.value}`), labeledPins: r.stats.labeledPins, nets: r.stats.nets, skipped, emptyNets, keptExistingSheets: !replaceEmpty, ok: real.length > 0 && emptyNets.length === 0, hint: real.length ? '已切换到新图纸；用 run_erc / review_schematic 复核；有出入用 place_component / connect_pins / set_component_value / delete_components 修改' : '没有元件落到图纸上：检查 components[].ref 与 pins 是否为空' });
     }
     case 'delete_components': {
       const refs = Array.isArray(input.refs) ? (input.refs as string[]) : [];

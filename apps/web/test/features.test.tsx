@@ -18,7 +18,7 @@ describe('新功能冒烟', () => {
   it('元件库：标签页、收藏、参数化封装加入项目库', async () => {
     await open();
     act(() => useApp.getState().set('rightTab', 'lib'));
-    expect(await screen.findByText('官方库')).toBeTruthy();
+    expect(await screen.findByText('零件库')).toBeTruthy();
     // 收藏第一条
     const star = screen.getAllByTitle('收藏')[0];
     act(() => { fireEvent.click(star); });
