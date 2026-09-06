@@ -24,6 +24,8 @@ export interface AppState {
   paletteOpen: boolean;
   /** 顶栏向导弹层 */
   guideOpen: boolean;
+  /** PCB 中临时隐藏的封装 id（不渲染、不可选，方便选到被遮住的元件；不入库） */
+  hiddenFootprints: string[];
   focusMode: boolean;
   bottomExpanded: boolean;
   bottomTab: 'problems' | 'nets' | 'console' | 'history';
@@ -113,6 +115,7 @@ export const useApp = create<AppState>((set, get) => ({
   projMenuOpen: false,
   paletteOpen: false,
   guideOpen: false,
+  hiddenFootprints: [],
   focusMode: false,
   bottomExpanded: false,
   bottomTab: 'problems',
@@ -179,7 +182,7 @@ export const useApp = create<AppState>((set, get) => ({
         try { await get().store.save(editor.project); set({ lastSavedAt: Date.now(), saving: false }); } catch (e) { set({ saving: false }); get().toast(`保存失败：${(e as Error).message}`, 'error'); }
       }, 600);
     });
-    set({ editor, autoroute: { status: 'idle', result: null }, placement: { status: 'idle', result: null }, guideOpen: false, screen: 'sch', rightTab: null, selection: [], pcbSelection: [], placing: null, pendingPin: null, routing: null, schTool: 'select', pcbTool: 'select', lastSavedAt: Date.now(), projMenuOpen: false, wizardOpen: false, highlightNet: null, checkHighlight: null, sheetId: p.schematic.sheets[0].id, wireDraft: null, busDraft: null, drawDraft: null, pasting: null });
+    set({ editor, autoroute: { status: 'idle', result: null }, placement: { status: 'idle', result: null }, guideOpen: false, hiddenFootprints: [], screen: 'sch', rightTab: null, selection: [], pcbSelection: [], placing: null, pendingPin: null, routing: null, schTool: 'select', pcbTool: 'select', lastSavedAt: Date.now(), projMenuOpen: false, wizardOpen: false, highlightNet: null, checkHighlight: null, sheetId: p.schematic.sheets[0].id, wireDraft: null, busDraft: null, drawDraft: null, pasting: null });
     void get().store.save(p).then(() => get().refreshProjects());
   },
   closeProject() {

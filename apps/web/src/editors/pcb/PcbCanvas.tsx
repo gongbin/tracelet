@@ -81,6 +81,7 @@ export function PcbCanvas() {
   const cu = copperLayers(board.copperCount);
   const opOf = (layer: CopperLayer) => (layer === app.activeLayer ? 1 : app.otherLayerOpacity);
   const pads = useMemo(() => board.footprints.map((f) => ({ fp: f, pads: footprintPads(f, board) })), [board]);
+  const hidden = useMemo(() => new Set(app.hiddenFootprints), [app.hiddenFootprints]);
   const flatPads = useMemo(() => pads.flatMap((p) => p.pads), [pads]);
   const hl = app.highlightNet;
   const dimIf = (net: string) => (hl && net !== hl ? 0.25 : 1);
@@ -112,7 +113,7 @@ export function PcbCanvas() {
   const selectIn = (rect: Rect, add: boolean, strict: boolean) => {
     const ids: string[] = [];
     const test = (b: Rect) => (strict ? contains(rect, b) : rectsOverlap(rect, b));
-    for (const f of board.footprints) if (test(footprintBody(f))) ids.push(f.id);
+    for (const f of board.footprints) if (!hidden.has(f.id) && test(footprintBody(f))) ids.push(f.id);
     for (const t of board.traces) if (visible(t.layer) && test(ptsBox(t.points, t.width / 2))) ids.push(t.id);
     for (const v of board.vias) if (test({ x: v.x - v.size / 2, y: v.y - v.size / 2, w: v.size, h: v.size })) ids.push(v.id);
     for (const t of board.texts) if (visible(t.layer) && test({ x: t.x - t.text.length * 0.4 * t.size, y: t.y - t.size, w: t.text.length * 0.8 * t.size, h: t.size * 1.4 })) ids.push(t.id);
@@ -265,8 +266,14 @@ export function PcbCanvas() {
   const onFootprintDown = (id: string) => (e: RPE<SVGElement>) => {
     if (e.button !== 0 || view.spaceDown || !isSelectLike) return;
     if (tool === 'flip') { e.stopPropagation(); editor.dispatch(pcb.flipFootprint(id)); return; }
-    const f = board.footprints.find((x) => x.id === id)!;
+    let f = board.footprints.find((x) => x.id === id)!;
     const p = view.toWorld(e.clientX, e.clientY);
+    // 重叠元件：再次点击已选中的元件时，轮换选到同一位置下面的下一个元件
+    if (!e.shiftKey && app.pcbSelection.length === 1 && app.pcbSelection[0] === id) {
+      const inBody = (x: typeof f) => { const b = footprintBody(x); return p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h; };
+      const under = board.footprints.filter((x) => !hidden.has(x.id) && inBody(x));
+      if (under.length > 1) { const next = under[(under.findIndex((x) => x.id === id) + 1) % under.length]; f = next; id = next.id; app.toast(`选中下面的 ${next.ref}（${under.length} 个元件重叠，继续点击轮换）`); }
+    }
     select(id, e);
     begin('移动封装', { kind: 'fp', id, dx: p.x - f.x, dy: p.y - f.y }, e);
   };
@@ -464,7 +471,7 @@ export function PcbCanvas() {
             </g>;
           })}
           {/* 封装 */}
-          {pads.map(({ fp, pads: ps }) => {
+          {pads.filter(({ fp }) => !hidden.has(fp.id)).map(({ fp, pads: ps }) => {
             const body = footprintBody(fp);
             const silk: Layer = fp.side === 'F' ? 'F.Silk' : 'B.Silk';
             const sel = app.pcbSelection.includes(fp.id);
@@ -621,6 +628,9 @@ export function PcbCanvas() {
           <span className={`chip${moveWithContents ? ' on' : ''}`} title="拖动板框时元件、走线、铺铜一起移动" onClick={() => setMoveWithContents(!moveWithContents)}>{moveWithContents ? '✓ 连同内容移动' : '仅移动板框'}</span>
           <span className="dim">{app.outlineDraft?.length ? `新板框已 ${app.outlineDraft.length} 点 · 双击闭合 · Esc 取消` : '拖板内 = 移动 · 拖顶点 = 调整 · 点板外 = 画新板框'}</span>
         </div>
+      )}
+      {hidden.size > 0 && tool !== 'edge' && app.placement.status === 'idle' && ar.status === 'idle' && (
+        <div className="banner" style={{ width: 'max-content', gap: 8, top: 'auto', bottom: 52, left: 'auto', right: 12, transform: 'none' }}><span>已隐藏 {hidden.size} 个元件（{board.footprints.filter((f) => hidden.has(f.id)).slice(0, 6).map((f) => f.ref).join('、')}{hidden.size > 6 ? '…' : ''}）</span><button className="btn sm" onClick={() => app.set('hiddenFootprints', [])}>全部显示</button></div>
       )}
       {app.placement.status === 'running' && (
         <div className="banner" style={{ width: 'max-content', gap: 8 }}><span className="spinner" /><span>布局优化 · {app.placement.stage ?? '整理中…'}</span><button className="btn sm" onClick={cancelPlacement}>取消</button></div>

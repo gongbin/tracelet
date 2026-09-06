@@ -14,6 +14,12 @@ export function LayersPanel() {
   const layers: Layer[] = [...cu, 'F.Silk', 'B.Silk', 'F.Mask', 'B.Mask', 'Edge.Cuts'];
   const [stackup, setStackup] = useState(false);
   const [filters, setFilters] = useState<Record<string, boolean>>({ 元件: true, 走线: true, 过孔: true, 文字: false, 铺铜: false });
+  const [q, setQ] = useState('');
+  const hiddenFp = new Set(app.hiddenFootprints);
+  const query = q.trim().toLowerCase();
+  const matches = query ? board.footprints.filter((f) => f.ref.toLowerCase().includes(query) || (f.value ?? '').toLowerCase().includes(query)).slice(0, 40) : board.footprints.filter((f) => hiddenFp.has(f.id) || app.pcbSelection.includes(f.id));
+  const toggleHidden = (id: string) => app.set('hiddenFootprints', hiddenFp.has(id) ? app.hiddenFootprints.filter((x) => x !== id) : [...app.hiddenFootprints, id]);
+  const locate = (f: typeof board.footprints[number]) => { app.patch({ pcbSelection: [f.id], highlightNet: null, flyTo: { x: f.x, y: f.y, space: 'pcb', seq: Date.now() } }); };
   const hidden = (l: Layer) => board.hiddenLayers.includes(l);
   return (
     <div className="panel-pad">
@@ -49,6 +55,23 @@ export function LayersPanel() {
       <div className="col" style={{ gap: 6 }}>
         <div className="kicker">网络类</div>
         {board.netClasses.map((nc) => <div key={nc.name} className="row mono" style={{ justifyContent: 'space-between' }}><span>{nc.name}</span><span className="muted">{nc.traceWidth.toFixed(2)}mm · 过孔 {nc.viaSize}/{nc.viaDrill}</span></div>)}
+      </div>
+      <div className="divider" />
+      <div className="col" style={{ gap: 6 }}>
+        <div className="row"><span className="kicker">元件</span>{hiddenFp.size > 0 && <span className="ml-auto xs" style={{ cursor: 'pointer', color: 'var(--accent)' }} onClick={() => app.set('hiddenFootprints', [])}>显示全部（已隐藏 {hiddenFp.size}）</span>}</div>
+        <div className="row" style={{ gap: 6 }}>
+          <input className="input" style={{ flex: 1, height: 26, fontSize: 12 }} placeholder="搜索位号 / 值，如 C3、10uF" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && matches[0]) locate(matches[0]); if (e.key === 'Escape') setQ(''); }} />
+          {app.pcbSelection.some((id) => board.footprints.some((f) => f.id === id)) && <button className="btn sm" title="隐藏当前选中的元件，方便选到被遮住的元件" onClick={() => app.set('hiddenFootprints', [...new Set([...app.hiddenFootprints, ...app.pcbSelection.filter((id) => board.footprints.some((f) => f.id === id))])])}>隐藏选中</button>}
+        </div>
+        {matches.length > 0 && <div className="col" style={{ gap: 2, maxHeight: 220, overflow: 'auto' }}>
+          {matches.map((f) => <div key={f.id} className="row mono xs" style={{ gap: 6, padding: '3px 4px', borderRadius: 4, background: app.pcbSelection.includes(f.id) ? 'var(--bg-raised)' : 'transparent', opacity: hiddenFp.has(f.id) ? 0.55 : 1 }}>
+            <span style={{ cursor: 'pointer', fontWeight: 500, minWidth: 34 }} onClick={() => locate(f)} title="定位并选中">{f.ref}</span>
+            <span className="muted" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={() => locate(f)}>{f.value} · {f.side === 'F' ? '顶' : '底'}</span>
+            <span style={{ cursor: 'pointer' }} title={hiddenFp.has(f.id) ? '显示' : '隐藏（重叠时便于选到下面的元件）'} onClick={() => toggleHidden(f.id)}><Icon d={hiddenFp.has(f.id) ? I.eyeOff : I.eye} size={13} stroke={1.8} /></span>
+          </div>)}
+        </div>}
+        {query && !matches.length && <div className="dim xs">没有匹配的元件</div>}
+        <div className="dim xs">重叠的元件：再次点击已选中的元件会轮换选到它下面的那个。</div>
       </div>
       <div className="divider" />
       <div className="col" style={{ gap: 8 }}>
