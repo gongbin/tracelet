@@ -18,6 +18,7 @@ export const I = {
   align: 'M4 4v16M9 8h11M9 14h7',
   auto: 'M4 18h4l4-8 4 8h4M12 4v2M6 8l1.5 1.5M18 8l-1.5 1.5',
   layout: 'M4 4h7v5H4zM13 4h7v9h-7zM4 11h7v9H4zM13 15h7v5h-7z',
+  pourgnd: 'M4 4h16v16H4zM12 8v4M8 12h8M9.5 15h5M11 18h2',
   guide: 'M12 3a9 9 0 100 18 9 9 0 000-18zM15.5 8.5l-2 5-5 2 2-5 5-2z',
   refill: 'M4 4h16v16H4zM8 12a4 4 0 108 0M12 8v4',
   clearroute: 'M4 6h9a3 3 0 010 6H8a3 3 0 000 6h4M15 15l5 5M20 15l-5 5',

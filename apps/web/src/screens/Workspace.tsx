@@ -36,6 +36,7 @@ const PCB_TOOLS: ToolDef[] = [
   { id: 'route', name: '走线', key: 'X', d: I.route, desc: '点击焊盘开始；默认 45° 拐角；双击结束。走线中按 V 放过孔换层。' },
   { id: 'via', name: '过孔', key: '', d: I.via, desc: '放置过孔，尺寸跟随网络类。' },
   { id: 'zone', name: '铺铜', key: 'Z', d: I.zone, desc: '画一个区域并选网络（默认 GND），自动填充铜。' },
+  { id: 'pourgnd', name: '一键铺 GND', key: '', d: I.pourgnd, desc: '在顶层和底层各铺一块覆盖整板的地铜（热焊盘连接）；已有地铜的层跳过。可 Undo。' },
   { id: 'place', name: '放置', key: 'A', d: I.comp, desc: '在板上直接放仅板级封装：定位孔、基准点、Logo、测试点（不进原理图 / BOM）。' },
   { id: 'hole', name: '开孔', key: 'H', d: I.junc, desc: '点击放置螺丝孔（M2–M4 非金属化）或金属化通孔；盘中孔请用过孔工具点在焊盘上。' },
   { id: 'edge', name: '板框', key: 'E', d: I.edge, desc: '改长宽、拖动整板（可连同元件）、板框自动包住内容；拖顶点微调，点板外画新的多边形板框（双击闭合）。' },
@@ -174,6 +175,19 @@ export function Workspace() {
   const removeSheet = (id: string) => { if (sheets.length <= 1) return; const sh = sheets.find((x) => x.id === id)!; if (sh.components.length && !confirm(`删除图纸「${sh.name}」及其中 ${sh.components.length} 个元件？`)) return; editor.dispatch(sch.deleteSheet(id)); app.patch({ sheetId: sheets.find((x) => x.id !== id)!.id, selection: [] }); };
   const onPcbTool = (id: string) => {
     if (id === 'refill') { app.toast('铺铜实时计算，无需重填'); return; }
+    if (id === 'pourgnd') {
+      const b = project.board; const netNames = new Set(a.netlist.nets.map((n) => n.name));
+      const gndNet = ['GND', 'AGND', 'DGND', 'VSS'].find((n) => netNames.has(n)) ?? [...netNames].find((n) => /gnd/i.test(n));
+      if (!gndNet) { app.toast('没有找到地网络（GND / AGND / DGND / VSS）'); return; }
+      if (b.outline.length < 3) { app.toast('先画好板框再铺铜'); return; }
+      const layers = ['B.Cu', 'F.Cu'] as const; const todo = layers.filter((l) => !b.zones.some((z) => z.net === gndNet && z.layer === l));
+      if (!todo.length) { app.toast(`${gndNet} 已在顶层和底层铺过铜`); return; }
+      editor.begin('一键铺地');
+      for (const layer of todo) editor.dispatch(pcb.addZone({ layer, net: gndNet, polygon: b.outline }));
+      editor.commit();
+      app.toast(`已在 ${todo.join(' / ')} 铺 ${gndNet} 铜（热焊盘连接，可在属性里改实心 / 调间隙，可 Undo）`, 'success');
+      return;
+    }
     if (id === 'clearroute') {
       const b = project.board; const n = { t: b.traces.length, v: b.vias.length, z: b.zones.length };
       if (!n.t && !n.v && !n.z) { app.toast('板上还没有走线 / 过孔 / 铺铜'); return; }

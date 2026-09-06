@@ -6,7 +6,7 @@ import { createProjectStore, type ProjectMeta, type ProjectStore } from './proje
 export type Screen = 'home' | 'sch' | 'pcb' | '3d' | 'lib' | 'bom' | 'fab';
 export type SchTool = 'select' | 'wire' | 'place' | 'pwr' | 'label' | 'bus' | 'junction' | 'draw' | 'measure';
 export type DrawMode = 'line' | 'rect' | 'text';
-export type PcbTool = 'select' | 'route' | 'via' | 'zone' | 'place' | 'hole' | 'edge' | 'text' | 'measure' | 'flip' | 'align' | 'placement' | 'autoroute' | 'refill' | 'clearroute';
+export type PcbTool = 'select' | 'route' | 'via' | 'zone' | 'pourgnd' | 'place' | 'hole' | 'edge' | 'text' | 'measure' | 'flip' | 'align' | 'placement' | 'autoroute' | 'refill' | 'clearroute';
 export type RightTab = 'props' | 'layers' | 'lib' | 'check' | 'ai' | '3d';
 
 export interface Placing { symbolId: string; value: string; footprint: string; props?: Record<string, string>; rotation: number; partLabel?: string }
