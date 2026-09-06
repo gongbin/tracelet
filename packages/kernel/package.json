@@ -2,7 +2,7 @@
   "name": "@tracelet/kernel",
   "version": "0.1.0",
   "description": "无头 EDA 内核：数据模型、命令系统、连通性、ERC/DRC、导入导出",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",

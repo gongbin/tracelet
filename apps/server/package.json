@@ -1,6 +1,7 @@
 {
   "name": "@tracelet/server",
   "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "type": "module",
   "description": "Tracelet 远程存储 / 协同服务端：REST API（Hono）+ PostgreSQL（Drizzle）或文件存储",

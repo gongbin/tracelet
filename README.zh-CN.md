@@ -163,4 +163,4 @@ PCB：`X` 走线 · `V` 走线中放过孔换层 · `Z` 铺铜 · `A` 放板级�
 
 ## 许可证
 
-MIT
+[GPL-3.0-or-later](./LICENSE)，与 KiCad 相同。允许使用、修改与商业销售；分发修改版时必须以同一协议公开源码。内核、CLI、Web 与服务端均适用。第三方资源沿用各自协议（KiCad 3D 模型：CC-BY-SA 4.0 附 KiCad 库例外条款，见 `apps/web/public/models3d`）。

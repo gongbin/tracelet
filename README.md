@@ -157,4 +157,4 @@ Global: `⌘K` command palette (`@` parts, `#` nets) · `⌘Z` undo · `Tab` foc
 
 ## License
 
-MIT
+[GPL-3.0-or-later](./LICENSE), the same license as KiCad. You may use, modify and sell Tracelet, including in commercial products; if you distribute a modified version you must publish its source under the same license. The kernel, CLI, web app and server are all covered. Third-party assets keep their own licenses (KiCad 3D models: CC-BY-SA 4.0 with the KiCad library exception; see `apps/web/public/models3d`).

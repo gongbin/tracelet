@@ -131,7 +131,7 @@ export function Home() {
             </div>
           </div>
         </div>
-        <div className="home-footer-bottom xs muted mono">© {new Date().getFullYear()} Tracelet contributors · MIT</div>
+        <div className="home-footer-bottom xs muted mono">© {new Date().getFullYear()} Tracelet contributors · GPL-3.0-or-later</div>
       </footer>
     </div>
   );

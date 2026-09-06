@@ -1,6 +1,7 @@
 {
   "name": "@tracelet/db",
   "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "type": "module",
   "description": "PostgreSQL schema（Drizzle）。本地无 Postgres 时不参与构建。",
