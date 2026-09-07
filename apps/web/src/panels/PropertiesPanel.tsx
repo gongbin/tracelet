@@ -1,3 +1,4 @@
+import { PartTrust } from '../components/PartTrust.js';
 import { ViaTechnology } from './ViaTechnology.js';
 import { PlacementSettings } from './PlacementSettings.js';
 import { useEffect, useState } from 'react';
@@ -39,6 +40,7 @@ export function PropertiesPanel() {
             <span className="k">面</span><div className="seg sm"><span className={`seg-opt${fp.side === 'F' ? ' on' : ''}`} onClick={() => fp.side !== 'F' && editor.dispatch(pcb.flipFootprint(fp.id))}>顶层</span><span className={`seg-opt${fp.side === 'B' ? ' on' : ''}`} onClick={() => fp.side !== 'B' && editor.dispatch(pcb.flipFootprint(fp.id))}>底层</span></div>
           </div>
           <PlacementSettings fp={fp} />
+          <PartTrust fp={fp} />
           <div className="divider" />
           <div className="col" style={{ gap: 6 }}>
             <div className="row"><span className="muted">焊盘</span><span className="mono">{pads.length}</span></div>
@@ -157,7 +159,6 @@ export function PropertiesPanel() {
       <div className="col" style={{ gap: 6 }}>
         <div className="next-step" onClick={() => app.setSchTool('place')}><span className="key">A</span>放置元件</div>
         <div className="next-step" onClick={() => app.setSchTool('wire')}><span className="key">W</span>连线：点一个引脚，再点另一个</div>
-        <div className="next-step" onClick={() => { editor.dispatch(pcb.syncFromSchematic()); app.go('pcb'); }}><span className="key">→</span>同步到 PCB，开始布局</div>
       </div>
     </div>
   );

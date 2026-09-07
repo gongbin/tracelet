@@ -1,3 +1,4 @@
+import { SyncPcb } from './SyncPcb.js';
 import { useEffect, useRef, useState } from 'react';
 import { useApp, type RightTab } from '../store/app.js';
 import { PropertiesPanel } from './PropertiesPanel.js';
@@ -36,7 +37,7 @@ export function RightPanel() {
         {tabs.map(([id, label]) => <button key={id} className={`${tab === id ? 'on' : ''} ${id === 'ai' ? 'ai' : ''}`} onClick={() => set('rightTab', id)}>{label}</button>)}
       </div>
       <div className="rightpanel-body">
-        {tab === 'props' && <PropertiesPanel />}
+        {tab === 'props' && <>{(screen === 'sch' || screen === 'pcb') && <SyncPcb />}<PropertiesPanel /></>}
         {tab === 'layers' && <LayersPanel />}
         {tab === 'lib' && <LibraryPanel />}
         {tab === 'check' && <CheckPanel />}

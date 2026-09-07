@@ -99,6 +99,7 @@ export function symbolTextPositions(comp: SchComponent, sym: SymbolDef): { ref: 
     value = rot === 90 || rot === 270 ? { x: b.x + b.w + 60, y: b.y + b.h / 2 + 40, anchor: 'start' } : up ? { x: cx, y: b.y - 50, anchor: 'middle' } : { x: cx, y: b.y + b.h + 120, anchor: 'middle' };
   }
   if (sym.graphic === 'gnd') value = rot === 90 || rot === 270 ? { x: cx, y: b.y + b.h + 120, anchor: 'middle' } : rot === 180 ? { x: cx, y: b.y - 50, anchor: 'middle' } : { x: cx, y: b.y + b.h + 120, anchor: 'middle' }; // 地：GND 文字居中放在远离导线的一侧（朝下在下方，朝上在上方）
+  if(comp.textOffset) { ref={...ref,x:ref.x+comp.textOffset.ref.x,y:ref.y+comp.textOffset.ref.y}; value={...value,x:value.x+comp.textOffset.value.x,y:value.y+comp.textOffset.value.y}; }
   return { ref, value };
 }
 /** 符号本体（局部坐标，不含引脚）。 */

@@ -1,3 +1,4 @@
+import type { SchComponent } from '../model/schematic.js';
 import type { Project } from '../model/project.js';
 import { buildSchematicNetlist } from '../schematic/connectivity.js';
 import { getSymbol } from '../library/symbols.js';
@@ -23,20 +24,26 @@ export function exportNetlistJson(project: Project): NetlistJson {
 
 export interface BomRow { refs: string[]; qty: number; value: string; footprint: string; mpn: string; lcsc: string }
 
+export function isAssemblyComponent(c: SchComponent, project: Project): boolean {
+  const props = Object.fromEntries(Object.entries(c.props).map(([k,v]) => [k.toLowerCase(), v.toLowerCase().trim()]));
+  const yes = (v?: string) => !!v && ['true', 'yes', '1', 'dnp'].includes(v);
+  return !c.ref.startsWith('#') && !getSymbol(c.symbolId).power && !yes(props.exclude_from_bom) && !yes(props.exclude_from_board) && (project.settings.manufacturing?.includeDnp === true || !yes(props.dnp));
+}
+
 export function buildBom(project: Project): BomRow[] {
   const groups = new Map<string, BomRow>();
   for (const c of project.schematic.sheets.flatMap((s) => s.components)) {
-    if (getSymbol(c.symbolId).power) continue;
+    if (!isAssemblyComponent(c, project)) continue;
     const fp = findFootprint(c.footprint)?.name ?? c.footprint;
-    const k = `${c.value}|${fp}`;
-    const row = groups.get(k) ?? { refs: [], qty: 0, value: c.value, footprint: fp, mpn: c.props.mpn ?? '', lcsc: c.props.lcsc ?? '' };
+    const k = JSON.stringify([c.value, fp, c.props.mpn ?? c.props.MPN ?? '', c.props.lcsc ?? c.props.LCSC ?? c.props['LCSC Part #'] ?? '']);
+    const row = groups.get(k) ?? { refs: [], qty: 0, value: c.value, footprint: fp, mpn: c.props.mpn ?? c.props.MPN ?? '', lcsc: c.props.lcsc ?? c.props.LCSC ?? c.props['LCSC Part #'] ?? '' };
     row.refs.push(c.ref); row.qty++;
     groups.set(k, row);
   }
   return [...groups.values()].map((r) => ({ ...r, refs: r.refs.sort((a, b) => a.localeCompare(b, undefined, { numeric: true })) }));
 }
 
-const csvCell = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+const csvCell = (s: string) => (/[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
 
 /** LCSC / 嘉立创模板 BOM。 */
 export function exportBomCsv(project: Project): string {
@@ -49,6 +56,14 @@ export function exportBomCsv(project: Project): string {
 /** 坐标文件（贴片机）。嘉立创约定：mm，顶层 T / 底层 B。 */
 export function exportPickAndPlaceCsv(project: Project): string {
   const lines = ['Designator,Mid X,Mid Y,Layer,Rotation'];
-  for (const f of project.board.footprints) lines.push([f.ref, f.x.toFixed(3), f.y.toFixed(3), f.side === 'F' ? 'T' : 'B', String(f.rotation)].join(','));
+  const components = project.schematic.sheets.flatMap(s => s.components);
+  const origin = project.settings.manufacturing?.origin ?? { x: 0, y: 0 };
+  for (const f of project.board.footprints) {
+    const c = components.find(c => f.componentId ? c.id === f.componentId : c.ref === f.ref);
+    if (!c || !isAssemblyComponent(c, project)) continue;
+    if (![f.x,f.y,f.rotation,origin.x,origin.y].every(Number.isFinite)) throw new Error(`Invalid placement: ${f.ref}`);
+    const angle = f.side === 'B' && project.settings.manufacturing?.bottomRotation === 'bottom-view' ? 180 - f.rotation : -f.rotation;
+    lines.push([f.ref, (f.x-origin.x).toFixed(3), (origin.y-f.y).toFixed(3), f.side === 'F' ? 'T' : 'B', String((angle % 360 + 360) % 360)].map(csvCell).join(','));
+  }
   return lines.join('\n') + '\n';
 }

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Icon } from './Icon.js';
 import { I } from '../icons.js';
 import { useApp } from '../store/app.js';
+import { MoreMenu } from './MoreMenu.js';
 
 export interface ToolDef { id: string; name: string; key: string; d: string; desc: string; sep?: boolean }
 
@@ -28,7 +29,7 @@ export function Toolbar({ tools, active, onSelect, children }: { tools: ToolDef[
         </div>
       )}
       {children}
-      <button className="tool" style={{ marginTop: 'auto' }} title="更多工具"><Icon d={I.more} size={18} stroke={2.5} /></button>
+      <MoreMenu />
     </div>
   );
 }

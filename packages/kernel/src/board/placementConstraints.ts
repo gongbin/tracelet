@@ -1,5 +1,5 @@
 import type { Board, BoardFootprint } from '../model/board.js';
-import { footprintBody, footprintPads } from './geometry.js';
+import { footprintBody, footprintPads, footprintDef } from './geometry.js';
 import { netRules } from './routingModel.js';
 import { pointSegDist, rotate, pointInPolygon, segRectDist, type Rect, type Vec } from '../geometry.js';
 
@@ -21,7 +21,11 @@ export function placementConstraintErrors(board: Board): string[] {
 }
 
 export function edgePlacementFits(f: BoardFootprint, board: Board): boolean {
-  const edge = f.placement?.edge;
+  const connector = footprintDef(f).connector;
+  const edge = f.placement?.edge ?? (connector?.mounting === 'horizontal' && board.outline.length > 2 ? {
+    index:board.outline.reduce((best,a,i)=>pointSegDist(f,a,board.outline[(i+1)%board.outline.length]) < pointSegDist(f,board.outline[best],board.outline[(best+1)%board.outline.length]) ? i : best,0),
+    direction:connector.direction,distance:connector.clearance
+  } : undefined);
   if (!edge) return true;
   const a = board.outline[edge.index], b = board.outline[(edge.index + 1) % board.outline.length];
   if (!a || !b || Math.hypot(b.x-a.x,b.y-a.y) < 1e-9) return false;

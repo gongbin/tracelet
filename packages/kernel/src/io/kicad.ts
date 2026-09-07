@@ -159,7 +159,7 @@ export function importKicadSchematic(text: string, opts: { sheetName?: string; s
     for (const p of children(inst, 'property')) props[str(p[1])] = str(p[2]);
     const placed = placeInstance(def, def.anchor ?? { x: 0, y: 0 }, P(at[1], at[2]), num(at[3]), mirror);
     const ref = props.Reference ?? def.prefix + '?';
-    components.push({ id: newId('c'), ref: def.power ? `#PWR${components.length + 1}` : ref, symbolId: def.id, value: props.Value ?? def.defaultValue, footprint: props.Footprint ? `fp:kicad:${props.Footprint.split(':').pop()}` : '', x: placed.x, y: placed.y, rotation: placed.rotation, mirror: placed.mirror, props: { ...(props.Footprint ? { kicadFootprint: props.Footprint } : {}), ...(props.Datasheet && props.Datasheet !== '~' ? { datasheet: props.Datasheet } : {}) } });
+    components.push({ id: newId('c'), ref: def.power ? `#PWR${components.length + 1}` : ref, symbolId: def.id, value: props.Value ?? def.defaultValue, footprint: props.Footprint ? `fp:kicad:${props.Footprint.split(':').pop()}` : '', x: placed.x, y: placed.y, rotation: placed.rotation, mirror: placed.mirror, props: { ...props, ...(str(child(inst,'dnp')?.[1])==='yes'?{dnp:'true'}:{}), ...(str(child(inst,'in_bom')?.[1])==='no'?{exclude_from_bom:'true'}:{}), ...(str(child(inst,'on_board')?.[1])==='no'?{exclude_from_board:'true'}:{}), ...(props.Footprint ? { kicadFootprint: props.Footprint } : {}), ...(props.Datasheet && props.Datasheet !== '~' ? { datasheet: props.Datasheet } : {}) } });
   }
   const wires: Wire[] = children(root, 'wire').map((w) => ({ id: newId('w'), points: children(child(w, 'pts') ?? [], 'xy').map((xy) => P(xy[1], xy[2])) })).filter((w) => w.points.length >= 2);
   const buses: Bus[] = children(root, 'bus').map((b) => ({ id: newId('b'), points: children(child(b, 'pts') ?? [], 'xy').map((xy) => P(xy[1], xy[2])) })).filter((b) => b.points.length >= 2);
@@ -275,7 +275,13 @@ export function parseFootprintNode(fp: SList, netName: (node: SList | undefined)
   };
   const body = boxFrom('F.CrtYd') ?? boxFrom('B.CrtYd') ?? boxFrom('F.Fab') ?? boxFrom('B.Fab') ?? boxFrom('F.SilkS') ?? padBox();
   const isTht = pads.some((p) => p.drill > 0 && !p.npth);
-  const def: Omit<FootprintDef, 'id'> = { name: shortName, body: { w: Math.round(body.w * 100) / 100, h: Math.round(body.h * 100) / 100, ...(Math.abs(body.x) > 0.005 || Math.abs(body.y) > 0.005 ? { x: Math.round(body.x * 1000) / 1000, y: Math.round(body.y * 1000) / 1000 } : {}) }, pads, height: isTht ? 4 : 1, description: descr ? str(descr[1]) : `KiCad ${libName}` };
+  const physicalBody = boxFrom('F.Fab') ?? boxFrom('B.Fab');
+  const model = child(fp,'model');
+  const xyz = (name:string, fallback:number):[number,number,number] => { const v=model && child(child(model,name) ?? [],'xyz'); return v ? [num(v[1]),num(v[2]),num(v[3])] : [fallback,fallback,fallback]; };
+  const def: Omit<FootprintDef, 'id'> = { name: shortName,
+    provenance:{source:`kicad:${libName}`,verified:false},
+    ...(physicalBody ? {physicalBody} : {}),
+    ...(model ? {modelPlacement:{source:str(model[1]),offset:xyz('offset',0),rotation:xyz('rotate',0),scale:xyz('scale',1)}} : {}), body: { w: Math.round(body.w * 100) / 100, h: Math.round(body.h * 100) / 100, ...(Math.abs(body.x) > 0.005 || Math.abs(body.y) > 0.005 ? { x: Math.round(body.x * 1000) / 1000, y: Math.round(body.y * 1000) / 1000 } : {}) }, pads, height: isTht ? 4 : 1, description: descr ? str(descr[1]) : `KiCad ${libName}` };
   return { def, shortName, libName, props, padNets, at: { x: num(at?.[1]), y: num(at?.[2]) }, angle: fpAngle, side, locked: fp.includes('locked') || str(child(fp, 'locked')?.[1]) === 'yes' };
 }
 

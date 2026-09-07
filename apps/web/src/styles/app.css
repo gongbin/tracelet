@@ -148,6 +148,7 @@ a:hover { color: var(--accent-hover); }
 .ws-tab.on { background: var(--bg-raised); color: var(--text); }
 .ws-tab .badge { position: absolute; top: 5px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .search-box { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px; flex: 0 1 240px; min-width: 110px; border-radius: var(--radius); background: var(--bg-panel); border: 1px solid var(--border); color: var(--text-3); font-size: 12px; white-space: nowrap; overflow: hidden; cursor: pointer; }
+.topbar .search-box { flex-basis: 192px; }
 .search-box:hover { border-color: var(--text-3); }
 /* 顶栏向导入口：静态图标，弹层挂在顶栏下方 */
 .guide-btn { position: relative; width: 30px; height: 28px; border: 0; border-radius: var(--radius); background: var(--bg-panel); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex: none; margin-right: 6px; }
@@ -287,6 +288,8 @@ table.data tr:hover td { background: var(--bg-raised); }
 @keyframes slidein { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes pulse { 0%, 100% { opacity: .15; } 50% { opacity: .4; } }
 .drc-pulse { animation: pulse 1s ease-in-out 3; }
+@keyframes pad-dash-run { to { stroke-dashoffset: -0.92; } }
+.pad-inset-dash { animation: pad-dash-run 0.85s linear infinite; }
 .spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--accent); display: inline-block; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
@@ -352,7 +355,6 @@ table.data tr:hover td { background: var(--bg-raised); }
   .topbar .guide-btn { margin-left: 0; flex: none; }
   .workspace-tabs { order: 2; flex: 1 0 100%; overflow-x: auto; }
   .workspace-tabs .ws-tab { min-height: 34px; flex: 1 0 auto; }
-  .topbar-sync { order: 3; min-height: 32px; }
   .editor-body { position: relative; min-width: 0; }
   .editor-body > .rightpanel { display: none; }
   .editor-body > .rightpanel.mobile-open { display: flex; position: absolute; inset: 0 0 0 auto; width: min(320px, calc(100% - 48px)); z-index: 41; box-shadow: -8px 0 24px #0004; }
@@ -392,4 +394,23 @@ table.data tr:hover td { background: var(--bg-raised); }
 .engineering-table { width:100%; border-collapse:collapse; font-size:12px; }
 .engineering-table th,.engineering-table td { padding:9px; text-align:left; border-bottom:1px solid var(--border); }
 
+/* ---------- 质检 / 装配页 ---------- */
+.workpage { flex: 1; min-height: 0; display: flex; }
+.workpage-side { width: 340px; flex: none; display: flex; flex-direction: column; min-height: 0; background: var(--bg-panel); border-left: 1px solid var(--border); border-right: 1px solid var(--border); font-size: 12.5px; }
+.qc-step { display: flex; align-items: center; gap: 8px; padding: 7px 12px; cursor: pointer; border-left: 2px solid transparent; }
+.qc-step:hover { background: var(--bg-raised); }
+.qc-step.on { background: var(--bg-raised); border-left-color: var(--accent); }
+.qc-detail { flex: none; max-height: 46%; overflow: auto; gap: 8px; padding: 12px; border-top: 1px solid var(--border); background: var(--bg-raised); }
+.qc-kv { display: flex; gap: 8px; align-items: baseline; font-size: 12px; }
+.qc-k { flex: none; width: 58px; color: var(--text-2); font-weight: 600; }
+.qc-ol { margin: 2px 0; padding-left: 18px; font-size: 12px; line-height: 1.7; color: var(--text-2); }
+.qc-ol li + li { margin-top: 2px; }
+.boardview-ctl { background: rgba(34, 38, 46, .95); }
+@media (max-width: 900px) { .workpage { flex-direction: column !important; } .workpage-side { width: auto; max-height: 45%; border-left: none; border-top: 1px solid var(--border); } }
+
 @media (max-width: 640px) { .page { padding: 20px 16px; } }
+
+@media (max-width: 600px) {
+  .gerber-preview-layout { flex-direction: column; }
+  .gerber-preview-files { width: 100% !important; max-height: 150px; border-right: 0 !important; border-bottom: 1px solid var(--border); }
+}

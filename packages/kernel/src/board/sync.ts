@@ -61,8 +61,15 @@ export function syncBoardDetailed(project: Project): SyncOutcome {
     if (res.mapped) mapped.push(c.ref);
     const def = findFootprint(fpId);
     if (!def) continue;
+    if (c.pinMap) {
+      const targets=Object.values(c.pinMap);
+      if (new Set(targets).size!==targets.length || targets.some(n=>!def.pads.some(p=>p.number===n && !p.npth)) || getSymbol(c.symbolId).pins.some(p=>p.type!=='no_connect' && !c.pinMap![p.number])) throw new Error(`Invalid pin mapping: ${c.ref}`);
+    }
     const padNets: Record<string, string> = {};
-    for (const pad of def.pads) padNets[pad.number] = netlist.pinNet.get(`${c.id}:${pad.number}`) ?? '';
+    for (const pad of def.pads) {
+      const pin = c.pinMap ? Object.keys(c.pinMap).find(pin=>c.pinMap![pin]===pad.number) : pad.number;
+      padNets[pad.number] = pin ? netlist.pinNet.get(`${c.id}:${pin}`) ?? '' : '';
+    }
     const prev = byComp.get(c.id);
     if (prev) {
       const changedFp = prev.footprintId !== fpId;

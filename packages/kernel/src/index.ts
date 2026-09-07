@@ -7,6 +7,7 @@ export * from './model/project.js';
 export * from './library/symbols.js';
 export * from './library/footprints.js';
 export * from './library/parts.js';
+export * from './library/pricing.js';
 export * from './library/registry.js';
 export * from './library/generators.js';
 export * from './library/templates.js';
@@ -57,3 +58,9 @@ export * from './board/engineeringRules.js';
 export * from './board/copperConnectivity.js';
 export * from './board/differentialRoute.js';
 export * from './board/powerThermal.js';
+
+export * from './export/manufacturing.js';
+export * from './library/trust.js';
+export * from './schematic/tidy.js';
+export * from './board/panel.js';
+export * from './export/panel.js';

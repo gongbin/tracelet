@@ -1,3 +1,6 @@
+import { BOARD_COLOR_KEYS } from '../i18n/boardColors.js';
+import { Panelization } from '../components/Panelization.js';
+import { ManufacturingSettings } from '../components/ManufacturingSettings.js';
 import { EngineeringReport } from '../components/EngineeringReport.js';
 import { LayerCountSelect } from '../components/LayerCountSelect.js';
 import { useState } from 'react';
@@ -46,9 +49,11 @@ export function FabPage() {
   ];
 
   const doExport = () => {
+    try {
     const z = exportFabZip(project, { bom: exports.bom, pnp: exports.pnp, netlist: true, project: true, assemblyPdf: exports.asm, schematicPdf: exports.sch });
     download(z.name, z.data, 'application/zip');
     app.toast(`已下载 ${z.name}（Gerber ${b.copperCount + 7} 层 + 钻孔${exports.bom ? ' + BOM' : ''}${exports.pnp ? ' + 坐标' : ''}${exports.asm ? ' + 装配图 PDF' : ''}${exports.sch ? ' + 原理图 PDF' : ''}）`, 'success');
+    } catch (error) { app.toast(error instanceof Error ? error.message : String(error), 'error'); }
   };
   const [orderTips, setOrderTips] = useState(false);
   const setSetting = (patch: Partial<typeof project.settings>) => editor.dispatch(command('项目设置', (p) => ({ ...p, settings: { ...p.settings, ...patch } })));
@@ -60,6 +65,8 @@ export function FabPage() {
       <div className="page-inner">
         <h1>{t('fab.title')}</h1>
         <EngineeringReport />
+        <ManufacturingSettings />
+        <Panelization />
         <section className="col" style={{ gap: 10 }}>
           <h3>{t('fab.precheck')}</h3>
           <div className="check-list">
@@ -79,7 +86,7 @@ export function FabPage() {
           <div className="row mono small muted" style={{ gap: 20 }}>
             <span>层数 <LayerCountSelect /></span>
             <span>板厚 <b style={{ color: 'var(--text)', fontWeight: 500 }}>{b.thickness}</b></span>
-            <span>工艺 <b style={{ color: 'var(--text)', fontWeight: 500 }}>{st.copperWeight}oz · {st.finish} · {st.maskColor}阻焊/{st.silkColor}丝印</b> <button className="btn sm" onClick={() => setStackup(true)}>层叠…</button></span>
+            <span>工艺 <b style={{ color: 'var(--text)', fontWeight: 500 }}>{st.copperWeight}oz · {st.finish} · {t('fab.maskSilk')}: {t(BOARD_COLOR_KEYS[st.maskColor])} / {t(BOARD_COLOR_KEYS[st.silkColor])}</b> <button className="btn sm" onClick={() => setStackup(true)}>层叠…</button></span>
             <span className="row" style={{ gap: 4 }}>尺寸 <input className="input mono" style={{ width: 60, height: 24 }} value={w} onChange={(e) => setW(e.target.value)} onBlur={() => editor.dispatch(pcb.setOutlineRect(Number(w) || bb.w, Number(h) || bb.h))} />×<input className="input mono" style={{ width: 60, height: 24 }} value={h} onChange={(e) => setH(e.target.value)} onBlur={() => editor.dispatch(pcb.setOutlineRect(Number(w) || bb.w, Number(h) || bb.h))} /> mm</span>
             <span>单位 <span className="seg sm" style={{ display: 'inline-flex', height: 24 }}>{(['mm', 'mil'] as const).map((u) => <span key={u} className={`seg-opt${project.settings.unit === u ? ' on' : ''}`} onClick={() => setSetting({ unit: u })}>{u}</span>)}</span></span>
           </div>

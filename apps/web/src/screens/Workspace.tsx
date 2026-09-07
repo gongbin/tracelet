@@ -1,3 +1,4 @@
+import { SchematicTidy } from '../components/SchematicTidy.js';
 import { modelFor, needsModel } from '../editors/three/models.js';
 import { useEffect } from 'react';
 import { sch, pcb, copperLayers, LAYER_COLORS, netClassFor, milToMm, formatLength, snapTo, SCH_GRID, getSymbol, boardBounds, paperSize, type CheckItem, sheetDisplayName } from '@tracelet/kernel';
@@ -17,6 +18,8 @@ import { SchematicCanvas } from '../editors/schematic/SchematicCanvas.js';
 import { PcbCanvas } from '../editors/pcb/PcbCanvas.js';
 import { ThreeView } from '../editors/three/ThreeView.js';
 import { FabPage } from './FabPage.js';
+import { QcPage } from './QcPage.js';
+import { AsmPage } from './AsmPage.js';
 import { LibPage } from './LibPage.js';
 import { BomPage } from './BomPage.js';
 import { I } from '../icons.js';
@@ -251,6 +254,8 @@ export function Workspace() {
     <div className="col" style={{ flex: 1, minHeight: 0, gap: 0 }}>
       <TopBar />
       {screen === 'fab' && <FabPage />}
+      {screen === 'qc' && <QcPage />}
+      {screen === 'asm' && <AsmPage />}
       {screen === 'lib' && <LibPage />}
       {screen === 'bom' && <BomPage />}
       {isEditor && (
@@ -295,6 +300,7 @@ export function Workspace() {
                 {sheet.frame.size === 'custom' && (() => { const p = paperSize(sheet.frame)!; const mm = (v: number) => Math.round(v * 0.0254); return <span className="row mono xs" style={{ gap: 4 }}>
                   <input className="input mono" style={{ width: 56, height: 22 }} key={`w${p.w}`} defaultValue={mm(p.w)} onBlur={(e) => { const v = Number(e.target.value); if (v >= 50 && v <= 2000) editor.dispatch(sch.setSheetFrame(sheet.id, { width: Math.round(v / 0.0254) })); }} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />×
                   <input className="input mono" style={{ width: 56, height: 22 }} key={`h${p.h}`} defaultValue={mm(p.h)} onBlur={(e) => { const v = Number(e.target.value); if (v >= 50 && v <= 2000) editor.dispatch(sch.setSheetFrame(sheet.id, { height: Math.round(v / 0.0254) })); }} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} /> mm</span>; })()}
+                <SchematicTidy />
                 {sheet.frame.size !== 'none' && <button className="btn sm" style={{ height: 24 }} onClick={() => setFrameDialog(true)} title="标题、公司、版本、作者、日期与标签文字">标题栏…</button>}
                 <span className="ml-auto dim xs">{sheet.components.filter((c) => !getSymbol(c.symbolId).power).length} 元件 · {sheet.wires.length} 导线 · {a.netlist.nets.length} 网络（全部页）</span>
               </div>

@@ -4,7 +4,7 @@ import { ProjectEditor, pcb, type sch, type Project, type CopperLayer, type Laye
 type Clipboard = sch.Clipboard;
 import { createProjectStore, type ProjectMeta, type ProjectStore } from './projectStore.js';
 
-export type Screen = 'home' | 'sch' | 'pcb' | '3d' | 'lib' | 'bom' | 'fab';
+export type Screen = 'home' | 'sch' | 'pcb' | '3d' | 'lib' | 'bom' | 'fab' | 'qc' | 'asm';
 export type SchTool = 'select' | 'wire' | 'place' | 'pwr' | 'label' | 'bus' | 'junction' | 'draw' | 'measure';
 export type DrawMode = 'line' | 'rect' | 'text';
 export type PcbTool = 'select' | 'route' | 'via' | 'zone' | 'pourgnd' | 'place' | 'hole' | 'edge' | 'text' | 'measure' | 'flip' | 'align' | 'placement' | 'autoroute' | 'refill' | 'clearroute';

@@ -6,6 +6,37 @@ English · [简体中文](./README.zh-CN.md)
 
 A TypeScript headless kernel + web editor + CLI + MCP server, with an optional self-hosted remote storage server. Schematic → PCB → 3D → fab files, all in the browser; your data stays local by default.
 
+## Highlights
+
+- **A complete browser workspace** — multi-sheet schematics, PCB editing, 3D, parts library, BOM, fabrication, guided assembly and testing in one project. Local storage by default; optional self-hosted shared storage.
+- **2-, 4- and 6-layer PCB design** — outline notches, rulers and alignment snapping, thermal-relief zones, configurable net classes, blind/buried vias and backdrill parameters.
+- **Placement and routing assistance** — previewable placement proposals with connector/antenna constraints; cancellable autorouting, paired differential search and length compensation within the supported routing cases.
+- **Checks with visible evidence** — ERC, DRC, connectivity checks and an engineering report covering placement, routing, alignment, configured signal constraints, impedance estimates and DC conductor thermal estimates.
+- **Manufacturing consistency** — shared Gerber/drill/placement origin, selectable bottom-side angle convention, a common BOM/placement DNP policy, reference checks and Gerber file read-back preview. Separate panel output includes rails, tabs, mouse bites, tooling holes and fiducials.
+- **Parts you can inspect** — source and datasheet records, pin mappings, physical outlines, connector orientation, model placement metadata, local part details and optional online reference pricing.
+- **Automation and presentation** — an undoable AI assistant, CLI and MCP live bridge; library 3D models, GLB export and separate product PNG rendering.
+- **A workspace for more devices and languages** — responsive navigation and panels, touch pan/zoom, dark/light/system themes, and 10 interface languages: English, Simplified/Traditional Chinese, Japanese, Korean, German, French, Spanish, Brazilian Portuguese and Hindi. Some legacy messages use fallback translation.
+
+## Manufacturing, engineering and presentation
+
+The **Fabrication** page combines the engineering report, manufacturing settings, panelization, file preview and ZIP export. BOM grouping distinguishes MPN and LCSC identifiers. Assembly exports check missing/duplicate references and component identities; Gerber-only export remains available for incomplete projects. Gerber, drill and placement coordinates use a shared origin and Y-up convention, with bottom XY viewed from the top. Confirm the selected bottom rotation convention with your assembler. DNP inclusion is shared by BOM and placement; it does not remove PCB copper or pads.
+
+**Panelization** generates a separate fabrication package without changing the single board. Same-orientation arrays use continuous support rails, safe straight-edge tabs, mouse bites, three tooling holes and three top fiducials. Protection checks use the actual outline, inferred antenna geometry and connector metadata. The current exporter supports through-drill panels; it rejects unsupported advanced drill operations and unsafe tab locations. Tool radius, breakaway strength and fabrication tolerances still need manufacturer review.
+
+**Part properties** retain source, datasheet and manual verification status, pin-to-pad mappings, physical body dimensions, horizontal/vertical connector intent and imported model offsets. Physical-body edits do not move pads. Unknown geometry remains unverified; imported STEP references are metadata, not automatic STEP conversion.
+
+The schematic **Tidy & verify** action conservatively arranges connected islands and explicit functional groups, avoids component-text overlaps where possible, and simplifies redundant wire vertices. It compares electrical identities before accepting a result and supports undo. Sheets containing graphics or buses retain their existing group positions. **Update PCB** is in the right-hand Properties panel.
+
+**Assembly** provides grouped part lists, board-side/rotation views, highlighting and completion tracking. **Testing** provides board-linked probe locations and suggested checks derived from nets and components; it does not operate instruments or certify a circuit. The **3D** page has an independent product-render dialog with top/bottom/isometric views, light/dark/transparent backgrounds and PNG output up to 2400 × 1800. Unmatched models remain explicitly identified placeholders.
+
+## Engineering limits
+
+- Autorouting is heuristic and does not guarantee completion, optimal placement or interference-free signals. Antenna and connector inference must be checked against datasheets and enclosure geometry.
+- Differential routing currently handles supported two-terminal, equal-width pairs on one layer, with gap checking and planar length compensation; paired vias and branched pairs are not supported.
+- Impedance uses closed-form single-ended microstrip/stripline estimates, not a field solver. The thermal tool is a lumped DC conductor model; temperature estimates require user-supplied thermal resistance and a supported unbranched trace path. These are not SI/EMI or full-board thermal simulations.
+- ERC/DRC and report scores depend on the imported geometry, pin types and configured rules. Unassessed categories remain unassessed; a high score cannot override errors. Fabrication and assembly still require engineering review.
+- GLB models and PNG rendering are supported. Native STEP export, general automatic STEP import/conversion and real-time multi-user co-editing are not provided.
+
 ## Parts library: built-in + community updates + mine
 
 - **Built-in**: `packages/kernel/src/library/partsBase.ts`, ~150 common parts (0402/0603 E-series resistors, MLCCs, inductors / ferrite beads / fuses / electrolytics, diodes / TVS / ESD, BJTs / MOSFETs, LDOs / DC-DC / chargers, 555 / op-amps / comparators / shift registers / CH340C / SPI flash / DS18B20, ESP32 modules, crystals, tactile switches, pin headers / JST / USB-C). ICs come with real pin names; footprints are generated parametrically from the package name. Only part numbers and pins we are sure about are written; prices and stock are never hard-coded; LCSC codes only where certain.
@@ -26,7 +57,7 @@ Click the avatar (top right) to set your name: every sheet in a new project gets
 Imports .SchDoc / .PcbDoc directly (OLE compound binary; an independent parser whose format knowledge comes from public implementations such as KiCad and altium2kicad):
 
 - Schematic: components (symbol graphics, pins, reference, Comment, footprint name), wires, buses, junctions, net labels, ports, power ports (mapped to built-in GND / power symbols), sheet symbols and entries (connected by name), free text and frames. Multi-part components import the current part.
-- PCB: board outline (Board Shape / Keep-Out), components and footprints (pad shapes / holes / rotation / bottom-side mirroring), tracks, arcs, vias, polygon pour outlines and rectangular fills, silkscreen text, 2 or 4 layers (only the first two inner layers are kept).
+- PCB: board outline (Board Shape / Keep-Out), components and footprints (pad shapes / holes / rotation / bottom-side mirroring), tracks, arcs, vias, polygon pour outlines and rectangular fills, silkscreen text, 2, 4 or 6 layers (up to four inner layers are mapped; additional layers are not preserved).
 - Schematic components and PCB footprints are linked by reference; pad nets come from the PCB and are filled from the schematic netlist when missing.
 - Not yet: SchLib / PcbLib / IntLib libraries, blind / buried vias, slots, split planes (those nets show as unrouted), rule → net class mapping, images. Pads of components rotated by non-90° angles are approximated as axis-aligned rectangles, so DRC may report false positives there.
 
@@ -39,15 +70,15 @@ The PCB toolbar's "Placement" tool (also in the Guide) checks first, then propos
 - Legality: inside the outline, no overlaps, 0.5–1.5 mm channels between parts, ≥0.6 mm between pads, ≥ copper-to-edge + 0.3 mm from the edge. Parts outside / overlapping are first placed constructively by connectivity (ICs first, the rest near their strongest neighbors), then refined by annealing.
 - Affinity: passives sharing nets with an IC sit at the matching pins. Capacitors sharing two nets (boost / buck in-out caps, decoupling) weigh most, inductors / diodes (switch node) next, resistors least; decoupling caps must also be near power pins, crystals near the MCU.
 - Aesthetics and balance: neighboring small parts of a kind share orientation and line up in rows; without fixed parts the layout is centered rather than piled on one side.
-- Connectors: at the edge, facing outward (judged from pad centroid vs body center).
-- Antennas: the pad-free end of an RF module is treated as the antenna area with a 5 mm keep-out, pushed toward the edge.
+- Connectors: explicit horizontal/vertical mounting and local mating direction take precedence; otherwise placement uses conservative name/geometry heuristics. Check inferred directions before routing.
+- Antennas: recognized RF modules with substantial pad-free overhangs get protected regions. Existing antenna placements are preserved during automatic optimization; inferred geometry is not a substitute for a datasheet keep-out.
 - Interference: crystals / analog parts away from switching and driver parts.
 
 When the original placement is legal, the suggestion is verified by a trial autoroute and shown only if routing does not get worse; when it is illegal (outside / overlapping), a routable cleanup is offered directly.
 
 ## Fab rules (DRC) vs. JLCPCB capabilities
 
-The `jlc` / `jlcpcb` rule sets follow JLC's public capability page ([www.jlc.com/portal/vtechnology.html](https://www.jlc.com/portal/vtechnology.html), checked 2026-09) with margin over the fab limits:
+The bundled `jlc` / `jlcpcb` rule sets use the reference values below with conservative defaults. Check the manufacturer's current [capabilities](https://www.jlc.com/portal/vtechnology.html) for your order; this table is not a live capability feed:
 
 | Item | JLC limit / recommendation | Tracelet default |
 |---|---|---|
@@ -71,7 +102,7 @@ Solder-mask dams (0.1 mm), slots, castellated holes and gold fingers are not cov
 ```
 packages/kernel   headless kernel: data model, commands (undo/redo), connectivity/netlist, ERC, schematic→PCB sync, ratsnest, DRC, export
 packages/db       PostgreSQL schema (Drizzle)
-apps/web          React + Vite editor (home / schematic / PCB / 3D / library / BOM / fab)
+apps/web          React + Vite editor (home / schematic / PCB / 3D / library / BOM / fab / testing / assembly)
 apps/cli          tracelet CLI + MCP server, shares the kernel with the web app
 apps/server       remote storage server (Hono REST; PostgreSQL or JSON files) for small teams to self-host
 scripts/          KiCad standard 3D model → GLB conversion (models in apps/web/public/models3d)
@@ -101,18 +132,19 @@ pnpm cli footprint gen demo.eda.json LQFP-48_7x7mm_P0.5mm                       
 - PCB: 45° routing, via layer changes, zones (avoid other-net copper, drop islands), ratsnest, live DRC, layer visibility and opacity
 - Fab: Gerber RS-274X (copper / mask / paste / silk / outline) + Excellon (PTH / NPTH) + BOM + placement file + assembly PDF (top / bottom) + schematic PDF + README (process parameters) in one zip; an "Ordering guide" lists parameters and popular vendors (no redirects); Gerber preview renders the exported files through a third-party parser (tracespace)
 - Library: built-in parts catalog searchable by part number / specs, 42 category icons for filtering; All / Project / Favorites / Parts tabs; KiCad library import (`.kicad_sym` multi-symbol / multi-unit / derived symbols, `.kicad_mod`); parametric footprints (0201–2512 SMD, SOIC/TSSOP, LQFP, QFN, DIP, headers / sockets, SOT-23); KiCad-style footprint names (e.g. `LQFP-48_7x7mm_P0.5mm`) get real geometry on import and sync
+- Part details: any library item opens a detail dialog — specs, pin list, symbol / footprint / 3D-sketch appearance all rendered locally (no external images), plus an optional reference price. Online pricing is off by default; once enabled it queries the JLC / LCSC assembly library (stock and price breaks, cached locally for 24 h) and falls back to similar parts when the exact part number is not stocked. Other distributors (Digi-Key, Mouser, Farnell, TME, Octopart …) are search links only — direct API access is not implemented here. The source URL, the on/off switch and the cache live behind the ⫶ button at the bottom of the left toolbar; any endpoint answering the same shape (e.g. your own proxy) can replace the default
 - Templates: ESP32 minimal system / STM32F103 minimal system / Arduino UNO shield, one click to schematic + pre-placed PCB
 - Guide: the top-bar guide shows progress and one-click actions step by step (schematic: place → wire → ERC → sync; PCB: outline → placement → mounting holes → routing → pour GND → DRC → silkscreen → 3D → export)
 - Inventory: track parts on hand (part number / value / symbol / footprint / qty / location), CSV in / out, place directly
-- Import: KiCad 6/7/8 projects (several `.kicad_sch` = several sheets, `.kicad_pcb`); EasyEDA Standard JSON (File → Export → EasyEDA source: schematic / PCB / symbols / footprints; Pro users export Standard or KiCad first); Altium .SchDoc / .PcbDoc; symbols / footprints are saved with the project; project backup zip in / out
+- Import: KiCad S-expression projects (`.kicad_sch` / `.kicad_pcb`; version-specific features may be approximated or omitted) (several `.kicad_sch` = several sheets, `.kicad_pcb`); EasyEDA Standard JSON (File → Export → EasyEDA source: schematic / PCB / symbols / footprints; Pro users export Standard or KiCad first); Altium .SchDoc / .PcbDoc; symbols / footprints are saved with the project; project backup zip in / out
 - Schematic extras: multiple sheets and sheet templates (A5–A1 / custom size, editable title block text and labels), buses, junctions, graphic notes (all draggable), measure, copy / paste, ⌥-drag duplicate, custom properties, grid switching
-- PCB extras: box select, outline editing (rounded rectangles, polygons), trace vertex / segment dragging, live clearance check while routing, align / distribute, built-in autorouter (global shortest-first strict routing → soft-conflict probing with targeted rip-up → shove → via-in-pad candidates → fine-grid retry → 45° chamfer; layer direction preference, real geometric clearance validation; runs in a Web Worker with progress / cancel, preview before accept), hole tool (M2–M4 screw holes / plated holes), board-only footprints (mounting holes / fiducials / logos) placed directly, resize / drag the whole board / fit to content, status-bar grid / trace width / via selection, stackup and process parameters (thickness, copper, finish, mask / silk colors), part search / hide, clear routing tool, trace length statistics
+- PCB extras: box select, outline editing (rounded rectangles, polygons, edge notches), rulers and drag alignment snapping, trace vertex / segment dragging, live clearance check while routing, align / distribute, built-in autorouter (global shortest-first strict routing → soft-conflict probing with targeted rip-up → shove → via-in-pad candidates → fine-grid retry → 45° chamfer; layer direction preference, real geometric clearance validation; runs in a Web Worker with progress / cancel, preview before accept), hole tool (M2–M4 screw holes / plated holes), board-only footprints (mounting holes / fiducials / logos) placed directly, resize / drag the whole board / fit to content, status-bar grid / trace width / via selection, stackup and process parameters (thickness, copper, finish, mask / silk colors), part search / hide, clear routing tool, trace length statistics
 - Gestures: trackpad two-finger pan / pinch zoom (wheel zoom optional), right-click or two-finger tap to end the current action
 - 3D: Three.js real geometry (board with holes, pads, traces, zones, silk) + KiCad standard-library 3D models (244 common footprints converted to GLB, matched by footprint name; import your own GLB, convert STEP with KiCad / FreeCAD first), screenshot PNG / export GLB, click to select on the PCB
 - Zones: thermal reliefs (gap and spoke width adjustable) or solid connections, reflected in Gerber
-- URLs: `/p/<projectId>/sch/<sheetId>`, `/p/<projectId>/pcb|3d|lib|bom|fab`; reload and shared links return to the same place
+- URLs: `/p/<projectId>/sch/<sheetId>`, `/p/<projectId>/pcb|3d|lib|bom|fab|qc|asm`; reload and shared links return to the same place
 - AI assistant: with your own Anthropic API key the model reads the netlist / runs ERC and DRC / places and wires / autoroutes through kernel tools (all undoable); "Reference designs" searches vendor dev-board schematic PDFs (built-in catalog + web) → recognizes parts and connections → generates a new sheet; upload your own PDF / screenshot too
-- UI: dark / light / system; 简体中文 / English (`t()` dictionary plus a runtime fallback translator in `apps/web/src/i18n`)
+- UI: dark / light / system; 10 languages (see Highlights; `t()` dictionaries plus a runtime fallback translator in `apps/web/src/i18n`); language/theme controls sit in the top bar
 - CLI: `tracelet new -t | templates | erc | drc | review | sync | placement check|optimize | export gerber|zip|pdf|assembly | import kicad|altium|easyeda|lib | footprint gen`, exit codes usable in CI
 
 ## MCP server
@@ -127,7 +159,7 @@ Exposes the Tracelet kernel to MCP clients such as Claude Code / Claude Desktop 
 claude mcp add tracelet -- pnpm --dir /path/to/tracelet cli serve --mcp --live
 ```
 
-Then in the web app: avatar menu → "Local agent (MCP live bridge)" → Enable (port 8790 by default, 127.0.0.1 only). Once the top bar shows "✨ Agent connected", the agent operates on your open project by id: `list_open_projects` lists `prj_xxx`, `use_project` selects it (auto-selected when only one is open), and every tool then acts in the browser as an undoable "Agent edit"; `undo` is forwarded to the browser; `new_project` / `new_from_template` without `file` open directly in the browser. Works with local and remote storage.
+Then in the web app: avatar menu → "Local agent (MCP live bridge)" → Enable (port 8790 by default, 127.0.0.1 only). Once the top bar shows "✨ Agent connected", the agent operates on your open project by id: `list_open_projects` lists `prj_xxx`, `use_project` selects it (auto-selected when only one is open), and editing tools then act in the browser as an undoable "Agent edit"; `undo` is forwarded to the browser; `new_project` / `new_from_template` without `file` open directly in the browser. Works with local and remote storage.
 
 **2. A local file**
 

@@ -36,6 +36,10 @@ export const FootprintDefSchema = z.object({
   /** 本体 / courtyard 尺寸（mm，居中于原点） */
   /** 本体外框（mm）；x/y 为外框中心相对封装原点的偏移（KiCad 连接器原点常在 1 脚，不在本体中心） */
   body: z.object({ w: z.number(), h: z.number(), x: z.number().optional(), y: z.number().optional() }),
+  physicalBody: z.object({ w:z.number().positive(), h:z.number().positive(), x:z.number().optional(), y:z.number().optional() }).optional(),
+  provenance: z.object({ source:z.string(), datasheet:z.string().optional(), revision:z.string().optional(), verified:z.boolean().default(false) }).optional(),
+  connector: z.object({ mounting:z.enum(['horizontal','vertical']), direction:z.number().finite(), clearance:z.number().finite().nonnegative().default(3) }).optional(),
+  modelPlacement: z.object({ source:z.string(), offset:z.tuple([z.number(),z.number(),z.number()]), rotation:z.tuple([z.number(),z.number(),z.number()]), scale:z.tuple([z.number(),z.number(),z.number()]) }).optional(),
   pads: z.array(PadDefSchema),
   /** 元件高度（mm），用于 3D 占位 */
   height: z.number().default(1),

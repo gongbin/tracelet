@@ -79,7 +79,7 @@ describe('KiCad 项目导入', () => {
     const drc = runDrc(project.board, ruleSetOf(project));
     expect(drc.items.some((i) => i.rule === 'clearance')).toBe(false);
     expect(computeRatsnest(project.board, ruleSetOf(project)).total).toBeGreaterThan(0);
-    expect(exportFabFiles(project).length).toBeGreaterThan(10);
+    expect(exportFabFiles(project, { bom: false, pnp: false }).length).toBeGreaterThan(10);
     const again = parseProject(serializeProject(project));
     expect(again.library.symbols.length).toBe(4);
     expect(getSymbol(again.schematic.sheets[0].components[0].symbolId)).toBeTruthy();

@@ -73,6 +73,8 @@ export const SchComponentSchema = z.object({
   y: z.number(),
   rotation: z.number().default(0),
   mirror: z.boolean().default(false),
+  pinMap: z.record(z.string()).optional(),
+  textOffset: z.object({ ref:VecSchema, value:VecSchema }).optional(),
   props: z.record(z.string()).default({})
 });
 export type SchComponent = z.infer<typeof SchComponentSchema>;

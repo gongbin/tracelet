@@ -50,7 +50,12 @@ export const RULE_SETS: RuleSet[] = [
 export const ProjectSettingsSchema = z.object({
   unit: z.enum(['mm', 'mil']).default('mm'),
   ruleSetId: z.string().default('jlc'),
-  fab: z.string().default('嘉立创')
+  fab: z.string().default('嘉立创'),
+  manufacturing: z.object({
+    origin: z.object({ x: z.number().finite(), y: z.number().finite() }),
+    bottomRotation: z.enum(['top-view', 'bottom-view']),
+    includeDnp: z.boolean()
+  }).optional()
 });
 
 /** 项目内库：导入的符号 / 封装随项目文件一起保存。 */

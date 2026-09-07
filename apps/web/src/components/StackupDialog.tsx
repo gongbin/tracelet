@@ -1,3 +1,5 @@
+import { useT } from '../i18n/index.js';
+import { BOARD_COLOR_KEYS } from '../i18n/boardColors.js';
 import { AdvancedStackup } from './AdvancedStackup.js';
 import { LayerCountSelect } from '../components/LayerCountSelect.js';
 import { pcb, DEFAULT_STACKUP, copperLayers, LAYER_COLORS, type Stackup } from '@tracelet/kernel';
@@ -9,6 +11,7 @@ const MASK_HEX: Record<string, string> = { 绿: '#1E6B3A', 黑: '#2B2B2B', 白: 
 
 /** 层叠 / 工艺：层数、板厚、铜厚、表面处理、阻焊与丝印颜色。参数写入项目，3D 视图与制造 README 同步。 */
 export function StackupDialog({ close }: { close: () => void }) {
+  const t = useT();
   const project = useProject();
   const editor = useEditor();
   const app = useApp();
@@ -38,8 +41,8 @@ export function StackupDialog({ close }: { close: () => void }) {
             <span className="k">外层铜厚</span><div className="row" style={{ gap: 4 }}>{[0.5, 1, 2].map((oz) => <span key={oz} className={`chip mono${st.copperWeight === oz ? ' on' : ''}`} onClick={() => set({ copperWeight: oz })}>{oz} oz</span>)}</div>
             {b.copperCount > 2 && <><span className="k">内层铜厚</span><div className="row" style={{ gap: 4 }}>{[0.5, 1].map((oz) => <span key={oz} className={`chip mono${st.innerCopperWeight === oz ? ' on' : ''}`} onClick={() => set({ innerCopperWeight: oz })}>{oz} oz</span>)}</div></>}
             <span className="k">表面处理</span><select className="input" value={st.finish} onChange={(e) => set({ finish: e.target.value as Stackup['finish'] })}>{FINISH.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-            <span className="k">阻焊颜色</span><div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>{MASK.map((c) => <span key={c} className={`chip${st.maskColor === c ? ' on' : ''}`} style={{ gap: 6 }} onClick={() => set({ maskColor: c })}><span style={{ width: 10, height: 10, borderRadius: 2, background: MASK_HEX[c], display: 'inline-block', border: '1px solid rgba(255,255,255,.2)' }} />{c}</span>)}</div>
-            <span className="k">丝印颜色</span><div className="row" style={{ gap: 6 }}>{(['白', '黑', '黄'] as const).map((c) => <span key={c} className={`chip${st.silkColor === c ? ' on' : ''}`} onClick={() => set({ silkColor: c })}>{c}</span>)}</div>
+            <span className="k">{t('fab.mask')}</span><div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>{MASK.map((c) => <span key={c} className={`chip${st.maskColor === c ? ' on' : ''}`} style={{ gap: 6 }} onClick={() => set({ maskColor: c })}><span style={{ width: 10, height: 10, borderRadius: 2, background: MASK_HEX[c], display: 'inline-block', border: '1px solid rgba(255,255,255,.2)' }} />{t(BOARD_COLOR_KEYS[c])}</span>)}</div>
+            <span className="k">{t('fab.silk')}</span><div className="row" style={{ gap: 6 }}>{(['白', '黑', '黄'] as const).map((c) => <span key={c} className={`chip${st.silkColor === c ? ' on' : ''}`} onClick={() => set({ silkColor: c })}>{t(BOARD_COLOR_KEYS[c])}</span>)}</div>
             <span className="k">材料</span><div className="row" style={{ gap: 4 }}>{['FR-4', 'FR-4 高 Tg', '铝基板', 'Rogers'].map((m) => <span key={m} className={`chip${st.material === m ? ' on' : ''}`} onClick={() => set({ material: m })}>{m}</span>)}</div>
             <span className="k">其他</span><div className="col" style={{ gap: 6 }}><label className="row" style={{ gap: 8, cursor: 'pointer' }} onClick={() => set({ impedance: !st.impedance })}><span className={`check${st.impedance ? ' on' : ''}`}>{st.impedance ? '✓' : ''}</span>阻抗控制（写入 README，下单时勾选）</label><label className="row" style={{ gap: 8, cursor: 'pointer' }} onClick={() => set({ viaTenting: !st.viaTenting })}><span className={`check${st.viaTenting ? ' on' : ''}`}>{st.viaTenting ? '✓' : ''}</span>过孔盖油</label></div>
           </div>

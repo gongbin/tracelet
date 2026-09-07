@@ -1,3 +1,4 @@
+import { manufacturingBoard, validateAssembly } from './manufacturing.js';
 import { viaLayers, viaSpan, validateVia, backdrillDepth } from '../board/via.js';
 import { estimateImpedance } from '../board/impedance.js';
 /**
@@ -27,7 +28,7 @@ const num = (v: number) => Math.round(v * 1e6).toString();
 const XY = (p: Vec) => `X${num(p.x)}Y${num(-p.y)}`;
 const f3 = (v: number) => v.toFixed(3).replace(/0+$/, '').replace(/\.$/, '.0');
 
-class GerberWriter {
+export class GerberWriter {
   private lines: string[] = [];
   private apertures = new Map<string, number>();
   private apLines: string[] = [];
@@ -164,14 +165,17 @@ export function exportExcellon(board: Board, plated: boolean): string {
   return L.join('\n');
 }
 
-export interface FabFile { name: string; content: string; kind: 'gerber' | 'drill' | 'bom' | 'pnp' | 'netlist' | 'project' | 'readme' | 'pdf' }
+export interface FabFile { name: string; content: string; kind: 'gerber' | 'drill' | 'bom' | 'pnp' | 'netlist' | 'project' | 'readme' | 'pdf' | 'manifest' }
 
 const slugOf = (name: string) => name.replace(/[^\w一-龥-]+/g, '-').replace(/^-|-$/g, '') || 'board';
 
 /** 全套制造文件（嘉立创/JLCPCB 可识别的 Protel 扩展名）。 */
 export function exportFabFiles(project: Project, opts: { bom?: boolean; pnp?: boolean; netlist?: boolean; project?: boolean; assemblyPdf?: boolean; schematicPdf?: boolean } = {}): FabFile[] {
-  const board = project.board, rules = ruleSetOf(project), s = slugOf(project.name);
+  const board = manufacturingBoard(project), rules = ruleSetOf(project), s = slugOf(project.name);
   const files: FabFile[] = [];
+  const assemblyIssues = validateAssembly(project);
+  if ((opts.bom !== false || opts.pnp !== false) && assemblyIssues.length) throw new Error(assemblyIssues.map(i=>`${i.code}: ${i.refs.join(', ')}`).join('; '));
+  files.push({name:`${s}-manufacturing.json`,kind:'manifest',content:JSON.stringify({origin:project.settings.manufacturing?.origin ?? {x:0,y:0},units:'mm',xy:'top view, X right, Y up; all Gerbers, drills and placement use this origin',bottomRotation:project.settings.manufacturing?.bottomRotation ?? 'top-view',rotation:'Degrees counterclockwise; top-view = -board rotation, bottom-view = 180 - board rotation; normalized 0..360. Confirm machine zero with assembler.',includeDnp:project.settings.manufacturing?.includeDnp ?? false,assemblyIssues},null,2)});
   for(const v of board.vias) { const errors=validateVia(board,v); if(errors.length)throw new Error(`${v.id}: ${errors.join('; ')}`); }
   const drillGroups=new Map<string, Board['vias']>();
   for(const v of board.vias) if(viaSpan(board,v).length!==board.copperCount) {

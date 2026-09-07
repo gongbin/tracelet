@@ -1,3 +1,4 @@
+import { footprintDef } from './geometry.js';
 import { withUsbEdgeConstraints } from './usbPlacement.js';
 /**
  * 布局检查与优化：在自动布线之前，按"连接关系、远近、信号干扰、空间均衡、最小间距、对齐"给出问题清单，
@@ -75,7 +76,7 @@ function crystalPairs(c: Ctx): { xtal: BoardFootprint; ic: BoardFootprint }[] {
 const PASSIVE_RE = /^(R|C|L|D|FB|Z|ZD|LED)\d/i;
 const isPassive = (f: BoardFootprint, byFp: Map<string, WorldPad[]>) => PASSIVE_RE.test(f.ref) && (byFp.get(f.id)?.length ?? 0) <= 3;
 const typeOf = (f: BoardFootprint) => (/^C\d/i.test(f.ref) ? 'C' : /^R\d/i.test(f.ref) ? 'R' : /^L\d/i.test(f.ref) ? 'L' : /^(D|LED)\d/i.test(f.ref) ? 'D' : '');
-const isPlugConnector = (f: BoardFootprint) => f.placement?.role === 'connector' || /^(J|P|CN|USB|X)\d/i.test(f.ref);
+const isPlugConnector = (f: BoardFootprint) => footprintDef(f).connector?.mounting === 'vertical' ? false : footprintDef(f).connector?.mounting === 'horizontal' || f.placement?.role === 'connector' || /^(J|P|CN|USB|X)\d/i.test(f.ref);
 const ANTENNA_RE = /(ant|antenna|wroom|wrover|esp32|esp8266|esp-|wifi|ble|nrf|rf|lora|zigbee|gnss|gps|module)/i;
 
 /**

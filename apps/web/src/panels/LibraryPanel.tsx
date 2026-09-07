@@ -8,6 +8,7 @@ import { I } from '../icons.js';
 import { CategoryFilter } from '../components/CategoryFilter.js';
 import { SymbolThumb, FootprintThumb } from '../components/Thumbs.js';
 import { FootprintGenerator } from '../components/FootprintGenerator.js';
+import { PartDetail, type PartDetailTarget } from '../components/PartDetail.js';
 import { usePartsStore, DEFAULT_PARTS_URL } from '../store/partsStore.js';
 import { useInventory, type InventoryItem } from '../store/inventory.js';
 import { downloadFile } from '../store/backup.js';
@@ -24,6 +25,9 @@ const symEntry = (s: SymbolDef): Entry => ({ id: s.id, name: s.name, maker: s.so
 const invEntry = (i: InventoryItem): Entry => ({ id: i.id, name: i.name, maker: i.location ? `库存 · ${i.location}` : '我的库存', kind: i.value || '元件', description: i.note ?? '', symbolId: i.symbolId || undefined, footprintId: i.footprintId, value: i.value || i.name, params: `数量 ${i.qty}${i.lcsc ? ` · LCSC ${i.lcsc}` : ''}${findFootprint(i.footprintId) ? ` · 封装 ${findFootprint(i.footprintId)!.name}` : i.footprintId ? ` · 封装 ${i.footprintId}` : ''}`, inv: i, source: 'inventory' });
 const fpEntry = (f: FootprintDef, source: Entry['source']): Entry => ({ id: f.id, name: f.name, maker: source === 'generated' ? '参数化' : f.id.startsWith('fp:kicad') ? 'KiCad' : source === 'footprint' ? '项目' : '内置', kind: '封装', description: f.description, footprintId: f.id, value: f.name, params: `${f.pads.length} 焊盘 · ${f.body.w}×${f.body.h} mm`, source });
 
+/** 库条目 → 详情页数据。 */
+const detailTarget = (e: Entry): PartDetailTarget => ({ name: e.name, maker: e.maker, kind: e.kind, category: e.part?.category, description: e.description, value: e.value, params: e.params, symbolId: e.symbolId, footprintId: e.footprintId, lcsc: e.part?.lcsc ?? e.inv?.lcsc, part: e.part, mpn: e.part?.mpn ?? e.name });
+
 export function LibraryPanel() {
   const app = useApp();
   const project = useProject();
@@ -31,6 +35,7 @@ export function LibraryPanel() {
   const [cat, setCat] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('all');
   const [gen, setGen] = useState(false);
+  const [detail, setDetail] = useState<Entry | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const csvRef = useRef<HTMLInputElement>(null);
   const inventory = useInventory();
@@ -68,6 +73,12 @@ export function LibraryPanel() {
     app.toast(`点击板面放置 ${e.name}（仅板级封装，R 旋转，右键 / Esc 结束）`);
   };
   const primary = (e: Entry) => (onPcb || !e.symbolId ? placeFootprint(e) : placeSymbol(e));
+  const addToInventory = (e: Entry) => {
+    const qty = Number(prompt(`「${e.name}」库存数量`, '10') ?? 0) || 0;
+    const location = prompt('存放位置（可空）', '') ?? '';
+    inventory.add({ name: e.name, value: e.value, symbolId: e.symbolId ?? '', footprintId: e.footprintId, lcsc: e.part?.lcsc ?? e.inv?.lcsc, qty, location: location || undefined });
+    app.toast('已加入我的库存', 'success'); setTab('inv');
+  };
 
   const importFiles = async (files: File[]) => {
     const symbols: SymbolDef[] = [], footprints: FootprintDef[] = [], warnings: string[] = [];
@@ -152,8 +163,9 @@ export function LibraryPanel() {
           <div className="row" style={{ gap: 6 }}>
             {sel.symbolId && <button className="btn primary grow" style={{ height: 30, justifyContent: 'center' }} onClick={() => placeSymbol(sel)}>{onPcb ? '放到原理图' : '放置'} <span className="mono" style={{ opacity: .7 }}>⏎</span></button>}
             {findFootprint(sel.footprintId) && <button className={`btn ${sel.symbolId ? '' : 'primary grow'}`} style={{ height: 30, justifyContent: 'center' }} title="仅板级封装：不出现在原理图 / BOM" onClick={() => placeFootprint(sel)}>{sel.symbolId ? '仅封装放到板上' : '放到板上'}</button>}
+            <button className="btn" style={{ height: 30 }} title="参数 / 外观 / 引脚 / 参考价" onClick={() => setDetail(sel)}>详情</button>
             {sel.source !== 'builtin' && sel.source !== 'inventory' && <button className="btn" style={{ height: 30 }} title="从项目库移除" onClick={() => { editor.dispatch(lib.removeLibraryItems([sel.id])); app.toast('已从项目库移除（可 Undo）'); }}>移除</button>}
-            {sel.source !== 'inventory' && <button className="btn" style={{ height: 30 }} title="记录到我的库存（数量 / 位置）" onClick={() => { const qty = Number(prompt(`「${sel.name}」库存数量`, '10') ?? 0) || 0; const location = prompt('存放位置（可空）', '') ?? ''; inventory.add({ name: sel.name, value: sel.value, symbolId: sel.symbolId ?? '', footprintId: sel.footprintId, lcsc: sel.part?.lcsc, qty, location: location || undefined }); app.toast('已加入我的库存', 'success'); setTab('inv'); }}>+ 库存</button>}
+            {sel.source !== 'inventory' && <button className="btn" style={{ height: 30 }} title="记录到我的库存（数量 / 位置）" onClick={() => addToInventory(sel)}>+ 库存</button>}
           </div>
           {sel.inv && <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
             <span className="row mono xs" style={{ gap: 4 }}>数量<input className="input mono" style={{ width: 60, height: 22 }} key={sel.inv.qty} defaultValue={sel.inv.qty} onBlur={(e) => inventory.update(sel.inv!.id, { qty: Number(e.target.value) || 0 })} onKeyDown={(e) => e.stopPropagation()} /></span>
@@ -164,6 +176,15 @@ export function LibraryPanel() {
           </div>}
         </div>
       )}
+      {detail && <PartDetail
+        target={detailTarget(detail)}
+        close={() => setDetail(null)}
+        favorite={app.favorites.includes(detail.id)}
+        onFavorite={() => app.toggleFavorite(detail.id)}
+        onPlaceSymbol={detail.symbolId ? () => placeSymbol(detail) : undefined}
+        onPlaceFootprint={findFootprint(detail.footprintId) ? () => placeFootprint(detail) : undefined}
+        onInventory={detail.source !== 'inventory' ? () => addToInventory(detail) : undefined}
+      />}
       {gen && <FootprintGenerator close={() => setGen(false)} />}
     </div>
   );

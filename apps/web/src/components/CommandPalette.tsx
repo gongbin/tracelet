@@ -29,6 +29,8 @@ export function CommandPalette() {
         { id: 'go-pcb', label: '打开 PCB', hint: '⌘2', kind: 'cmd', run: goto('pcb') },
         { id: 'go-3d', label: '打开 3D 视图', hint: '⌘3', kind: 'cmd', run: goto('3d') },
         { id: 'go-fab', label: '制造与导出', kind: 'cmd', run: goto('fab') },
+        { id: 'go-qc', label: '质检（万用表检测流程）', kind: 'cmd', run: goto('qc') },
+        { id: 'go-asm', label: '装配（手工回流焊步骤）', kind: 'cmd', run: goto('asm') },
         { id: 'go-bom', label: '查看 BOM', kind: 'cmd', run: goto('bom') },
         { id: 'sync', label: '同步原理图到 PCB', kind: 'cmd', run: () => { close(); ed.dispatch(pcb.syncFromSchematic()); app.go('pcb'); app.toast('已同步到 PCB', 'success'); } },
         { id: 'undo', label: `撤销${ed.undoLabel ? ' · ' + ed.undoLabel : ''}`, hint: '⌘Z', kind: 'cmd', run: () => { close(); ed.undo(); } },

@@ -1,6 +1,6 @@
 import { relativeTime } from '../i18n/format.js';
 import { AppearanceControls } from './AppearanceControls.js';
-import { pcb, sch, diffBoardFromSchematic, syncBoardDetailed, exportSchematicPdf, exportAssemblyPdf } from '@tracelet/kernel';
+import { sch, diffBoardFromSchematic, exportSchematicPdf, exportAssemblyPdf } from '@tracelet/kernel';
 import { exportProjectFile, backupAllProjects, downloadFile, slug, importProjectFiles } from '../store/backup.js';
 import { useRef } from 'react';
 import { useApp, useEditor, useProject, type Screen } from '../store/app.js';
@@ -12,8 +12,8 @@ import { PrefsMenu } from './PrefsMenu.js';
 import { useBridge } from '../store/bridge.js';
 import { GuidePanel } from '../panels/GuidePanel.js';
 
-const TABS: { id: Screen; key: 'ws.sch' | 'ws.pcb' | 'ws.3d' | 'ws.lib' | 'ws.bom' | 'ws.fab' }[] = [
-  { id: 'sch', key: 'ws.sch' }, { id: 'pcb', key: 'ws.pcb' }, { id: '3d', key: 'ws.3d' }, { id: 'lib', key: 'ws.lib' }, { id: 'bom', key: 'ws.bom' }, { id: 'fab', key: 'ws.fab' }
+const TABS: { id: Screen; key: 'ws.sch' | 'ws.pcb' | 'ws.3d' | 'ws.lib' | 'ws.bom' | 'ws.fab' | 'ws.qc' | 'ws.asm' }[] = [
+  { id: 'sch', key: 'ws.sch' }, { id: 'pcb', key: 'ws.pcb' }, { id: '3d', key: 'ws.3d' }, { id: 'lib', key: 'ws.lib' }, { id: 'bom', key: 'ws.bom' }, { id: 'fab', key: 'ws.fab' }, { id: 'qc', key: 'ws.qc' }, { id: 'asm', key: 'ws.asm' }
 ];
 
 /** 导出 PDF 时把头像里的姓名填进没写作者的图纸 */
@@ -32,14 +32,6 @@ export function TopBar() {
   const bridgeStatus = useBridge((b) => b.status);
   const pendingSync = screen === 'pcb' && (() => { const d = diffBoardFromSchematic(project); return d.added.length + d.removed.length > 0; })();
 
-  const sync = () => {
-    const d = diffBoardFromSchematic(project);
-    const detail = syncBoardDetailed(project);
-    editor.dispatch(pcb.syncFromSchematic());
-    toast(`已同步到 PCB：新增 ${d.added.length}，删除 ${d.removed.length}，更新 ${d.updated.length}${detail.mapped.length ? `；${detail.mapped.length} 个 KiCad 封装已映射为内置封装` : ''}`, 'success');
-    if (detail.placeholders.length) toast(`${detail.placeholders.length} 个元件没有可用封装，已生成占位封装（${detail.placeholders.slice(0, 4).join('、')}${detail.placeholders.length > 4 ? '…' : ''}），请在属性面板替换`);
-    go('pcb');
-  };
 
   return (
     <div className="topbar">
@@ -79,9 +71,6 @@ export function TopBar() {
           <button key={tab.id} className={`ws-tab${screen === tab.id ? ' on' : ''}`} onClick={() => go(tab.id)}>{t(tab.key)}{tab.id === 'sch' && pendingSync && <span className="badge" />}</button>
         ))}
       </div>
-      {screen === 'sch' && (
-        <button className="btn quiet topbar-sync" style={{ marginLeft: 6 }} onClick={sync}><Icon d={I.arrow} size={13} stroke={2} />{t('ws.sync')}</button>
-      )}
       <button className={`guide-btn ml-auto${guideOpen ? ' on' : ''}`} title={`${t('tab.guide')} · 分步完成一块板`} onClick={() => set('guideOpen', !guideOpen)}><Icon d={I.guide} size={15} stroke={1.8} /></button>
       {guideOpen && <>
         <div className="guide-backdrop" onPointerDown={() => set('guideOpen', false)} />

@@ -1,6 +1,7 @@
+import { ProductRender } from './ProductRender.js';
 import { viaSpan, viaLayers, copperDepths, backdrillDepth } from '@tracelet/kernel';
 import { copperLayers, type CopperLayer } from '@tracelet/kernel';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -101,8 +102,8 @@ function buildScene(project: Project, s: View3dState, selection: string[], model
     const root = new THREE.Group();
     if (loaded && config) root.add(modelInstance(loaded, config));
     else {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(def.body.w, def.body.h, h), new THREE.MeshStandardMaterial({ color: 0x9aa1ad, roughness: .7 }));
-      m.position.set(def.body.x ?? 0, -(def.body.y ?? 0), h / 2); root.add(m); // 本体中心偏移（连接器原点常在 1 脚）
+      const m = new THREE.Mesh(new THREE.BoxGeometry((def.physicalBody??def.body).w, (def.physicalBody??def.body).h, h), new THREE.MeshStandardMaterial({ color: 0x9aa1ad, roughness: .7 }));
+      m.position.set((def.physicalBody??def.body).x ?? 0, -((def.physicalBody??def.body).y ?? 0), h / 2); root.add(m); // 本体中心偏移（连接器原点常在 1 脚）
     }
     root.position.set(X(f.x), Y(f.y), f.side === 'F' ? T + .015 : -.015);
     root.rotation.z = -f.rotation * Math.PI / 180;
@@ -119,6 +120,7 @@ export function ThreeView() {
   const project = useProject();
   const app = useApp();
   const s3 = use3d();
+  const [productRender,setProductRender]=useState(false);
   const [matching, setMatching] = useState(false);
   const [models, setModels] = useState<Map<string, THREE.Group>>(new Map());
   const [failed, setFailed] = useState<string[]>([]);
@@ -206,6 +208,7 @@ export function ThreeView() {
   const missingCount = parts.filter(f => !modelFor(f, board)).length;
   const failedCount = parts.filter(f => { const m = modelFor(f, board); return m && failed.includes(m.source); }).length;
   const pendingCount = parts.length - loadedCount - missingCount - failedCount;
+  const buildProduct=useCallback(()=>buildScene(project,{...s3,components:true,mask:true,copper:false,silk:true},[],models).group,[project,s3,models]);
   return (
     <div className="canvas-wrap" style={{ background: 'radial-gradient(ellipse at 50% 40%,#2A2F38,#1A1D23 70%)' }}>
       {ok ? <div ref={host} style={{ position: 'absolute', inset: 0 }} /> : <div className="empty-state"><div className="muted">当前环境不支持 WebGL，无法显示 3D 视图</div></div>}
@@ -216,6 +219,8 @@ export function ThreeView() {
       <div className="float" style={{ left: 12, top: 12, fontFamily: 'var(--font-ui)', fontSize: 12, padding: '6px 10px' }}>
         <span>{loadedCount} 个元件模型已加载{pendingCount > 0 && ` · ${pendingCount} 个加载中`}{missingCount > 0 && ` · ${missingCount} 个未匹配`}{failedCount > 0 && ` · ${failedCount} 个加载失败`}</span><button className="btn sm" onClick={() => setMatching(true)}>模型匹配</button>
       </div>
+      <button className="btn float" style={{right:12,top:90}} onClick={()=>setProductRender(true)}>产品渲染 / Product render</button>
+      {productRender && <ProductRender build={buildProduct} name={project.name} missing={missingCount+failedCount+pendingCount} onClose={()=>setProductRender(false)}/>}
       {matching && <ModelMatcher close={() => setMatching(false)} />}
       <div className="float" style={{ right: 12, top: 52 }}><span className="dim">板</span><span>{bb.w.toFixed(1)}×{bb.h.toFixed(1)}×{board.thickness} mm</span><span className="dim">· 拖动旋转 · 滚轮缩放 · 右键平移</span></div>
     </div>

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { allParts, searchParts, findFootprint } from '@tracelet/kernel';
+import { allParts, searchParts, findFootprint, type Part } from '@tracelet/kernel';
 import { useApp } from '../store/app.js';
 import { CategoryFilter, iconUrl } from '../components/CategoryFilter.js';
 import { useT } from '../i18n/index.js';
 import { Pager, pageSlice } from '../components/Pager.js';
+import { PartDetail } from '../components/PartDetail.js';
 
 const PAGE = 48;
 
@@ -13,6 +14,7 @@ export function LibPage() {
   const [cat, setCat] = useState<string | null>(null);
   const t = useT();
   const [page, setPage] = useState(0);
+  const [detail, setDetail] = useState<Part | null>(null);
   const results = searchParts(q, allParts(), cat ?? undefined);
   const pg = pageSlice(results, page, PAGE);
   return (
@@ -23,17 +25,24 @@ export function LibPage() {
         <CategoryFilter value={cat} onChange={(c) => { setCat(c); setPage(0); }} onlyUsed={false} />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
           {pg.shown.map((p) => (
-            <div key={p.id} className="card col" style={{ padding: 14, gap: 6 }}>
+            <div key={p.id} className="card col" style={{ padding: 14, gap: 6, cursor: 'pointer' }} title="查看详情" onClick={() => setDetail(p)}>
               <div className="row"><span className="cat-icon" style={{ ['--icon' as string]: `url(${iconUrl(p.category)})`, color: 'var(--text-2)' }} /><div className="mono nowrap grow" style={{ fontWeight: 500 }}>{p.mpn}</div></div>
               <div className="muted small">{p.maker} · {p.kind} · {p.description}</div>
               <div className="mono xs muted">封装 {findFootprint(p.footprintId)?.name} · {p.pinCount} 引脚</div>
               <div className="row xs" style={{ marginTop: 4 }}><span className="muted">LCSC {p.lcsc}</span><span className="ml-auto">{p.price} · <span style={{ color: 'var(--success)' }}>{p.stock}</span></span></div>
-              <button className="btn sm primary" style={{ alignSelf: 'flex-start', marginTop: 4 }} onClick={() => { app.go('sch'); app.startPlacing({ symbolId: p.symbolId, value: p.value, footprint: p.footprintId, props: { mpn: p.mpn, lcsc: p.lcsc ?? '' }, rotation: 0, partLabel: p.mpn }); }}>{t('lib.place')}</button>
+              <button className="btn sm primary" style={{ alignSelf: 'flex-start', marginTop: 4 }} onClick={(e) => { e.stopPropagation(); app.go('sch'); app.startPlacing({ symbolId: p.symbolId, value: p.value, footprint: p.footprintId, props: { mpn: p.mpn, lcsc: p.lcsc ?? '' }, rotation: 0, partLabel: p.mpn }); }}>{t('lib.place')}</button>
             </div>
           ))}
         </div>
         <Pager page={pg.page} count={pg.count} total={results.length} onChange={setPage} />
       </div>
+      {detail && <PartDetail
+        target={{ name: detail.mpn, mpn: detail.mpn, maker: detail.maker, kind: detail.kind, category: detail.category, description: detail.description, value: detail.value, params: detail.params, symbolId: detail.symbolId, footprintId: detail.footprintId, lcsc: detail.lcsc, part: detail }}
+        close={() => setDetail(null)}
+        favorite={app.favorites.includes(detail.id)}
+        onFavorite={() => app.toggleFavorite(detail.id)}
+        onPlaceSymbol={() => { app.go('sch'); app.startPlacing({ symbolId: detail.symbolId, value: detail.value, footprint: detail.footprintId, props: { mpn: detail.mpn, lcsc: detail.lcsc ?? '' }, rotation: 0, partLabel: detail.mpn }); }}
+      />}
     </div>
   );
 }
