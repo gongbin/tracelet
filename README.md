@@ -8,6 +8,7 @@ A TypeScript headless kernel + web editor + CLI + MCP server, with an optional s
 
 ## Highlights
 
+- **Lightweight TypeScript EDA** — the application and EDA kernel are written in TypeScript. Build once and serve static files; everyday local design needs no desktop client, database or native EDA kernel installation.
 - **A complete browser workspace** — multi-sheet schematics, PCB editing, 3D, parts library, BOM, fabrication, guided assembly and testing in one project. Local storage by default; optional self-hosted shared storage.
 - **2-, 4- and 6-layer PCB design** — outline notches, rulers and alignment snapping, thermal-relief zones, configurable net classes, blind/buried vias and backdrill parameters.
 - **Placement and routing assistance** — previewable placement proposals with connector/antenna constraints; cancellable autorouting, paired differential search and length compensation within the supported routing cases.
@@ -16,6 +17,22 @@ A TypeScript headless kernel + web editor + CLI + MCP server, with an optional s
 - **Parts you can inspect** — source and datasheet records, pin mappings, physical outlines, connector orientation, model placement metadata, local part details and optional online reference pricing.
 - **Automation and presentation** — an undoable AI assistant, CLI and MCP live bridge; library 3D models, GLB export and separate product PNG rendering.
 - **A workspace for more devices and languages** — responsive navigation and panels, touch pan/zoom, dark/light/system themes, and 10 interface languages: English, Simplified/Traditional Chinese, Japanese, Korean, German, French, Spanish, Brazilian Portuguese and Hindi. Some legacy messages use fallback translation.
+
+## Lightweight: build and serve
+
+Tracelet delivers its design workspace as static web assets. Open the website and start designing locally, without first downloading a gigabyte-scale desktop installer or a complete offline component library. The application and EDA kernel use TypeScript; schematic, placement, routing and checking logic run in the browser, with autorouting in a Web Worker.
+
+For the production build at `57b17a6`, all files in `apps/web/dist` total approximately **25.4 MiB**, including bundled 3D models, icons and other assets. This is the uncompressed static output size, not the initial page download or runtime memory. It excludes development dependencies, project data and the optional backend; the size will change as the asset library grows.
+
+```bash
+pnpm install
+pnpm build
+pnpm --filter @tracelet/web preview  # Preview the production build locally
+```
+
+To publish the web app, serve `apps/web/dist` on a static host with SPA fallback to `index.html` for project routes. The static host needs no Node.js runtime or database; Node.js and pnpm are needed to build the project. Access it over HTTP(S), rather than opening `index.html` directly from disk.
+
+Local design and fabrication export do not require a backend. Shared remote storage, AI services and online pricing are optional and need their respective services or network access. Auxiliary tools such as 3D model conversion are not required for everyday browser use.
 
 ## Manufacturing, engineering and presentation
 
