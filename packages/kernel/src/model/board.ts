@@ -26,7 +26,13 @@ export const PadDefSchema = z.object({
   /** 通孔焊盘钻孔直径；0 表示贴片。 */
   drill: z.number().default(0),
   /** 非金属化孔（定位孔） */
-  npth: z.boolean().default(false)
+  npth: z.boolean().default(false),
+  /**
+   * 贴片焊盘落在**与封装相反**的那一面（如 Kailh 热插拔插座：本体从正面装、焊盘在背面焊）。
+   * 存"相对封装面"而不是绝对层名，封装翻面时才会跟着一起翻。
+   * 省略 = 与封装同面（绝大多数情况）。通孔焊盘忽略此项。
+   */
+  oppositeSide: z.boolean().optional()
 });
 export type PadDef = z.infer<typeof PadDefSchema>;
 
@@ -38,7 +44,13 @@ export const FootprintDefSchema = z.object({
   body: z.object({ w: z.number(), h: z.number(), x: z.number().optional(), y: z.number().optional() }),
   physicalBody: z.object({ w:z.number().positive(), h:z.number().positive(), x:z.number().optional(), y:z.number().optional() }).optional(),
   provenance: z.object({ source:z.string(), datasheet:z.string().optional(), revision:z.string().optional(), verified:z.boolean().default(false) }).optional(),
-  connector: z.object({ mounting:z.enum(['horizontal','vertical']), direction:z.number().finite(), clearance:z.number().finite().nonnegative().default(3) }).optional(),
+  /**
+   * Mating geometry. `direction` (footprint-local degrees, 0 = +x) is **optional and must
+   * never be guessed**: a connector whose opening faces inward is scrap, so it may only be
+   * declared by someone who knows the real part. `mounting: 'vertical'` mates off-board and
+   * therefore has no in-plane direction at all — that is a real answer, not a missing one.
+   */
+  connector: z.object({ mounting:z.enum(['horizontal','vertical']), direction:z.number().finite().optional(), clearance:z.number().finite().nonnegative().default(3) }).optional(),
   modelPlacement: z.object({ source:z.string(), offset:z.tuple([z.number(),z.number(),z.number()]), rotation:z.tuple([z.number(),z.number(),z.number()]), scale:z.tuple([z.number(),z.number(),z.number()]) }).optional(),
   pads: z.array(PadDefSchema),
   /** 元件高度（mm），用于 3D 占位 */
@@ -68,8 +80,18 @@ export const BoardFootprintSchema = z.object({
     target: z.object({ footprintId: z.string(), pad: z.string(), maxDistance: z.number().positive().default(3) }).optional(),
     edge: z.object({
       index: z.number().int().nonnegative(),
-      /** Mating direction in footprint-local degrees, before bottom-side mirroring. */
-      direction: z.number().finite().default(0),
+      /**
+       * Mating direction in footprint-local degrees, before bottom-side mirroring.
+       *
+       * **Absent means unknown, and unknown must never be filled in.** A connector whose
+       * opening faces inward is scrap, so this may only come from footprint metadata
+       * (`FootprintDef.connector`) that a human declared. It used to default to 0, which
+       * silently asserted "opening faces +x" for every connector without metadata — and
+       * `edgePlacementFits` then validated the placement against that same made-up value,
+       * so a wrong guess passed its own check. When it is absent the part is still pulled
+       * to the edge, but its rotation is locked and no orientation is asserted.
+       */
+      direction: z.number().finite().optional(),
       distance: z.number().nonnegative().default(2)
     }).optional()
   }).optional(),

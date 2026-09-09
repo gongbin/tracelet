@@ -30,14 +30,18 @@ export function edgePlacementFits(f: BoardFootprint, board: Board): boolean {
   const a = board.outline[edge.index], b = board.outline[(edge.index + 1) % board.outline.length];
   if (!a || !b || Math.hypot(b.x-a.x,b.y-a.y) < 1e-9) return false;
   const r = footprintBody(f), center = { x:r.x+r.w/2, y:r.y+r.h/2 };
-  const v = rotate({x:1,y:0}, edge.direction);
-  const direction = rotate({x:f.side === 'B' ? -v.x : v.x, y:v.y}, f.rotation);
   const area = board.outline.reduce((n,p,i) => {const q=board.outline[(i+1)%board.outline.length]; return n+p.x*q.y-q.x*p.y;},0);
   const length = Math.hypot(b.x-a.x,b.y-a.y);
   const outward = {x:(b.y-a.y)/length * Math.sign(area), y:-(b.x-a.x)/length * Math.sign(area)};
   const support = Math.abs(outward.x)*r.w/2 + Math.abs(outward.y)*r.h/2;
-  return direction.x*outward.x + direction.y*outward.y >= Math.cos(Math.PI/4)-1e-6
-    && pointSegDist(center,a,b) - support <= edge.distance + 1e-6;
+  const nearEnough = pointSegDist(center,a,b) - support <= edge.distance + 1e-6;
+  // Unknown mating direction: check the distance to the edge only. Validating a made-up
+  // direction is worse than not validating — it certifies whatever we guessed, and a
+  // connector whose opening faces inward is scrap.
+  if (edge.direction === undefined) return nearEnough;
+  const v = rotate({x:1,y:0}, edge.direction);
+  const direction = rotate({x:f.side === 'B' ? -v.x : v.x, y:v.y}, f.rotation);
+  return direction.x*outward.x + direction.y*outward.y >= Math.cos(Math.PI/4)-1e-6 && nearEnough;
 }
 
 /** Broad-phase sweep over conservative copper bounds of different components. */

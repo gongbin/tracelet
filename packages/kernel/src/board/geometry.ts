@@ -42,10 +42,12 @@ export function footprintPads(fp: BoardFootprint, board: Board): WorldPad[] {
   return def.pads.map((pad) => {
     const { center, rect } = padWorld(fp, pad);
     const through = pad.drill > 0;
+    // 贴片焊盘可以落在与封装相反的一面（热插拔插座之类），此时铜层要跟着翻
+    const padSide = pad.oppositeSide ? (fp.side === 'F' ? 'B' : 'F') : fp.side;
     return {
       footprintId: fp.id, ref: fp.ref, number: pad.number, def: pad, center, rect,
       net: fp.padNets[pad.number] ?? '',
-      layers: through ? all : [fp.side === 'F' ? 'F.Cu' : 'B.Cu'],
+      layers: through ? all : [padSide === 'F' ? 'F.Cu' : 'B.Cu'],
       through
     };
   });

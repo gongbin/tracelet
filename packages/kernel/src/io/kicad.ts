@@ -13,6 +13,8 @@ import { newId } from '../ids.js';
 import { type Vec, dist } from '../geometry.js';
 import { buildSchematicNetlist } from '../schematic/connectivity.js';
 import { getSymbol } from '../library/symbols.js';
+import { symbolTextPositions } from '../schematic/render.js';
+import { pinGeoms } from '../schematic/geometry.js';
 
 const MIL = 1000 / 25.4;
 const mil = (mm: number) => Math.round(mm * MIL * 100) / 100;
@@ -42,7 +44,7 @@ export function parseSymbolNodes(nodes: SList[]): Map<string, RawSymbol> {
     const props: Record<string, string> = {};
     for (const p of children(sym, 'property')) props[str(p[1])] = str(p[2]);
     const pinNames = child(sym, 'pin_names'), pinNumbers = child(sym, 'pin_numbers');
-    const raw: RawSymbol = { id: name, name, power: hasFlag(sym, 'power'), pinNamesHidden: !!pinNames && hasFlag(pinNames, 'hide'), pinNumbersHidden: !!pinNumbers && hasFlag(pinNumbers, 'hide'), units: new Map(), props };
+    const raw: RawSymbol = { id: name, name, power: hasFlag(sym, 'power') || ['global', 'local'].includes(str(child(sym, 'power')?.[1])), pinNamesHidden: !!pinNames && hasFlag(pinNames, 'hide'), pinNumbersHidden: !!pinNumbers && hasFlag(pinNumbers, 'hide'), units: new Map(), props };
     for (const sub of children(sym, 'symbol')) {
       const m = /_(\d+)_(\d+)$/.exec(str(sub[1]));
       const unit = m ? Number(m[1]) : 0, style = m ? Number(m[2]) : 1;
@@ -95,7 +97,7 @@ export function buildSymbolDef(raw: RawSymbol, unit: number, libId: string): Sym
         const base = { x: end.x + length * Math.cos(rad), y: end.y - length * Math.sin(rad) };
         const name = str(child(n, 'name')?.[1]), number = str(child(n, 'number')?.[1]);
         const side: PinSide = angle === 0 ? 'L' : angle === 180 ? 'R' : angle === 90 ? 'B' : 'T';
-        pins.push({ number, name: name === '~' ? number : name, side, offset: 0, length, type, at: end, dir: angle, hidden: hasFlag(n, 'hide'), _base: base });
+        pins.push({ number, name: name === '~' ? number : name, side, offset: 0, length, type, at: end, dir: angle, hidden: hasFlag(n, 'hide'), graphic: str(n[2]), nameSize: mil(num(child(child(child(child(n, 'name') ?? [], 'effects') ?? [], 'font') ?? [], 'size')?.[1], 1.27)), numberSize: mil(num(child(child(child(child(n, 'number') ?? [], 'effects') ?? [], 'font') ?? [], 'size')?.[1], 1.27)), _base: base });
       }
     }
   }
@@ -113,7 +115,7 @@ export function buildSymbolDef(raw: RawSymbol, unit: number, libId: string): Sym
     width: Math.max(1, Math.round((maxX - minX) * 100) / 100), height: Math.max(1, Math.round((maxY - minY) * 100) / 100),
     graphic: 'shapes', shapes: shapes2,
     pins: pins.map(({ _base, ...p }) => ({ ...p, at: sh(p.at!) })),
-    showPinNames: !raw.pinNamesHidden, power: raw.power, defaultValue: raw.props.Value ?? '', defaultFootprint: '', description: raw.props.Description ?? raw.props.ki_description ?? '', source: `kicad:${raw.name}`
+    showPinNames: !raw.pinNamesHidden, showPinNumbers: !raw.pinNumbersHidden, power: raw.power, defaultValue: raw.props.Value ?? '', defaultFootprint: '', description: raw.props.Description ?? raw.props.ki_description ?? '', source: `kicad:${raw.name}`
   };
   // 记录锚点（KiCad 原点）在局部框中的位置，供实例定位
   (def as unknown as { anchor: Vec }).anchor = sh({ x: 0, y: 0 });
@@ -143,7 +145,15 @@ export function importKicadSchematic(text: string, opts: { sheetName?: string; s
   const defFor = (libId: string, unit: number) => {
     const key = `sym:kicad:${libId}#u${unit}`;
     let d = defs.get(key);
-    if (!d) { const raw = raws.get(libId); if (!raw) return undefined; d = buildSymbolDef(raw, unit, key); defs.set(key, d); }
+    if (!d) {
+      const raw = raws.get(libId);
+      if (raw) d = buildSymbolDef(raw, unit, key);
+      else {
+        warnings.push({ where: libId, message: '缺少嵌入的库符号定义，保留占位器件；请在 KiCad 更新原理图中的符号后重新导入，不能推断引脚位置。' });
+        d = { id: key, name: libId, kind: '导入', prefix: 'U', width: 400, height: 400, graphic: 'box', pins: [], showPinNames: false, power: false, defaultValue: '', defaultFootprint: '', description: 'Missing embedded symbol definition', source: `kicad:${libId}`, anchor: { x: 200, y: 200 } };
+      }
+      defs.set(key, d);
+    }
     return d;
   };
   const components: SchComponent[] = [];
@@ -159,7 +169,22 @@ export function importKicadSchematic(text: string, opts: { sheetName?: string; s
     for (const p of children(inst, 'property')) props[str(p[1])] = str(p[2]);
     const placed = placeInstance(def, def.anchor ?? { x: 0, y: 0 }, P(at[1], at[2]), num(at[3]), mirror);
     const ref = props.Reference ?? def.prefix + '?';
-    components.push({ id: newId('c'), ref: def.power ? `#PWR${components.length + 1}` : ref, symbolId: def.id, value: props.Value ?? def.defaultValue, footprint: props.Footprint ? `fp:kicad:${props.Footprint.split(':').pop()}` : '', x: placed.x, y: placed.y, rotation: placed.rotation, mirror: placed.mirror, props: { ...props, ...(str(child(inst,'dnp')?.[1])==='yes'?{dnp:'true'}:{}), ...(str(child(inst,'in_bom')?.[1])==='no'?{exclude_from_bom:'true'}:{}), ...(str(child(inst,'on_board')?.[1])==='no'?{exclude_from_board:'true'}:{}), ...(props.Footprint ? { kicadFootprint: props.Footprint } : {}), ...(props.Datasheet && props.Datasheet !== '~' ? { datasheet: props.Datasheet } : {}) } });
+    components.push({ id: newId('c'), ref, symbolId: def.id, value: props.Value ?? def.defaultValue, footprint: props.Footprint ? `fp:kicad:${props.Footprint.split(':').pop()}` : '', x: placed.x, y: placed.y, rotation: placed.rotation, mirror: placed.mirror, props: { ...props, ...(!raws.has(libId) ? { unresolvedSymbol: libId } : {}), ...(str(child(inst,'dnp')?.[1])==='yes'?{dnp:'true'}:{}), ...(str(child(inst,'in_bom')?.[1])==='no'?{exclude_from_bom:'true'}:{}), ...(str(child(inst,'on_board')?.[1])==='no'?{exclude_from_board:'true'}:{}), ...(props.Footprint ? { kicadFootprint: props.Footprint } : {}), ...(props.Datasheet && props.Datasheet !== '~' ? { datasheet: props.Datasheet } : {}) } });
+    const c = components[components.length - 1];
+    const defaults = symbolTextPositions(c, def);
+    const styles = {} as NonNullable<SchComponent['textStyle']>;
+    const offsets = { ref: { x: 0, y: 0 }, value: { x: 0, y: 0 } };
+    for (const [key, property] of [['ref', 'Reference'], ['value', 'Value']] as const) {
+      const p = children(inst, 'property').find((p) => str(p[1]) === property);
+      const effects = p && child(p, 'effects');
+      const size = mil(num(child(child(effects ?? [], 'font') ?? [], 'size')?.[1], 1.27));
+      const justify = child(effects ?? [], 'justify');
+      const anchor = justify?.includes('left') ? 'start' : justify?.includes('right') ? 'end' : 'middle';
+      styles[key] = { size, hidden: !!p && (hasFlag(p, 'hide') || !!effects && hasFlag(effects, 'hide')), anchor };
+      const at = p && child(p, 'at');
+      if (at) offsets[key] = { x: mil(num(at[1])) - defaults[key].x, y: mil(num(at[2])) + size * 0.35 - defaults[key].y };
+    }
+    c.textStyle = styles; c.textOffset = offsets;
   }
   const wires: Wire[] = children(root, 'wire').map((w) => ({ id: newId('w'), points: children(child(w, 'pts') ?? [], 'xy').map((xy) => P(xy[1], xy[2])) })).filter((w) => w.points.length >= 2);
   const buses: Bus[] = children(root, 'bus').map((b) => ({ id: newId('b'), points: children(child(b, 'pts') ?? [], 'xy').map((xy) => P(xy[1], xy[2])) })).filter((b) => b.points.length >= 2);
@@ -167,9 +192,9 @@ export function importKicadSchematic(text: string, opts: { sheetName?: string; s
   for (const be of children(root, 'bus_entry')) { const at = child(be, 'at')!, sz = child(be, 'size')!; const a = P(at[1], at[2]); wires.push({ id: newId('w'), points: [a, { x: a.x + mil(num(sz[1])), y: a.y + mil(num(sz[2])) }] }); }
   const junctions: Junction[] = children(root, 'junction').map((j) => { const at = child(j, 'at')!; return { id: newId('j'), ...P(at[1], at[2]) }; });
   const labels: NetLabel[] = [];
-  for (const kind of ['label', 'global_label', 'hierarchical_label']) for (const l of children(root, kind)) { const at = child(l, 'at')!; labels.push({ id: newId('l'), text: str(l[1]).replace(/^\//, ''), ...P(at[1], at[2]) }); }
+  for (const kind of ['label', 'global_label', 'hierarchical_label']) for (const l of children(root, kind)) { const at = child(l, 'at')!; labels.push({ id: newId('l'), text: str(l[1]), ...P(at[1], at[2]) }); }
   const graphics: Graphic[] = [];
-  for (const t of children(root, 'text')) { const at = child(t, 'at')!; graphics.push({ id: newId('g'), kind: 'text', x: mil(num(at[1])), y: mil(num(at[2])), text: str(t[1]), size: 120 }); }
+  for (const t of children(root, 'text')) { const at = child(t, 'at')!; graphics.push({ id: newId('g'), kind: 'text', x: mil(num(at[1])), y: mil(num(at[2])), text: str(t[1]), size: mil(num(child(child(child(t, 'effects') ?? [], 'font') ?? [], 'size')?.[1], 1.27)) }); }
   for (const pl of children(root, 'polyline')) { const pts = children(child(pl, 'pts') ?? [], 'xy').map((xy) => P(xy[1], xy[2])); if (pts.length >= 2) graphics.push({ id: newId('g'), kind: 'line', points: pts }); }
   for (const r of children(root, 'rectangle')) { const s = child(r, 'start')!, e = child(r, 'end')!; graphics.push({ id: newId('g'), kind: 'rect', a: P(s[1], s[2]), b: P(e[1], e[2]) }); }
   const paper = str(child(root, 'paper')?.[1]);
@@ -177,6 +202,11 @@ export function importKicadSchematic(text: string, opts: { sheetName?: string; s
   const frame = { ...DEFAULT_FRAME, size: (['A4', 'A3', 'A2'].includes(paper) ? paper : 'A4') as 'A4', landscape: !(child(root, 'paper') && hasFlag(child(root, 'paper')!, 'portrait')), title: tb ? str(child(tb, 'title')?.[1]) : '', revision: tb ? str(child(tb, 'rev')?.[1]) || '1.0' : '1.0', company: tb ? str(child(tb, 'company')?.[1]) : '' };
   const symbols = [...defs.values()].map(({ anchor: _a, ...d }) => d as SymbolDef);
   registerSymbols(symbols);
+  const noConnects = children(root, 'no_connect').map((n) => { const at = child(n, 'at')!; return P(at[1], at[2]); });
+  for (const c of components) {
+    const pins = pinGeoms(c).filter((g) => noConnects.some((p) => dist(p, g.end) < 0.5)).map((g) => g.def.number);
+    if (pins.length) c.noConnectPins = pins;
+  }
   const sheet: Sheet = { id: opts.sheetId ?? newId('sheet'), name: opts.sheetName ?? (frame.title || '主图'), frame, components, wires, labels, junctions, buses, graphics };
   return { sheet, symbols, warnings };
 }
@@ -184,6 +214,23 @@ export function importKicadSchematic(text: string, opts: { sheetName?: string; s
 // ---------------- PCB ----------------
 
 const CU: Record<string, CopperLayer> = { 'F.Cu': 'F.Cu', 'B.Cu': 'B.Cu', 'In1.Cu': 'In1.Cu', 'In2.Cu': 'In2.Cu', 'In3.Cu': 'In3.Cu', 'In4.Cu': 'In4.Cu' };
+
+/**
+ * KiCad 5 的圆弧参数化：`(start 圆心) (end 起点) (angle 张角°)`——
+ * 与 KiCad 6+ 的三点式 `(start)(mid)(end)` 完全不同，`start` 的含义都不一样。
+ * 只认三点式的话，KiCad 5 板子的圆角会被静默丢掉，Edge.Cuts 的链就在圆角处断开，
+ * 板框退化成一条缝，于是所有器件都被判成"在板外"。
+ * 张角的符号与文件坐标系（y 向下）里的 atan2 方向一致，不需要翻转。
+ * 返回三点式参数，交给 arcPoints 展开。
+ */
+function kicad5Arc(center: Vec, from: Vec, degrees: number): [Vec, Vec, Vec] {
+  const rot = (t: number): Vec => ({
+    x: center.x + (from.x - center.x) * Math.cos(t) - (from.y - center.y) * Math.sin(t),
+    y: center.y + (from.x - center.x) * Math.sin(t) + (from.y - center.y) * Math.cos(t)
+  });
+  const th = (degrees * Math.PI) / 180;
+  return [from, rot(th / 2), rot(th)];
+}
 
 function arcPoints(start: Vec, mid: Vec, end: Vec, n = 8): Vec[] {
   // 三点圆
@@ -204,24 +251,49 @@ function arcPoints(start: Vec, mid: Vec, end: Vec, n = 8): Vec[] {
   return out;
 }
 
-/** 把 Edge.Cuts 的线段链接成闭合多边形。 */
+/**
+ * 把 Edge.Cuts 的线段链成闭合多边形，**取面积最大的那个环**。
+ *
+ * 原来是从文件里的第一条线段开始链、闭合就返回。可 Edge.Cuts 上除了板子外轮廓，
+ * 还有槽孔、开窗、安装孔环这些内部特征；只要文件里恰好把某个小特征写在前面，
+ * 板框就被读成那个小环。实测 tairakb（79 器件的键盘板）被读成 4×1.5mm 的一条缝，
+ * 而器件铺满 139×106mm —— 79 个器件全被判成"在板外"，基线布局必然非法。
+ *
+ * 板框是最外层的闭合环，挖孔在它里面，所以按面积取最大的那个。
+ */
 function chainOutline(segs: Vec[][]): Vec[] {
   if (!segs.length) return [];
   const rest = segs.map((s) => [...s]);
-  const poly = rest.shift()!;
   const tol = 0.01;
-  for (let guard = 0; rest.length && guard < 10000; guard++) {
-    const tail = poly[poly.length - 1];
-    let found = false;
-    for (let i = 0; i < rest.length; i++) {
-      const s = rest[i];
-      if (dist(s[0], tail) < tol) { poly.push(...s.slice(1)); rest.splice(i, 1); found = true; break; }
-      if (dist(s[s.length - 1], tail) < tol) { poly.push(...s.slice(0, -1).reverse()); rest.splice(i, 1); found = true; break; }
+  const loops: Vec[][] = [];
+  const open: Vec[][] = [];
+  while (rest.length) {
+    const poly = rest.shift()!;
+    for (let guard = 0; rest.length && guard < 10000; guard++) {
+      const tail = poly[poly.length - 1];
+      let found = false;
+      for (let i = 0; i < rest.length; i++) {
+        const s = rest[i];
+        if (dist(s[0], tail) < tol) { poly.push(...s.slice(1)); rest.splice(i, 1); found = true; break; }
+        if (dist(s[s.length - 1], tail) < tol) { poly.push(...s.slice(0, -1).reverse()); rest.splice(i, 1); found = true; break; }
+      }
+      if (!found) break;
     }
-    if (!found) break;
+    if (poly.length > 2 && dist(poly[0], poly[poly.length - 1]) < tol) { poly.pop(); loops.push(poly); }
+    else open.push(poly);
   }
-  if (poly.length > 2 && dist(poly[0], poly[poly.length - 1]) < tol) poly.pop();
-  return poly.map((p) => ({ x: Math.round(p.x * 1000) / 1000, y: Math.round(p.y * 1000) / 1000 }));
+  const area = (p: Vec[]) => Math.abs(p.reduce((n, q, i) => { const r = p[(i + 1) % p.length]; return n + q.x * r.y - r.x * q.y; }, 0)) / 2;
+  // 没有任何环闭合时，退回最长的那条链，交给调用方的兜底（按内容生成矩形板框）
+  const best = loops.length ? loops.reduce((a, b) => (area(b) > area(a) ? b : a))
+    : open.reduce((a, b) => (b.length > a.length ? b : a), open[0] ?? []);
+  // **自检：板框必须罩住所有 Edge.Cuts 几何。** 罩不住说明我们没读全（有不认识的图元、
+  // 或者链断在某处），这时返回空、让调用方按内容生成矩形板框，比返回一个错的小环强得多——
+  // 错的小环会让全板器件都被判成"在板外"，而且不会有任何报错。
+  const span = (ps: Vec[]) => ({ w: Math.max(...ps.map((q) => q.x)) - Math.min(...ps.map((q) => q.x)),
+                                 h: Math.max(...ps.map((q) => q.y)) - Math.min(...ps.map((q) => q.y)) });
+  const all = span(segs.flat()), got = best.length ? span(best) : { w: 0, h: 0 };
+  if (!best.length || got.w < all.w * 0.7 - 1e-6 || got.h < all.h * 0.7 - 1e-6) return [];
+  return best.map((p) => ({ x: Math.round(p.x * 1000) / 1000, y: Math.round(p.y * 1000) / 1000 }));
 }
 
 export interface ParsedFootprintNode { def: Omit<FootprintDef, 'id'>; shortName: string; libName: string; props: Record<string, string>; padNets: Record<string, string>; at: Vec; angle: number; side: 'F' | 'B'; locked: boolean }
@@ -254,7 +326,11 @@ export function parseFootprintNode(fp: SList, netName: (node: SList | undefined)
     if (!number) number = npth ? `NPTH${pads.length + 1}` : `P${pads.length + 1}`;
     const dup = seen.get(number) ?? 0; seen.set(number, dup + 1);
     const drillD = drill ? (typeof drill[1] === 'number' ? num(drill[1]) : num(drill[2])) : 0;
-    pads.push({ number, x: num(pat?.[1]), y: num(pat?.[2]), w, h, shape: shape === 'circle' ? 'circle' : shape === 'oval' ? 'oval' : shape === 'roundrect' ? 'roundrect' : 'rect', drill: kind === 'smd' ? 0 : drillD, npth });
+    // 焊盘可以显式声明在与封装相反的一面（如 Kailh 热插拔插座：(footprint (layer "F.Cu")) 而 (pad ... (layers "B.Cu" …))）。
+    // 不读这个字段就会把焊盘放到错误的铜层，连通性 / DRC / 飞线 / 布线全部静默出错。
+    const padCu = (child(pad, 'layers') ?? []).slice(1).map((x) => str(x)).find((x) => /^[FB]\.Cu$/.test(x));
+    const oppositeSide = kind === 'smd' && !!padCu && (padCu.startsWith('B') ? side === 'F' : side === 'B');
+    pads.push({ number, x: num(pat?.[1]), y: num(pat?.[2]), w, h, shape: shape === 'circle' ? 'circle' : shape === 'oval' ? 'oval' : shape === 'roundrect' ? 'roundrect' : 'rect', drill: kind === 'smd' ? 0 : drillD, npth, ...(oppositeSide ? { oppositeSide } : {}) });
     const nn = netName(child(pad, 'net'));
     if (nn && !padNets[number]) padNets[number] = nn;
   }
@@ -310,7 +386,11 @@ export function importKicadPcb(text: string): PcbImportResult {
     let id = `fp:kicad:${r.shortName}`;
     for (let k = 2; fpDefs.has(id) && JSON.stringify(fpDefs.get(id)!.pads.map((p) => [p.number, p.x, p.y, p.w, p.h, p.shape, p.drill])) !== sig; k++) id = `fp:kicad:${r.shortName}#${k}`;
     if (!fpDefs.has(id)) fpDefs.set(id, { ...r.def, id });
-    board.footprints.push({ id: newId('fp'), ref: r.props.Reference ?? 'REF?', footprintId: id, value: r.props.Value ?? '', x: r.at.x, y: r.at.y, rotation: ((-r.angle) % 360 + 360) % 360, side: r.side, padNets: r.padNets, locked: r.locked });
+    // KiCad 的角度是逆时针，我们的模型是顺时针，所以要取负；但底面封装我们额外做了 x 镜像
+    // （geometry.ts::padWorld），镜像会翻转旋转的手性，此时**不能再取负**，否则焊盘会左右对调
+    // （实测：keezyboost40 的二极管 1/2 脚互换，整块板连通性断掉）。
+    const rotation = ((r.side === 'B' ? r.angle : -r.angle) % 360 + 360) % 360;
+    board.footprints.push({ id: newId('fp'), ref: r.props.Reference ?? 'REF?', footprintId: id, value: r.props.Value ?? '', x: r.at.x, y: r.at.y, rotation, side: r.side, padNets: r.padNets, locked: r.locked });
   }
   // 走线 / 过孔
   for (const s of children(root, 'segment')) {
@@ -335,8 +415,25 @@ export function importKicadPcb(text: string): PcbImportResult {
   const edgeSegs: Vec[][] = [];
   const onEdge = (n: SList) => str(child(n, 'layer')?.[1]) === 'Edge.Cuts';
   for (const l of children(root, 'gr_line')) if (onEdge(l)) edgeSegs.push([P(child(l, 'start')), P(child(l, 'end'))]);
-  for (const a of children(root, 'gr_arc')) if (onEdge(a)) { const s = child(a, 'start'), m = child(a, 'mid'), e = child(a, 'end'); if (s && m && e) edgeSegs.push(arcPoints(P(s), P(m), P(e))); }
+  for (const a of children(root, 'gr_arc')) if (onEdge(a)) {
+    const s = child(a, 'start'), m = child(a, 'mid'), e = child(a, 'end'), ang = child(a, 'angle');
+    if (s && m && e) edgeSegs.push(arcPoints(P(s), P(m), P(e)));           // KiCad 6+：三点式
+    else if (s && e && ang) edgeSegs.push(arcPoints(...kicad5Arc(P(s), P(e), num(ang[1]))));
+  }
   for (const r of children(root, 'gr_rect')) if (onEdge(r)) { const a = P(child(r, 'start')), b = P(child(r, 'end')); edgeSegs.push([a, { x: b.x, y: a.y }], [{ x: b.x, y: a.y }, b], [b, { x: a.x, y: b.y }], [{ x: a.x, y: b.y }, a]); }
+  // KiCad 的 gr_curve 是三次贝塞尔（4 个控制点）。不解析的话轮廓会被这些缺口切断，
+  // 链不成闭合环——torn_right 的板框就是这么散掉的（Edge.Cuts 上有 6 条曲线）。
+  for (const cv of children(root, 'gr_curve')) if (onEdge(cv)) {
+    const pts = children(child(cv, 'pts') ?? [], 'xy').map((xy) => ({ x: num(xy[1]), y: num(xy[2]) }));
+    if (pts.length !== 4) continue;
+    const [p0, p1, p2, p3] = pts, n = 12, out: Vec[] = [];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, u = 1 - t;
+      out.push({ x: u*u*u*p0.x + 3*u*u*t*p1.x + 3*u*t*t*p2.x + t*t*t*p3.x,
+                 y: u*u*u*p0.y + 3*u*u*t*p1.y + 3*u*t*t*p2.y + t*t*t*p3.y });
+    }
+    edgeSegs.push(out);
+  }
   for (const pl of children(root, 'gr_poly')) if (onEdge(pl)) { const pts = children(child(pl, 'pts') ?? [], 'xy').map((xy) => ({ x: num(xy[1]), y: num(xy[2]) })); if (pts.length >= 3) board.outline = pts; }
   for (const c of children(root, 'gr_circle')) if (onEdge(c) && !board.outline.length) { const ce = P(child(c, 'center')), en = P(child(c, 'end')); const r = dist(ce, en); board.outline = Array.from({ length: 48 }, (_, i) => ({ x: ce.x + r * Math.cos((i / 48) * 2 * Math.PI), y: ce.y + r * Math.sin((i / 48) * 2 * Math.PI) })); }
   if (!board.outline.length) board.outline = chainOutline(edgeSegs);

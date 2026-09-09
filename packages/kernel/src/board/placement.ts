@@ -8,7 +8,7 @@ import { withUsbEdgeConstraints } from './usbPlacement.js';
  */
 import type { Board, BoardFootprint } from '../model/board.js';
 import type { RuleSet } from '../model/project.js';
-import { allPads, footprintPads, footprintBody, boardBounds, type WorldPad } from './geometry.js';
+import { allPads, footprintPads, footprintBody, boardBounds, netClassFor, type WorldPad } from './geometry.js';
 import { pointInPolygon, segRectDist, type Rect, type Vec } from '../geometry.js';
 import { bodyInsideOutline, edgePlacementFits, placementConstraintErrors, placementCopperClear } from './placementConstraints.js';
 import { antennaGeometry, placementBodyInside, antennaAreasClear } from './antennaPlacement.js';
@@ -16,7 +16,7 @@ import { autoroute } from './autoroute.js';
 
 export interface PlacementIssue { rule: 'overlap' | 'outside' | 'spacing' | 'decoupling' | 'crystal' | 'connector-edge' | 'connector-facing' | 'noise' | 'long-net' | 'alignment' | 'affinity' | 'grouping' | 'antenna'; severity: 'error' | 'warning' | 'info'; message: string; refs: string[]; location?: Vec; suggestion?: string }
 export interface PlacementMetrics { hpwl: number; overlaps: number; outside: number; decouplingAvg: number; issues: number }
-export interface PlacementResult { outline?: Vec[]; moves: { id: string; ref: string; x: number; y: number; rotation?: number; from: { x: number; y: number; rotation: number } }[]; before: PlacementMetrics; after: PlacementMetrics; iterations: number; ms: number; /** 用自动布线验证前后（verifyRouting） */ routing?: { before: { routed: number; total: number; vias: number; length: number }; after: { routed: number; total: number; vias: number; length: number } }; /** 布线验证变差，建议已丢弃 */ rejected?: string; /** 完整建议布线变差时回退为保守子集 */ fallback?: boolean; /** 第 0 步从板外 / 重叠状态摆进板内的器件数 */ legalized?: number }
+export interface PlacementResult { outline?: Vec[]; moves: { id: string; ref: string; x: number; y: number; rotation?: number; from: { x: number; y: number; rotation: number } }[]; before: PlacementMetrics; after: PlacementMetrics; iterations: number; ms: number; /** 用自动布线验证前后（verifyRouting） */ routing?: { before: { routed: number; total: number; vias: number; length: number }; after: { routed: number; total: number; vias: number; length: number } }; /** 布线验证变差，建议已丢弃 */ rejected?: string; /** Per-part constraint errors of the rejected candidate (`ref: reason`), so callers can relax just those parts. */ constraintErrors?: string[]; /** 完整建议布线变差时回退为保守子集 */ fallback?: boolean; /** 第 0 步从板外 / 重叠状态摆进板内的器件数 */ legalized?: number }
 export interface PlacementOptions { mode?: 'initial' | 'incremental'; /** Explicit opt-in: use an estimated rectangular outline. */ estimateOutline?: boolean; timeBudgetMs?: number; /** 固定迭代次数（给定 seed 时结果可复现；默认按时间预算） */ iterations?: number; seed?: number; moveConnectors?: boolean; grid?: number; keepRotation?: boolean; /** 单个器件最大位移（mm，默认 8） */ maxMove?: number; /** 用自动布线对比前后，变差则丢弃建议（默认开） */ verifyRouting?: boolean; routeBudgetMs?: number; onProgress?: (stage: string) => void }
 
 const POWER_RE = /^(\+|vcc|vdd|v[0-9]|3v3|5v|vbus|vin|avdd|dvdd|vbat)/i;
@@ -65,6 +65,7 @@ function crystalPairs(c: Ctx): { xtal: BoardFootprint; ic: BoardFootprint }[] {
   const out: { xtal: BoardFootprint; ic: BoardFootprint }[] = [];
   for (const f of c.board.footprints) {
     if (!isCrystal(f)) continue;
+    if (f.placement?.target) continue; // 显式 target 意图由 singleCost 的 intent 项负责，不再另猜 IC
     const netsOf = new Set((c.byFp.get(f.id) ?? []).map((p) => p.net).filter((n) => n && !GND_RE.test(n)));
     const counts = new Map<string, number>();
     for (const n of netsOf) for (const p of c.nets.get(n) ?? []) if (p.footprintId !== f.id) counts.set(p.footprintId, (counts.get(p.footprintId) ?? 0) + 1);
@@ -88,6 +89,7 @@ function affinityPairs(c: Ctx): { part: BoardFootprint; ic: BoardFootprint; nets
   const ics = c.board.footprints.filter((f) => isIc(f, c.byFp));
   for (const f of c.board.footprints) {
     if (!isPassive(f, c.byFp)) continue;
+    if (f.placement?.target) continue; // 显式 target 意图优先于亲源性推断
     const mine = new Set((c.byFp.get(f.id) ?? []).map((p) => p.net).filter(Boolean));
     let best: { ic: BoardFootprint; nets: string[]; score: number } | null = null;
     for (const ic of ics) {
@@ -132,7 +134,14 @@ function connectorFacing(f: BoardFootprint, byFp: Map<string, WorldPad[]>, outli
   if (!best) return null;
   return (dir.x / dl) * best.n.x + (dir.y / dl) * best.n.y * 1 > 0 ? Math.max(0, (dir.x / dl) * best.n.x + (dir.y / dl) * best.n.y) : 0;
 }
-const classOf = (net: string) => (CLOCK_RE.test(net) ? 'clock' : ANALOG_RE.test(net) ? 'analog' : SWITCH_RE.test(net) ? 'switch' : POWER_RE.test(net) || GND_RE.test(net) ? 'power' : 'signal');
+/** 网络类别：先看网络类名（显式意图：Clock / Analog|Sensitive / Switch|Noisy），再按网络名正则猜。 */
+const classOf = (net: string, board?: Board) => {
+  const nc = board ? (netClassFor(board, net)?.name ?? '') : '';
+  if (/clock/i.test(nc)) return 'clock';
+  if (/analog|sensitive/i.test(nc)) return 'analog';
+  if (/switch|noisy/i.test(nc)) return 'switch';
+  return CLOCK_RE.test(net) ? 'clock' : ANALOG_RE.test(net) ? 'analog' : SWITCH_RE.test(net) ? 'switch' : POWER_RE.test(net) || GND_RE.test(net) ? 'power' : 'signal';
+};
 
 /** 布局问题清单（不改动板子）。 */
 export function checkPlacement(board: Board, rules: RuleSet): PlacementIssue[] {
@@ -152,8 +161,8 @@ export function checkPlacement(board: Board, rules: RuleSet): PlacementIssue[] {
   for (const { xtal, ic } of crystalPairs(c)) { const d = Math.hypot(xtal.x - ic.x, xtal.y - ic.y); if (d > 10) out.push({ rule: 'crystal', severity: 'warning', message: `晶振 ${xtal.ref} 离 ${ic.ref} ${d.toFixed(1)}mm`, refs: [xtal.ref, ic.ref], location: { x: xtal.x, y: xtal.y }, suggestion: '晶振紧贴 MCU 的 OSC 引脚，走线短且下面不要走其他信号' }); }
   if (board.outline.length >= 3) for (const { f, r } of bodies) if (CONNECTOR_RE.test(f.ref) && !/^(H|MH|TP|FID|SW)\d/i.test(f.ref)) { let d = Infinity; for (let k = 0; k < board.outline.length; k++) { const a = board.outline[k], b = board.outline[(k + 1) % board.outline.length]; d = Math.min(d, segRectGap(a, b, r)); } if (d > 4) out.push({ rule: 'connector-edge', severity: 'info', message: `连接器 ${f.ref} 离板边 ${d.toFixed(1)}mm`, refs: [f.ref], location: { x: f.x, y: f.y }, suggestion: '接插件一般贴板边，方便插拔与外壳开孔' }); }
   // 干扰：晶振 / 模拟器件与开关 / 电机驱动器件靠太近
-  const sensitive = board.footprints.filter((f) => isCrystal(f) || (c.byFp.get(f.id) ?? []).some((p) => classOf(p.net) === 'analog'));
-  const noisy = board.footprints.filter((f) => (c.byFp.get(f.id) ?? []).some((p) => classOf(p.net) === 'switch') && !sensitive.includes(f));
+  const sensitive = board.footprints.filter((f) => isCrystal(f) || (c.byFp.get(f.id) ?? []).some((p) => classOf(p.net, board) === 'analog'));
+  const noisy = board.footprints.filter((f) => (c.byFp.get(f.id) ?? []).some((p) => classOf(p.net, board) === 'switch') && !sensitive.includes(f));
   for (const s of sensitive) for (const n of noisy) { const d = rectGap(footprintBody(s), footprintBody(n)); if (d < 3) out.push({ rule: 'noise', severity: 'info', message: `敏感器件 ${s.ref} 与开关/驱动器件 ${n.ref} 相距 ${d.toFixed(1)}mm`, refs: [s.ref, n.ref], location: { x: s.x, y: s.y }, suggestion: '拉开 5mm 以上，或用地铜隔开' }); }
   // 过长飞线
   const diag = Math.hypot(c.bb.w, c.bb.h);
@@ -205,6 +214,30 @@ export function placementMetrics(board: Board, rules: RuleSet): PlacementMetrics
  * 最近的空位（螺旋搜索，本体之间留通道、离板边留余量），并在 0/90/180/270° 里选飞线最短的朝向。
  * 返回被移动器件的新位置（原位置已合法且不重叠的器件保持不动）。
  */
+/**
+ * Parts whose rotation must not be touched.
+ *
+ * An edge constraint with no mating direction means "put it on this edge, but nobody
+ * declared which way it opens". Rotating it is then a coin flip on whether the opening
+ * faces off-board — and a connector facing inward is scrap. Keep the rotation a human
+ * (or the imported CAD file) already chose, and let the optimizer only move it.
+ */
+
+/**
+ * 密集螺旋在放弃前最多探查多少个位置。
+ *
+ * 螺旋按环向外扫，凑够 24 个候选、或有候选且超出 6mm 就停。**一个候选都找不到**时，
+ * 它会一路扫到板子对角线，每个格点都算 `fits()` + `costAt()`（含 HPWL）——
+ * 75 器件的拥挤板要几分钟，而降级阶梯最多调用它 8 次，实测单板打分 28 分钟。
+ * `iterations` 管的是退火，管不到这里，所以"探路用 1/8 迭代"完全没起作用。
+ *
+ * 按**位置数**而不是毫秒计是有意的：墙钟预算会让同一块板在不同负载下算出不同布局，
+ * 而打分与合成数据生成都依赖布局可复现。
+ */
+const LEGALIZE_PROBES = 12000;
+
+const rotationLocked = (f: BoardFootprint) => !!f.placement?.edge && f.placement.edge.direction === undefined;
+
 function legalize(board: Board, c: Ctx, movable: BoardFootprint[], rules: RuleSet, G: number, keepRotation: boolean, initial = false): Map<string, { x: number; y: number; rotation: number }> {
   const out = new Map<string, { x: number; y: number; rotation: number }>();
   const margin = (rules.copperToEdge ?? 0.3) + 0.3;
@@ -229,10 +262,20 @@ function legalize(board: Board, c: Ctx, movable: BoardFootprint[], rules: RuleSe
   const dps = decouplingPairs(c); const decTarget = new Map(dps.map(d => [d.cap.id, {footprintId:d.ic.id, pad:d.pin.number}])); const decIc = new Map(dps.map((d) => [d.cap.id, d.ic.id]));
   const gapWant = (a: string, b: string) => { const ra = bodyAt(fpById.get(a)!, placed.get(a)!), rb = bodyAt(fpById.get(b)!, placed.get(b)!); void ra; void rb; return decIc.get(a) === b || decIc.get(b) === a ? 0.5 : 1.0; };
   const bigGap = (r: Rect) => (r.w * r.h > 20 ? 1.5 : 1.0);
-  const antennaAreas = board.footprints.flatMap(f=>{const a=antennaGeometry(f,board);return a?[a.area]:[];});
   const fits = (f: BoardFootprint, q: { x: number; y: number; rotation: number }) => {
-    const r = bodyAt(f, q); if (!insideBody(r) || !edgePlacementFits({ ...f, ...q }, board)) return false;
-    if(antennaAreas.some(a=>overlapArea(r,a)>1e-6))return false;
+    const candidate = at(f, q), r = footprintBody(candidate);
+    const antenna = antennaGeometry(candidate, board);
+    // An antenna may overhang, but its support and copper must remain inside.
+    const contained = antenna
+      ? placementBodyInside(candidate, board) && insideBody(antenna.support) && footprintPads(candidate, board).every(p => insideBody(p.rect))
+      : insideBody(r);
+    if (!contained || !edgePlacementFits(candidate, board)) return false;
+    for (const [id, pq] of placed) {
+      if (id === f.id) continue;
+      const other = at(fpById.get(id)!, pq), otherAntenna = antennaGeometry(other, board);
+      if (otherAntenna && overlapArea(r, otherAntenna.area) > 1e-6) return false;
+      if (antenna && overlapArea(footprintBody(other), antenna.area) > 1e-6) return false;
+    }
     for (const [id, pq] of placed) { const o = fpById.get(id)!; if (o.side !== f.side) continue; const ro = bodyAt(o, pq); const want = Math.max(decIc.get(f.id) === id || decIc.get(id) === f.id ? 0.5 : Math.min(bigGap(r), bigGap(ro)), 0.5); if (rectGap(r, ro) < want) return false; }
     return placementCopperClear({ ...board, footprints: [{ ...f, ...q }, ...[...placed].filter(([id]) => id !== f.id).map(([id, pq]) => ({ ...fpById.get(id)!, ...pq }))] }, rules);
   };
@@ -240,13 +283,16 @@ function legalize(board: Board, c: Ctx, movable: BoardFootprint[], rules: RuleSe
   const order: string[] = [];
   while (pending.size) {
     let best: string | null = null, bestScore = -Infinity;
-    for (const id of pending) { let sc = 0; for (const pid of placed.keys()) sc += conn(id, pid); sc += [...placed.keys()].filter(pid => fpById.get(pid)!.placement?.group && fpById.get(pid)!.placement?.group === fpById.get(id)!.placement?.group).length * 2; sc = (fpById.get(id)!.placement?.edge ? 10000 : initial && isPlugConnector(fpById.get(id)!) ? 1000 : 0) + sc * 10 + padCount(id) * 0.1 + (/^(U|IC)\d/i.test(fpById.get(id)!.ref) ? 5 : 0) - (/^(TP|FID)\d/i.test(fpById.get(id)!.ref) ? 3 : 0); const targetId = fpById.get(id)!.placement?.target?.footprintId ?? decIc.get(id); if (targetId && !placed.has(targetId)) sc -= 100000; else if (targetId) sc += 500; if (sc > bestScore) { bestScore = sc; best = id; } }
+    for (const id of pending) { let sc = 0; for (const pid of placed.keys()) sc += conn(id, pid); sc += Math.min(3, [...placed.keys()].filter(pid => fpById.get(pid)!.placement?.group && fpById.get(pid)!.placement?.group === fpById.get(id)!.placement?.group).length) * 6; sc = (antennaGeometry(fpById.get(id)!, board) ? 1000000 : fpById.get(id)!.placement?.edge ? 10000 : initial && isPlugConnector(fpById.get(id)!) ? 1000 : 0) + sc * 10 + padCount(id) * 0.1 + (/^(U|IC)\d/i.test(fpById.get(id)!.ref) ? 5 : 0) - (/^(TP|FID)\d/i.test(fpById.get(id)!.ref) ? 3 : 0); const targetId = fpById.get(id)!.placement?.target?.footprintId ?? decIc.get(id); if (targetId && !placed.has(targetId)) sc -= 100000; else if (targetId) sc += 500; if (sc > bestScore) { bestScore = sc; best = id; } }
     const id = best!; pending.delete(id); order.push(id);
     const f = fpById.get(id)!;
     // 理想点：所连已放引脚的加权重心；没有就板中心（第一个器件）或已放器件的空白侧
     let sx = 0, sy = 0, wsum = 0;
     for (const n of netsOf(id)) { if (GND_RE.test(n)) continue; for (const p of c.nets.get(n) ?? []) if (placed.has(p.footprintId) && p.footprintId !== id) { const pq = placed.get(p.footprintId)!; const o = fpById.get(p.footprintId)!; const pp = padsAt(o, pq).find((x) => x.number === p.number); if (pp) { const w = netW(n); sx += pp.center.x * w; sy += pp.center.y * w; wsum += w; } } }
     let ideal = wsum ? { x: sx / wsum, y: sy / wsum } : { x: bb.x + bb.w / 2, y: bb.y + bb.h / 2 };
+    // 功能分组：已放同组器件的本体重心与连接重心各占一半（没有连接重心时全用分组重心）
+    const grp = f.placement?.group;
+    if (grp && !f.placement?.target && !f.placement?.edge) { let gx = 0, gy = 0, gn = 0; for (const [pid, pq] of placed) { const o = fpById.get(pid)!; if (o.placement?.group === grp) { const r = bodyAt(o, pq); gx += r.x + r.w / 2; gy += r.y + r.h / 2; gn++; } } if (gn) ideal = wsum ? { x: (ideal.x + gx / gn) / 2, y: (ideal.y + gy / gn) / 2 } : { x: gx / gn, y: gy / gn }; }
     // A valid imported IC location is a useful functional seed. Staged ICs still use connectivity.
     if(initial && isIc(f,c.byFp) && insideBody(footprintBody(f))) ideal={x:f.x,y:f.y};
     const target = f.placement?.target ?? decTarget.get(f.id);
@@ -274,7 +320,10 @@ function legalize(board: Board, c: Ctx, movable: BoardFootprint[], rules: RuleSe
       const i = f.placement.edge.index, a = board.outline[i], b = board.outline[(i+1)%board.outline.length];
       if (a && b) ideal = { x:(a.x+b.x)/2, y:(a.y+b.y)/2 };
     }
-    const rots = keepRotation ? [f.rotation] : [f.rotation, (f.rotation + 90) % 360, (f.rotation + 180) % 360, (f.rotation + 270) % 360];
+    // Repair staged RF modules by translation only, near their original position.
+    // Their repaired location becomes an anchor for the following optimization.
+    if (antennaGeometry(f, board)) ideal = { x: Math.max(bb.x, Math.min(bb.x + bb.w, f.x)), y: Math.max(bb.y, Math.min(bb.y + bb.h, f.y)) };
+    const rots = keepRotation || rotationLocked(f) || antennaGeometry(f, board) ? [f.rotation] : [f.rotation, (f.rotation + 90) % 360, (f.rotation + 180) % 360, (f.rotation + 270) % 360];
     // 螺旋搜索：按离理想点由近到远，收集前若干个可行位置，按飞线长度 + 偏离距离选最好的
     const snap = (v: number) => Math.round(v / G) * G;
     const cands: { q: { x: number; y: number; rotation: number }; cost: number }[] = [];
@@ -290,6 +339,7 @@ function legalize(board: Board, c: Ctx, movable: BoardFootprint[], rules: RuleSe
         if(facing!==null)e+=(1-facing)*40;
       }
       if (target && placed.has(target.footprintId)) { const pin = padsAt(fpById.get(target.footprintId)!, placed.get(target.footprintId)!).find(p => p.number === target.pad); if (pin) { const related = mine.filter(p => p.net && p.net === pin.net); if (related.length) e += Math.min(...related.map(p => Math.hypot(p.center.x-pin.center.x, p.center.y-pin.center.y))) * 30; } } for (const [n, ps] of netPads) { const own = mine.filter((p) => p.net === n).map((p) => p.center); e += hpwl([...ps, ...own]) * netW(n); } return e; };
+    let probes = 0;
     outer: for (let ring = 0; ring * G <= maxR; ring++) {
       const step = ring === 0 ? [0] : [-ring, ring];
       const pts: Vec[] = [];
@@ -298,13 +348,52 @@ function legalize(board: Board, c: Ctx, movable: BoardFootprint[], rules: RuleSe
       for (const d of pts) for (const rot of rots) {
         const q = { x: snap(ideal.x + d.x), y: snap(ideal.y + d.y), rotation: rot };
         if (q.x < bb.x - 1 || q.x > bb.x + bb.w + 1 || q.y < bb.y - 1 || q.y > bb.y + bb.h + 1) continue;
+        probes++;
         if (fits(f, q)) cands.push({ q, cost: costAt(q) });
       }
-      if (cands.length >= 24 || (cands.length && ring * G > 6)) break outer;
+      // 预算**只在一个候选都没有时**才生效：已经找到位置的话，原有的两个条件
+      // （凑够 24 个 / 超出 6mm）很快就会停，提前打断只会让它挑到更差的位置
+      // （实测模板板的奖励因此从 0.79 掉到 0.663）。
+      if (cands.length >= 24 || (cands.length && ring * G > 6) || (!cands.length && probes >= LEGALIZE_PROBES)) break outer;
     }
-    if (!cands.length) { // 实在放不下：退而求其次，放到板内不出界的位置（可能与别的重叠，交给退火处理）
-      const q = { x: snap(Math.max(bb.x + margin + 2, Math.min(bb.x + bb.w - margin - 2, ideal.x))), y: snap(Math.max(bb.y + margin + 2, Math.min(bb.y + bb.h - margin - 2, ideal.y))), rotation: f.rotation };
-      placed.set(id, q); out.set(id, q); continue;
+    if (!cands.length) {
+      // 放不下时**首选仍是"贴着理想点摆、允许重叠，交给退火就地解决"**——
+      // 退火能化解重叠，却拉不回一个很远的合法位置（把顺序反过来，模板板从 0.79 掉到 0.713）。
+      //
+      // 但夹取必须**按本体**夹，不能按原点。原来是把原点限制在外接矩形内缩 margin+2 的范围里，
+      // 那个 2mm 与器件尺寸无关，本体伸出更多的器件夹完照样出界。
+      const b0 = bodyAt(f, { x: ideal.x, y: ideal.y, rotation: f.rotation });
+      const fit1 = (lo: number, hi: number, bLo: number, bLen: number, v: number) =>
+        v + Math.max(0, lo - bLo) - Math.max(0, bLo + bLen - hi);
+      const clamp = {
+        // 多留 G 的余量：insideBody 会把本体再外扩 margin，正好贴边会因为浮点判定失败
+        x: snap(fit1(bb.x + margin + G, bb.x + bb.w - margin - G, b0.x, b0.w, ideal.x)),
+        y: snap(fit1(bb.y + margin + G, bb.y + bb.h - margin - G, b0.y, b0.h, ideal.y)),
+        rotation: f.rotation
+      };
+      if (insideBody(bodyAt(f, clamp))) { placed.set(id, clamp); out.set(id, clamp); continue; }
+      // 本体仍在**真实轮廓**外（圆角 / 切角板夹的是外接矩形，不是轮廓；实测 basic-ecp5
+      // 这样兜底出来 6 个器件在板外，直接触发布局硬门）：这时才全板粗扫找合法位置。
+      const step = Math.max(G, 2);
+      for (let y = bb.y + margin; y <= bb.y + bb.h - margin; y += step)
+        for (let x = bb.x + margin; x <= bb.x + bb.w - margin; x += step)
+          for (const rot of rots) { const q = { x: snap(x), y: snap(y), rotation: rot }; if (fits(f, q)) cands.push({ q, cost: costAt(q) }); }
+      if (!cands.length) {
+        // 全板都放不下：挑重叠最小且确实在轮廓内的位置，交给退火。
+        let best: { q: { x: number; y: number; rotation: number }; cost: number } | null = null;
+        for (let y = bb.y + margin; y <= bb.y + bb.h - margin; y += step)
+          for (let x = bb.x + margin; x <= bb.x + bb.w - margin; x += step) {
+            const q = { x: snap(x), y: snap(y), rotation: f.rotation };
+            const r = bodyAt(f, q);
+            if (!insideBody(r)) continue;
+            let over = 0;
+            for (const [oid, pq] of placed) { const o = fpById.get(oid)!; if (o.side !== f.side) continue; over += overlapArea(r, bodyAt(o, pq)); }
+            const c = over * 100 + Math.hypot(q.x - ideal.x, q.y - ideal.y);
+            if (!best || c < best.cost) best = { q, cost: c };
+          }
+        const q = best ? best.q : clamp;
+        placed.set(id, q); out.set(id, q); continue;
+      }
     }
     cands.sort((a, b) => a.cost - b.cost);
     placed.set(id, cands[0].q); out.set(id, cands[0].q);
@@ -345,7 +434,7 @@ export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementO
   for (const p of c.pads) if (board.traces.some((t) => p.layers.includes(t.layer) && t.points.slice(1).some((b, i) => segRectGap(t.points[i], b, p.rect) <= t.width / 2 + 1e-6))) wired.add(p.footprintId);
   const inside0 = (f: BoardFootprint) => { if (board.outline.length < 3) return true; const r = footprintBody(f); return [{ x: r.x, y: r.y }, { x: r.x + r.w, y: r.y }, { x: r.x + r.w, y: r.y + r.h }, { x: r.x, y: r.y + r.h }].every((q) => pointInPolygon(q, board.outline)); };
   const FIXED_RE = /^(J|P|CN|USB|X|BT|H|MH|FID|SW)\d/i; // 连接器 / 安装孔 / 按键默认不动；测试点可动
-  const movable = board.footprints.filter((f) => !antennaGeometry(f,board) && !f.locked && !f.placement?.fixed && f.placement?.role !== 'mechanical' && !wired.has(f.id) && (f.placement?.edge || opts.moveConnectors || (initial && isPlugConnector(f) && !/^(H|MH|FID|SW)\d/i.test(f.ref)) || (!FIXED_RE.test(f.ref) && f.placement?.role !== 'connector') || !inside0(f)) && !(c.byFp.get(f.id) ?? []).every((p) => p.def.npth));
+  const movable = board.footprints.filter((f) => (!antennaGeometry(f,board) || (initial && !placementBodyInside(f,board))) && !f.locked && !f.placement?.fixed && f.placement?.role !== 'mechanical' && !wired.has(f.id) && (f.placement?.edge || opts.moveConnectors || (initial && isPlugConnector(f) && !/^(H|MH|FID|SW)\d/i.test(f.ref)) || (!FIXED_RE.test(f.ref) && f.placement?.role !== 'connector') || !inside0(f)) && !(c.byFp.get(f.id) ?? []).every((p) => p.def.npth));
   const before = placementMetrics(board, rules);
   if (movable.length === 0) return { moves: [], before, after: before, iterations: 0, ms: Date.now() - t0, ...(before.overlaps || before.outside || placementConstraintErrors(board).length ? { rejected: 'No movable components: resolve overlaps or outside components by adjusting fixed parts.' } : {}) };
   // ---- 第 0 步：合法化。有器件在板外 / 重叠时，先按连接关系从核心器件开始"构造式"摆进板内（不重叠、留通道），再退火细调 ----
@@ -360,7 +449,8 @@ export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementO
   // 工作副本
   const pos = new Map<string, { x: number; y: number; rotation: number }>(); for (const f of board.footprints) pos.set(f.id, { ...start.get(f.id)! });
   const orig = new Map(board.footprints.map((f) => [f.id, { x: f.x, y: f.y }]));
-  const movableIds = movable.map((f) => f.id);
+  const annealable = movable.filter(f => !antennaGeometry(f, board));
+  const movableIds = annealable.map((f) => f.id);
   const maxMove = opts.maxMove ?? 8;
   const edgeMargin = (rules.copperToEdge ?? 0.3) + 0.3;
   const fpById = new Map(board.footprints.map((f) => [f.id, f]));
@@ -376,8 +466,8 @@ export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementO
   const smallPassive = new Set(board.footprints.filter((f) => isPassive(f, c.byFp) && footprintBody(f).w * footprintBody(f).h < 12).map((f) => f.id));
   const plugs = new Set(board.footprints.filter(isPlugConnector).map((f) => f.id));
   const xps = crystalPairs(c).map((d) => ({ xtal: d.xtal.id, ic: d.ic.id }));
-  const sensitive = board.footprints.filter((f) => isCrystal(f) || (c.byFp.get(f.id) ?? []).some((p) => classOf(p.net) === 'analog')).map((f) => f.id);
-  const noisy = board.footprints.filter((f) => (c.byFp.get(f.id) ?? []).some((p) => classOf(p.net) === 'switch') && !sensitive.includes(f.id)).map((f) => f.id);
+  const sensitive = board.footprints.filter((f) => isCrystal(f) || (c.byFp.get(f.id) ?? []).some((p) => classOf(p.net, board) === 'analog')).map((f) => f.id);
+  const noisy = board.footprints.filter((f) => (c.byFp.get(f.id) ?? []).some((p) => classOf(p.net, board) === 'switch') && !sensitive.includes(f.id)).map((f) => f.id);
   const ids = board.footprints.map((f) => f.id);
   const currentPads = new Map<string, WorldPad[]>();
   const padsOf = new Map<string, { x: number; y: number; number: string; net: string; w: number; h: number }[]>();
@@ -430,13 +520,17 @@ export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementO
     for (const xt of icXtals.get(id) ?? []) { const a2 = pos.get(xt)!, b2 = pos.get(id)!; e += Math.max(0, Math.hypot(a2.x - b2.x, a2.y - b2.y) - 6) * 4; }
     return e;
   };
+  const groupSize = new Map<string, number>();
+  for (const f of board.footprints) if (f.placement?.group) groupSize.set(f.placement.group, (groupSize.get(f.placement.group) ?? 0) + 1);
   const pairCost = (a: string, b: string) => {
     if (fpById.get(a)!.side !== fpById.get(b)!.side) return 0;
     const ra = body(a), rb = body(b);
     const ov = overlapArea(ra, rb); if (ov > 0) return 300 + ov * 200;
     let e = 0;
     const ga = fpById.get(a)!.placement?.group, gb = fpById.get(b)!.placement?.group;
-    if (ga && ga === gb) e += Math.hypot(pos.get(a)!.x-pos.get(b)!.x, pos.get(a)!.y-pos.get(b)!.y) * 0.8;
+    // 同组拉力按 1/(组员数−1) 归一：逐对惩罚在 N 人组上总代价按 N² 增长，
+    // 8 人组会压过飞线与间距项（door 实测布通 216 → 151、HPWL 反升），必须让各组总强度与规模无关。
+    if (ga && ga === gb) { const d = Math.hypot(pos.get(a)!.x - pos.get(b)!.x, pos.get(a)!.y - pos.get(b)!.y); const w = 1 / Math.max(1, (groupSize.get(ga) ?? 2) - 1); e += (d * 0.5 + Math.max(0, d - 8) * 4) * w; }
     const g = rectGap(ra, rb);
     if (g < 2.5) {
       const big = (r: Rect) => r.w * r.h > 20;
@@ -487,18 +581,18 @@ export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementO
   };
   let cur = fullCost(), best = legalPosition() ? cur : Infinity; const bestPos = new Map([...pos].map(([k, v]) => [k, { ...v }]));
   const deltas: number[] = [];
-  for (let k = 0; k < 40; k++) { const f = movable[Math.floor(rnd() * movable.length)]; const old = { ...pos.get(f.id)! }; const b0 = deltaTerms([f.id]); setPos(f.id, { ...old, x: snap(old.x + (rnd() - 0.5) * 4), y: snap(old.y + (rnd() - 0.5) * 4) }); deltas.push(Math.abs(deltaTerms([f.id]) - b0)); setPos(f.id, old); }
+  for (let k = 0; k < 40 && annealable.length; k++) { const f = annealable[Math.floor(rnd() * annealable.length)]; const old = { ...pos.get(f.id)! }; const b0 = deltaTerms([f.id]); setPos(f.id, { ...old, x: snap(old.x + (rnd() - 0.5) * 4), y: snap(old.y + (rnd() - 0.5) * 4) }); deltas.push(Math.abs(deltaTerms([f.id]) - b0)); setPos(f.id, old); }
   deltas.sort((a2, b2) => a2 - b2);
   const T0 = Math.max(1, deltas[Math.floor(deltas.length * 0.6)] || 1); let T = T0, iter = 0;
   const end = t0 + budget; const maxIter = opts.iterations ?? Infinity;
-  while (maxIter === Infinity ? Date.now() < end : iter < maxIter) {
+  while (annealable.length && (maxIter === Infinity ? Date.now() < end : iter < maxIter)) {
     iter++;
-    const f = movable[Math.floor(rnd() * movable.length)];
+    const f = annealable[Math.floor(rnd() * annealable.length)];
     const old = { ...pos.get(f.id)! };
     const kind = rnd();
     let moved = [f.id]; const undo: [string, { x: number; y: number; rotation: number }][] = [[f.id, old]];
     let g2: BoardFootprint | null = null;
-    if (kind >= 0.85) { g2 = movable[Math.floor(rnd() * movable.length)]; if (g2 === f) continue; moved = [f.id, g2.id]; undo.push([g2.id, { ...pos.get(g2.id)! }]); }
+    if (kind >= 0.85) { g2 = annealable[Math.floor(rnd() * annealable.length)]; if (g2 === f) continue; moved = [f.id, g2.id]; undo.push([g2.id, { ...pos.get(g2.id)! }]); }
     // 整体平移：没有固定件且器件不多时，偶尔把全部可动器件一起挪一格（飞线不变，只改善居中 / 出板），单件移动做不到这一点
     if (!hasFixed && movable.length <= 60 && kind >= 0.97) {
       const dx = (Math.floor(rnd() * 3) - 1) * G * (1 + Math.floor(rnd() * 4)), dy = (Math.floor(rnd() * 3) - 1) * G * (1 + Math.floor(rnd() * 4));
@@ -522,7 +616,7 @@ export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementO
         else { const step = G * (1 + Math.floor(rnd() * 3)); const ang = Math.floor(rnd() * 8) * Math.PI / 4; setPos(f.id, { ...old, x: snap(old.x + Math.cos(ang) * step), y: snap(old.y + Math.sin(ang) * step) }); }
       } else { const step = G * (1 + Math.floor(rnd() * (rnd() < 0.7 ? 3 : 10))); const ang = Math.floor(rnd() * 8) * Math.PI / 4; setPos(f.id, { ...old, x: snap(old.x + Math.cos(ang) * step), y: snap(old.y + Math.sin(ang) * step) }); }
     }
-    else if (kind < 0.85) { if (opts.keepRotation) continue; setPos(f.id, { ...old, rotation: (old.rotation + 90) % 360 }); }
+    else if (kind < 0.85) { if (opts.keepRotation || rotationLocked(f)) continue; setPos(f.id, { ...old, rotation: (old.rotation + 90) % 360 }); }
     else { const o2 = { ...pos.get(g2!.id)! }; setPos(f.id, { ...old, x: o2.x, y: o2.y }); setPos(g2!.id, { ...o2, x: old.x, y: old.y }); }
     const d = deltaTerms(moved) - before;
     if (d <= 0 || rnd() < Math.exp(-d / T)) { cur += d; if (cur < best - 1e-9 && legalPosition()) { best = cur; for (const [k, v] of pos) bestPos.set(k, { ...v }); } }
@@ -535,7 +629,13 @@ export function optimizePlacement(board: Board, rules: RuleSet, opts: PlacementO
   const result: PlacementResult = { moves, before, after, iterations: iter, ms: Date.now() - t0 };
   // A lower weighted cost must never turn an illegal placement into an accepted suggestion.
   if (!antennaAreasClear(applyPlacement(board,moves)) || after.overlaps || after.outside || !placementCopperClear(applyPlacement(board, moves), rules) || placementConstraintErrors(applyPlacement(board, moves)).length) {
-    result.rejected = 'No legal placement found. ' + (placementConstraintErrors(applyPlacement(board, moves)).slice(0, 3).join('; ') || 'Components overlap, extend outside the board, or violate pad clearance.') + ' Adjust fixed components, board dimensions, or placement constraints.';
+    const candidate = applyPlacement(board, moves);
+    const geometryErrors = checkPlacement(candidate, rules).filter(issue => issue.severity === 'error').map(issue => `${issue.refs.join(' / ')}: ${issue.rule}`);
+    const constraintErrors = placementConstraintErrors(candidate);
+    result.rejected = 'No legal placement found. ' + ([...geometryErrors, ...constraintErrors].slice(0, 3).join('; ') || 'Components violate antenna or pad clearance.') + ' Adjust fixed components, board dimensions, or placement constraints.';
+    // The candidate is discarded, but which parts violated their constraints is the only
+    // information a caller has to relax just those parts instead of the whole intent.
+    result.constraintErrors = constraintErrors;
     result.moves = [];
     result.after = before;
     return result;
