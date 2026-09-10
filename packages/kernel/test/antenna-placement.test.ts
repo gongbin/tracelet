@@ -27,3 +27,34 @@ it('does not waive support/pad containment or accept another part in the antenna
  p.board.footprints[1]={...p.board.footprints[1],x:ant.area.x+ant.area.w/2,y:ant.area.y+ant.area.h/2};
  expect(antennaAreasClear(p.board)).toBe(false);
 });
+it('repairs an initially out-of-board antenna without rotating it or moving its pads independently',()=>{
+ const p=fixture();p.board.footprints[0].y=53;
+ const before=structuredClone(p.board),f=p.board.footprints[0],pads=footprintPads(f,p.board);
+ expect(placementBodyInside(f,p.board)).toBe(false);
+ const r=optimizePlacement(p.board,RULE_SETS[0],{mode:'initial',iterations:300,seed:1,verifyRouting:false});
+ expect(r.rejected).toBeUndefined();
+ const after=applyPlacement(p.board,r.moves),moved=after.footprints[0];
+ expect(moved.rotation).toBe(f.rotation);expect(moved.y).toBeGreaterThan(f.y);
+ expect(placementBodyInside(moved,after)).toBe(true);expect(antennaAreasClear(after)).toBe(true);
+ footprintPads(moved,after).forEach((pad,i)=>{
+  expect(pad.center.x-pads[i].center.x).toBeCloseTo(moved.x-f.x);
+  expect(pad.center.y-pads[i].center.y).toBeCloseTo(moved.y-f.y);
+  expect(pad.net).toBe(pads[i].net);
+ });
+ expect(p.board).toEqual(before);
+ // The corrected RF module is an anchor on subsequent initializations.
+ const again=optimizePlacement(after,RULE_SETS[0],{mode:'initial',iterations:300,verifyRouting:false});
+ expect(again.rejected).toBeUndefined();expect(again.moves.some(m=>m.id===f.id)).toBe(false);
+});
+it('does not repair locked or wired RF anchors and identifies the outside component',()=>{
+ for(const kind of ['locked','wired','incremental']){
+  const p=fixture();p.board.footprints[0].y=53;
+  if(kind==='locked')p.board.footprints[0].locked=true;
+  if(kind==='wired'){
+   const pad=footprintPads(p.board.footprints[0],p.board)[0];
+   p.board.traces.push({id:'wire',net:pad.net,layer:'F.Cu',width:0.25,points:[pad.center,{x:pad.center.x+2,y:pad.center.y}]});
+  }
+  const r=optimizePlacement(p.board,RULE_SETS[0],{mode:kind==='incremental'?'incremental':'initial',iterations:0,verifyRouting:false});
+  expect(r.moves).toEqual([]);expect(r.rejected).toContain('U1: outside');
+ }
+});

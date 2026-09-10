@@ -9,16 +9,19 @@ import type { AiConfig } from './config.js';
 import type { ExtractedSchematic } from '@tracelet/kernel';
 
 export const ExtractedSchema = z.object({
+  preserveNetNames: z.boolean().optional().describe('识别原图时设为true，禁止合并AGND/DGND或改写电源标签'),
   title: z.string().describe('图纸标题或电路名称'),
   components: z.array(z.object({
     ref: z.string().describe('位号，如 U1、R3'),
     value: z.string().describe('值 / 型号，如 10k、ESP32-S3-WROOM-1'),
     kind: z.string().describe('类别：resistor / capacitor / led / module / ic / connector / crystal / …'),
     footprint: z.string().describe('封装提示，如 0402、SOT-223、未知则空串'),
+    position: z.object({x:z.number().min(0).max(100),y:z.number().min(0).max(100)}).optional().describe('元件本体中心在原图中的相对坐标，左上角0,0右下角100,100；不是PCB坐标'),
     pins: z.array(z.object({
+      side: z.enum(['L','R','T','B']).optional().describe('原图引脚朝向：左/右/上/下。按各侧从上到下或从左到右的顺序列出'),
       number: z.string().describe('引脚编号'),
       name: z.string().describe('引脚名，没有则重复编号'),
-      net: z.string().describe('该引脚连接的网络名；电源写 3V3/5V/VBUS 等，地写 GND，未连接写空串')
+      net: z.string().describe('该引脚连接的网络名；严格保留原图标签，如 +3V0、VSTOR、AGND；未连接写空串')
     }))
   })),
   notes: z.array(z.string()).describe('识别中的不确定项或页面说明，最多 5 条')
@@ -29,9 +32,11 @@ export type RecognizeSource = { kind: 'pdf'; data: string } | { kind: 'image'; m
 const PROMPT = `请把这份原理图（可能是多页 PDF 或截图）抽取为结构化数据。要求：
 1. 列出所有元件：位号、值/型号、类别、封装提示。
 2. 对每个元件列出所有引脚（编号、引脚名）以及该引脚连接的网络名。网络名以图上的网络标签 / 电源符号为准；没有标签时，用相连元件里位号最小的那个引脚命名，如 Net-R1-2。
-3. 电源与地统一：GND 家族写 GND；3.3V 写 3V3；5V 写 5V。
+3. 严格保留标签，AGND、DGND、GND是不同网络，+3V0不是3V3。preserveNetNames=true。
 4. 只抽取电气连接，不要虚构没画出来的连接；不确定的地方写进 notes。
-5. 位号必须唯一。`;
+5. 位号必须唯一，保留测试点。仔细辨认数值和单位，M与k相差1000倍，不能按常用值纠正原图。
+6. 提供每个元件的position（原图百分比中心）和引脚side，按每侧视觉顺序列出引脚；沿导线追踪结点，不把无结点的交叉当连接，不靠型号猜引脚。
+7. 最后逐网复核引脚清单；看不清的连接留空并写入notes，不用经验补电路。`;
 
 export interface RecognizeProgress { chars: number; thinking: boolean }
 
@@ -66,7 +71,7 @@ export async function recognizeSchematic(cfg: AiConfig, src: RecognizeSource, op
     if (response.stop_reason === 'max_tokens') throw new Error('图纸太大，输出被截断：请拆页识别或裁剪到需要的部分');
     const out = response.parsed_output;
     if (!out) throw new Error('模型没有返回可解析的结构化结果，请重试或换一页');
-    return out;
+    return { ...out, preserveNetNames: true };
   } catch (e) { throw new Error(describeError(e)); }
 }
 

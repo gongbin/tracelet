@@ -1,0 +1,29 @@
+.model-matcher { position:absolute;inset:16px;z-index:30;background:var(--bg-panel,#242832);border:1px solid var(--border);border-radius:12px;padding:18px;color:var(--text);overflow:auto;max-width:1160px;margin:auto;box-shadow:0 18px 70px #0006; }
+.model-matcher p { line-height:1.6; }
+.model-matcher-grid { display:grid;grid-template-columns:minmax(280px,.9fr) minmax(320px,1.1fr);gap:24px;margin-top:18px; }
+.model-controls,.model-inspection { min-width:0; }
+.model-field { display:flex;flex-direction:column;gap:6px;margin-bottom:12px;min-width:0; }
+.model-field .input { width:100%;min-width:0; }
+.model-actions { display:flex;align-items:center;flex-wrap:wrap;gap:8px; }
+.model-actions .btn { white-space:nowrap; }
+.model-current,.model-hash { overflow-wrap:anywhere; }
+.model-calibration { border:1px solid var(--border);padding:12px;border-radius:8px;display:flex;flex-direction:column;gap:12px;min-width:0; }
+.model-calibration .model-field { margin:0; }
+.model-axes { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:6px; }
+.model-axes label { display:flex;align-items:center;gap:6px; }
+.model-axes input { width:100%;min-width:0; }
+.model-preview { position:sticky;top:0; }
+.model-preview-canvas { height:340px;overflow:hidden;border-radius:8px;border:1px solid var(--border); }
+.model-preview .model-actions { margin-top:10px; }
+.model-preview label,.model-review { display:flex;align-items:center;gap:6px; }
+.model-preview label { margin-left:auto; }
+.model-dimensions { width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums; }
+.model-dimensions th,.model-dimensions td { padding:8px 0;border-bottom:1px solid var(--border);text-align:left; }
+.model-dimensions th { font-weight:400; }
+.model-dimensions td { text-align:right; }
+.model-notice { padding:10px 12px;border-radius:6px;background:var(--bg-raised);border-left:3px solid #e3b65b;line-height:1.6; }
+.model-notice .btn { margin-left:8px; }
+.model-footer { position:sticky;bottom:-18px;background:var(--bg-panel,#242832);border-top:1px solid var(--border);margin-top:16px;padding:12px 0 4px; }
+.model-footer a { font-size:12px; }
+.model-review { margin-bottom:12px; }
+@media(max-width:850px) { .model-matcher { inset:6px;padding:12px; }.model-matcher-grid { grid-template-columns:1fr;gap:12px; }.model-inspection { grid-row:1; }.model-preview { position:static; }.model-preview-canvas { height:260px; }.model-footer { bottom:-12px; }.model-preview label { margin-left:0; } }

@@ -1,8 +1,10 @@
+import { HoleControls } from './HoleControls.js';
+import { PCB_DISPLAY, padColor, pcbWidthText, ClearanceOutline, PcbCheckMarker } from './display.js';
 import { PcbRulers } from './PcbRulers.js';
 import { alignDrag, type AlignmentGuide } from './alignment.js';
-import { viaLayers, backdrillLayers } from '@tracelet/kernel';
+import { runDrc, castellatedFootprint, snapCastellatedRow, InteractiveRouter, routeTarget, cleanRoute, manualCopperIssues, routeLength, type RouteTarget, viaLayers } from '@tracelet/kernel';
 import React, { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from 'react';
-import { estimateBoardSize, pcb, holeFootprint, SCREW_HOLES, LAYER_COLORS, copperLayers, footprintPads, footprintBody, boardBounds, netClassFor, snapTo, PCB_GRID, dist, segRectDist, segSegDist, pointSegDist, pointInPolygon, rectsOverlap, alignFootprints, autoroute, type Vec, type Rect, type CopperLayer, type Layer, type WorldPad, type AlignMode } from '@tracelet/kernel';
+import { estimateBoardSize, pcb, holeFootprint, LAYER_COLORS, copperLayers, footprintPads, footprintBody, boardBounds, netClassFor, snapTo, PCB_GRID, dist, pointSegDist, pointInPolygon, rectsOverlap, alignFootprints, autoroute, type Vec, type Rect, type CopperLayer, type Layer, type WorldPad, type AlignMode } from '@tracelet/kernel';
 import { useApp, useEditor, useProject } from '../../store/app.js';
 import { lib } from '@tracelet/kernel';
 import { getAnalysis } from '../../store/analysis.js';
@@ -11,22 +13,6 @@ import { useT } from '../../i18n/index.js';
 import { Hint } from '../../components/Hint.js';
 import { OutlineNotch } from '../../panels/OutlineNotch.js';
 
-/** 45° 约束：把 p 吸附到从 a 出发的 H/V/45° 方向上。 */
-function snap45(a: Vec, p: Vec): Vec {
-  const dx = p.x - a.x, dy = p.y - a.y;
-  if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) return p;
-  const ang = Math.atan2(dy, dx);
-  const q = Math.round(ang / (Math.PI / 4)) * (Math.PI / 4);
-  const len = Math.cos(ang - q) * Math.hypot(dx, dy);
-  return { x: a.x + Math.cos(q) * len, y: a.y + Math.sin(q) * len };
-}
-/** 从 a 到 b 的 45° 折线：先走对角线再走直线（KiCad 风格），返回中间点或 null。 */
-function bend45(a: Vec, b: Vec): Vec | null {
-  const dx = b.x - a.x, dy = b.y - a.y, ax = Math.abs(dx), ay = Math.abs(dy);
-  if (ax < 1e-6 || ay < 1e-6 || Math.abs(ax - ay) < 1e-6) return null;
-  const d = Math.min(ax, ay);
-  return { x: a.x + Math.sign(dx) * d, y: a.y + Math.sign(dy) * d };
-}
 let PCB_SNAP = PCB_GRID;
 const sg = (v: number) => snapTo(v, PCB_SNAP);
 const fmt = (v: number) => v.toFixed(2);
@@ -34,7 +20,7 @@ const ptsBox = (pts: Vec[], m = 0): Rect => { const xs = pts.map((p) => p.x), ys
 const contains = (a: Rect, b: Rect) => b.x >= a.x && b.y >= a.y && b.x + b.w <= a.x + a.w && b.y + b.h <= a.y + a.h;
 
 type Drag =
-  | { kind: 'fp'; id: string; dx: number; dy: number }
+  | { kind: 'fp'; id: string; dx: number; dy: number; origin: Vec; members: {id:string;x:number;y:number}[] }
   | { kind: 'via'; id: string; dx: number; dy: number }
   | { kind: 'text'; id: string; dx: number; dy: number }
   | { kind: 'tracePt'; id: string; index: number }
@@ -47,6 +33,11 @@ type Drag =
 const ALIGN: [AlignMode, string][] = [['left', '左对齐'], ['hcenter', '水平居中'], ['right', '右对齐'], ['top', '上对齐'], ['vcenter', '垂直居中'], ['bottom', '下对齐'], ['hdist', '水平等距'], ['vdist', '垂直等距']];
 
 export function PcbCanvas() {
+  const t=useT();
+  const [straightFirst,setStraightFirst]=useState(false);
+  const [walkAround,setWalkAround]=useState(true);
+  const [magnetOff,setMagnetOff]=useState(false);
+  const [movingIds,setMovingIds]=useState<string[]>([]);
   const [alignmentGuides, setAlignmentGuides] = useState<AlignmentGuide[]>([]);
   const [alignmentEnabled, setAlignmentEnabled] = useState(true);
   const [notchOpen, setNotchOpen] = useState(false);
@@ -57,14 +48,13 @@ export function PcbCanvas() {
   const app = useApp();
   const board = project.board;
   const svgRef = useRef<SVGSVGElement>(null);
-  const view = useViewport(svgRef, { initial: { x: 40, y: 40, k: 12 }, minK: 2, maxK: 200, onTouchCancel: () => { setAlignmentGuides([]); if (drag.current) editor.rollback(); drag.current = null; setMarquee(null); } });
+  const view = useViewport(svgRef, { initial: { x: 40, y: 40, k: 12 }, minK: 2, maxK: 200, onTouchCancel: () => { setAlignmentGuides([]); setMovingIds([]); if (drag.current) editor.rollback(); drag.current = null; setMarquee(null); } });
   const { vp } = view;
   const analysis = getAnalysis(project);
   const drag = useRef<Drag | null>(null);
   const fitted = useRef<string | null>(null);
   const lastClick = useRef<{ t: number; x: number; y: number }>({ t: 0, x: 0, y: 0 });
   const [marquee, setMarquee] = useState<{ a: Vec; b: Vec } | null>(null);
-  const [previewBad, setPreviewBad] = useState(false);
   const [moveWithContents, setMoveWithContents] = useState(true);
   PCB_SNAP = app.pcbGrid;
 
@@ -72,7 +62,7 @@ export function PcbCanvas() {
     if (fitted.current === project.id) return;
     fitted.current = project.id;
     const bb = boardBounds(board);
-    setTimeout(() => view.fit({ x: bb.x - 2, y: bb.y - 2, w: bb.w + 4 + 30, h: bb.h + 4 }, 60), 0);
+    setTimeout(() => view.fit({ x: bb.x - 2, y: bb.y - 2, w: bb.w + 4, h: bb.h + 4 }, 60), 0);
   }, [project.id, board, view]);
 
   useEffect(() => {
@@ -93,7 +83,8 @@ export function PcbCanvas() {
   const pads = useMemo(() => board.footprints.map((f) => ({ fp: f, pads: footprintPads(f, board) })), [board]);
   const hidden = useMemo(() => new Set(app.hiddenFootprints), [app.hiddenFootprints]);
   const flatPads = useMemo(() => pads.flatMap((p) => p.pads), [pads]);
-  const hl = app.highlightNet;
+  const hl = app.routing?.net ?? app.highlightNet;
+  const router=useMemo(()=>new InteractiveRouter(board,analysis.rules),[board,analysis.rules]);
   const dimIf = (net: string) => (hl && net !== hl ? 0.25 : 1);
   const tool = app.pcbTool;
   const isSelectLike = tool === 'select' || tool === 'align' || tool === 'flip';
@@ -103,22 +94,75 @@ export function PcbCanvas() {
     return null;
   };
 
-  // ---- 走线中的实时间距检查 ----
-  const violates = (a: Vec, b: Vec, layer: CopperLayer, width: number, net: string): boolean => {
-    const c = analysis.rules.minClearance;
-    for (const pd of flatPads) { if (!pd.layers.includes(layer) || (pd.net && pd.net === net)) continue; if (segRectDist(a, b, pd.rect) - width / 2 < c - 1e-6) return true; }
-    for (const t of board.traces) { if (t.layer !== layer || (t.net && t.net === net)) continue; for (let i = 0; i < t.points.length - 1; i++) if (segSegDist(a, b, t.points[i], t.points[i + 1]) - (width + t.width) / 2 < c - 1e-6) return true; }
-    for (const v of board.vias) { if (backdrillLayers(board,v).includes(app.activeLayer as CopperLayer) && pointSegDist(v,a,b)-width/2-v.backdrill!.diameter/2<c) return true; if(!viaLayers(board,v).includes(app.activeLayer as CopperLayer))continue; if (v.net && v.net === net) continue; if (pointSegDist(v, a, b) - width / 2 - v.size / 2 < c - 1e-6) return true; }
-    return false;
+  const snapTarget=(raw:Vec,net?:string,ignoreSnap=magnetOff):RouteTarget|null=>ignoreSnap?null:routeTarget(board,raw,app.routing?.layer??app.activeLayer,Math.min(1,8/vp.k),net,hidden);
+  const routePlan=(raw:Vec,ignoreSnap=magnetOff)=>{
+    const r=app.routing!;
+    const target=snapTarget(raw,r.net,ignoreSnap);
+    const end=target?.point??{x:sg(raw.x),y:sg(raw.y)};
+    return {...router.suggest(r.points[r.points.length-1],end,r,straightFirst,walkAround),target};
   };
-
-  const finishRoute = (extra?: Vec) => {
-    const r = app.routing; if (!r) return;
-    let pts = r.points;
-    if (extra) { const last = pts[pts.length - 1]; const mid = bend45(last, extra); pts = mid ? [...pts, mid, extra] : [...pts, extra]; }
-    if (pts.length >= 2) editor.dispatch(pcb.addTrace({ layer: r.layer, net: r.net, width: r.width, points: pts }).command);
-    app.patch({ routing: null });
+  const reasonText=(reason:string|null)=>reason==='board-edge'?t('pcb.route.reason.board-edge'):reason==='antenna'?t('pcb.route.reason.antenna'):reason==='layer'?t('pcb.route.reason.layer'):reason==='width'?t('pcb.route.reason.width'):t('pcb.route.reason.clearance');
+  const blocked=(reason:string)=>app.toast(`${t('pcb.route.blocked')} · ${reasonText(reason)} (${reason})`, 'error');
+  const finishRoute=(points=app.routing?.points)=>{
+    const r=app.routing;if(!r||!points)return;
+    const pts=cleanRoute(points);
+    if(pts.length>=2){
+      const trace={layer:r.layer,net:r.net,width:r.width,points:pts};
+      const issues=manualCopperIssues(board,analysis.rules,[trace]);
+      if(issues.length){blocked(issues[0]);return;}
+      editor.dispatch(pcb.addTrace(trace).command);
+    }
+    app.patch({routing:null});
   };
+  const undoRoutePoint=()=>{
+    const r=app.routing;if(!r)return;
+    const checkpoints=r.checkpoints??[];
+    const count=checkpoints[checkpoints.length-1]??Math.max(1,r.points.length-1);
+    app.patch({routing:r.points.length>1?{...r,points:r.points.slice(0,count),checkpoints:checkpoints.slice(0,-1)}:null});
+  };
+  const placeRouteVia=()=>{
+    const r=app.routing;if(!r)return;
+    const plan=routePlan(app.cursorWorld);
+    if(plan.reason){blocked(plan.reason);return;}
+    const points=cleanRoute([...r.points,...plan.points.slice(1)]),last=points[points.length-1];
+    const nc=netClassFor(board,r.net),allowed=nc?.allowedLayers??cu;
+    const next=cu.slice(cu.indexOf(r.layer)+1).concat(cu.slice(0,cu.indexOf(r.layer))).find(l=>allowed.includes(l));
+    if(!next){blocked('layer');return;}
+    const trace={points,net:r.net,layer:r.layer,width:r.width};
+    const via={x:last.x,y:last.y,size:app.viaOverride?.size??nc?.viaSize??.6,drill:app.viaOverride?.drill??nc?.viaDrill??.3,net:r.net};
+    const traces=points.length>=2?[trace]:[];
+    const existing=board.vias.some(v=>v.net===r.net&&dist(v,last)<1e-6&&[r.layer,next].every(l=>viaLayers(board,v).includes(l)))
+      ||flatPads.some(p=>p.net===r.net&&!p.def.npth&&p.def.drill>0&&dist(p.center,last)<1e-6&&[r.layer,next].every(l=>p.layers.includes(l)));
+    const issues=manualCopperIssues(board,analysis.rules,traces,existing?[]:[via]);
+    if(issues.length){blocked(issues[0]);return;}
+    editor.begin('过孔换层');
+    if(traces.length)editor.dispatch(pcb.addTrace(trace).command);
+    if(!existing)editor.dispatch(pcb.addVia(via));editor.commit();
+    app.patch({routing:{...r,points:[last],checkpoints:[],layer:next,startPad:undefined},activeLayer:next});
+  };
+  // Capture routing keys before the workspace selection shortcuts can delete other objects.
+  useEffect(()=>{
+    const key=(e:KeyboardEvent)=>{
+      if((e.target as HTMLElement)?.closest?.('input,textarea,select,[contenteditable="true"]'))return;
+      if(e.key==='Escape'&&drag.current){editor.rollback();drag.current=null;setMovingIds([]);setAlignmentGuides([]);setMarquee(null);e.preventDefault();e.stopImmediatePropagation();return;}
+      if(!app.routing)return;
+      const k=e.key.toLowerCase();
+      if(e.metaKey||e.ctrlKey){
+        if(k==='z'&&!e.shiftKey&&app.routing.points.length>1){undoRoutePoint();e.preventDefault();e.stopImmediatePropagation();}
+        else if(k==='z'||k==='y')app.patch({routing:null});
+        return;
+      }
+      if(e.key==='Escape')app.patch({routing:null});
+      else if(e.key==='Backspace'||e.key==='Delete')undoRoutePoint();
+      else if(e.key==='Enter'){const plan=routePlan(app.cursorWorld);if(plan.reason)blocked(plan.reason);else finishRoute([...app.routing.points,...plan.points.slice(1)]);}
+      else if(k==='v')placeRouteVia();
+      else if(k==='/')setStraightFirst(v=>!v);
+      else if(/^[1-9]$/.test(k)){app.toast(t('pcb.route.changeLayer'));}
+      else return;
+      e.preventDefault();e.stopImmediatePropagation();
+    };
+    window.addEventListener('keydown',key,true);return()=>window.removeEventListener('keydown',key,true);
+  });
 
   const selectIn = (rect: Rect, add: boolean, strict: boolean) => {
     const ids: string[] = [];
@@ -139,26 +183,29 @@ export function PcbCanvas() {
     const now = Date.now(); const dbl = now - lastClick.current.t < 350 && Math.abs(e.clientX - lastClick.current.x) < 4 && Math.abs(e.clientY - lastClick.current.y) < 4; lastClick.current = { t: now, x: e.clientX, y: e.clientY };
     if (app.autoroute.status === 'done') return;
     if (tool === 'route') {
-      const pad = padAt(raw);
-      if (!app.routing) {
-        if (!pad) { app.toast('从一个焊盘开始走线'); return; }
-        const nc = netClassFor(board, pad.net);
-        const layer = pad.layers.includes(app.activeLayer) ? app.activeLayer : pad.layers[0];
-        app.patch({ routing: { points: [pad.center], net: pad.net, layer, width: app.traceWidthOverride ?? nc?.traceWidth ?? 0.25, startPad: { footprintId: pad.footprintId, number: pad.number } }, activeLayer: layer });
+      if(!app.routing){
+        const target=snapTarget(raw,undefined,e.altKey);
+        if(!target){app.toast(t('pcb.route.startHint'));return;}
+        const nc=netClassFor(board,target.net),layer=app.activeLayer;
+        if(nc?.allowedLayers&&!nc.allowedLayers.includes(layer)){blocked('layer');return;}
+        app.patch({routing:{points:[target.point],net:target.net,layer,width:app.traceWidthOverride??nc?.traceWidth??.25,checkpoints:[],startPad:target.pad?{footprintId:target.pad.footprintId,number:target.pad.number}:undefined},cursorWorld:target.point,pcbSelection:[]});
         return;
       }
-      const last = app.routing.points[app.routing.points.length - 1];
-      if (pad && pad.net === app.routing.net && !(pad.footprintId === app.routing.startPad?.footprintId && pad.number === app.routing.startPad?.number)) { finishRoute(pad.center); return; }
-      if (dbl) { finishRoute(); return; }
-      const np = snap45(last, p);
-      if (dist(np, last) > 1e-6) app.patch({ routing: { ...app.routing, points: [...app.routing.points, np] } });
+      const r=app.routing,plan=routePlan(raw,e.altKey);
+      if(plan.reason){blocked(plan.reason);return;}
+      const pts=[...r.points,...plan.points.slice(1)];
+      if(pts.length===r.points.length)return;
+      if(plan.target||dbl){finishRoute(pts);return;}
+      app.patch({routing:{...r,points:pts,checkpoints:[...(r.checkpoints??[]),r.points.length]}});
       return;
     }
     if (tool === 'via') {
-      const pad = padAt(raw);
-      const nc = netClassFor(board, pad?.net ?? '');
-      editor.dispatch(pcb.addVia({ x: p.x, y: p.y, size: app.viaOverride?.size ?? nc?.viaSize ?? 0.6, drill: app.viaOverride?.drill ?? nc?.viaDrill ?? 0.3, net: pad?.net ?? '' }));
-      return;
+      const target=snapTarget(raw,undefined,e.altKey),pos=target?.point??p;
+      const nc=netClassFor(board,target?.net??'');
+      const via={...pos,size:app.viaOverride?.size??nc?.viaSize??.6,drill:app.viaOverride?.drill??nc?.viaDrill??.3,net:target?.net??''};
+      const issues=manualCopperIssues(board,analysis.rules,[],[via]);
+      if(issues.length){blocked(issues[0]);return;}
+      editor.dispatch(pcb.addVia(via));return;
     }
     if (tool === 'zone') {
       const d = app.zoneDraft ?? [];
@@ -177,11 +224,20 @@ export function PcbCanvas() {
       return;
     }
     if (tool === 'hole') {
-      const def = holeFootprint(app.hole.drill, app.hole.plated, app.hole.ring);
-      if (!editor.project.library.footprints.some((f) => f.id === def.id)) editor.dispatch(lib.addLibraryItems({ footprints: [def] }));
-      const r = pcb.addBoardFootprint(editor.project, { footprintId: def.id, x: p.x, y: p.y, prefix: app.hole.plated ? 'PTH' : 'H' });
+      const half=app.hole.mode==='castellated';
+      let def;
+      try{def=half?castellatedFootprint(app.hole.drill,app.hole.ring,app.hole.count??4,app.hole.pitch??2.54):holeFootprint(app.hole.drill,app.hole.plated,app.hole.ring);}catch{app.toast(t('pcb.hole.invalid'),'error');return;}
+      const edge=half?snapCastellatedRow(board,raw,def.body.w,Math.max(.8,14/vp.k)):null;
+      if(half&&!edge){app.toast(t('pcb.hole.edgeHint'),'error');return;}
+      const pos=edge??p;
+      if(!half&&(!pointInPolygon(pos,board.outline)||board.outline.some((a,i)=>pointSegDist(pos,a,board.outline[(i+1)%board.outline.length])<app.hole.drill/2+.1))){app.toast(t('pcb.hole.edgeHint'),'error');return;}
+      editor.begin('开孔');
+      if(!editor.project.library.footprints.some(f=>f.id===def.id))editor.dispatch(lib.addLibraryItems({footprints:[def]}));
+      const r=pcb.addBoardFootprint(editor.project,{footprintId:def.id,x:pos.x,y:pos.y,rotation:edge?.rotation??0,prefix:half?'CAST':app.hole.plated?'PTH':'H',padNets:Object.fromEntries(def.pads.map(pd=>[pd.number,app.hole.plated?app.hole.net??'':'']))});
       editor.dispatch(r.command);
-      return;
+      const issues=runDrc(editor.project.board,analysis.rules).items.filter(i=>i.severity==='error'&&i.objectIds?.includes(r.id));
+      if(issues.length){editor.rollback();app.toast(t('pcb.hole.conflict'),'error');return;}
+      editor.commit();return;
     }
     if (tool === 'measure') { const m = app.measure ?? []; app.patch({ measure: m.length >= 2 ? [p] : [...m, p] }); return; }
     if (tool === 'text') { const t = prompt('丝印文字', 'v1.0'); if (t) editor.dispatch(pcb.addBoardText({ layer: 'F.Silk', text: t, x: p.x, y: p.y, size: 1 })); return; }
@@ -203,15 +259,8 @@ export function PcbCanvas() {
     const raw = view.toWorld(e.clientX, e.clientY);
     app.set('cursorWorld', raw);
     const d = drag.current;
-    if (!d) {
-      if (app.routing) {
-        const pv = previewPath(raw);
-        let prev = app.routing.points[app.routing.points.length - 1], bad = false;
-        for (const q of pv) { if (violates(prev, q, app.routing.layer, app.routing.width, app.routing.net)) bad = true; prev = q; }
-        setPreviewBad(bad);
-      }
-      return;
-    }
+    setMagnetOff(e.altKey);
+    if (!d) return;
     const p = { x: sg(raw.x), y: sg(raw.y) };
     if (d.kind === 'marquee') { setMarquee({ a: d.start, b: raw }); return; }
     if (d.kind === 'fp') {
@@ -219,10 +268,11 @@ export function PcbCanvas() {
       if(!f)return;
       const desired={x:raw.x-d.dx,y:raw.y-d.dy};
       const local=footprintBody({...f,x:0,y:0});
-      const targets=editor.project.board.footprints.filter(other=>other.id!==d.id&&other.side===f.side&&!hidden.has(other.id)).map(other=>footprintBody(other));
+      const targets=editor.project.board.footprints.filter(other=>!d.members.some(m=>m.id===other.id)&&other.side===f.side&&!hidden.has(other.id)).map(other=>footprintBody(other));
       const result=alignmentEnabled&&!e.altKey?alignDrag(desired,local,targets,Math.min(1,6/vp.k),PCB_SNAP):{position:{x:sg(desired.x),y:sg(desired.y)},guides:[]};
       setAlignmentGuides(result.guides);
-      editor.dispatch(pcb.moveFootprint(d.id,result.position));
+      const delta={x:result.position.x-d.origin.x,y:result.position.y-d.origin.y};
+      editor.dispatch(pcb.moveFootprints(d.members.map(m=>({id:m.id,x:m.x+delta.x,y:m.y+delta.y}))));
     }
     else if (d.kind === 'via') editor.dispatch(pcb.setViaProps(d.id, { x: sg(raw.x - d.dx), y: sg(raw.y - d.dy) }));
     else if (d.kind === 'text') editor.dispatch(pcb.setTextProps(d.id, { x: sg(raw.x - d.dx), y: sg(raw.y - d.dy) }));
@@ -254,7 +304,7 @@ export function PcbCanvas() {
   };
 
   const onUp = (e: RPE<SVGSVGElement>) => {
-    setAlignmentGuides([]);
+    setAlignmentGuides([]); setMovingIds([]);
     if (view.panEnd(e)) return;
     const d = drag.current;
     drag.current = null;
@@ -296,7 +346,14 @@ export function PcbCanvas() {
       if (under.length > 1) { const next = under[(under.findIndex((x) => x.id === id) + 1) % under.length]; f = next; id = next.id; app.toast(`选中下面的 ${next.ref}（${under.length} 个元件重叠，继续点击轮换）`); }
     }
     select(id, e);
-    begin('移动封装', { kind: 'fp', id, dx: p.x - f.x, dy: p.y - f.y }, e);
+    const selectedPad=flatPads.find(pd=>pd.footprintId===id&&p.x>=pd.rect.x&&p.x<=pd.rect.x+pd.rect.w&&p.y>=pd.rect.y&&p.y<=pd.rect.y+pd.rect.h);
+    if(selectedPad?.net)app.set('highlightNet',selectedPad.net);
+    if(f.locked||f.placement?.fixed){e.stopPropagation();app.toast(t('pcb.move.locked'));return;}
+    if(e.shiftKey){e.stopPropagation();return;}
+    const selected=app.pcbSelection.includes(id)?app.pcbSelection:[id];
+    const members=board.footprints.filter(f=>selected.includes(f.id)&&!f.locked&&!f.placement?.fixed).map(f=>({id:f.id,x:f.x,y:f.y}));
+    setMovingIds(members.map(m=>m.id));
+    begin('移动封装', {kind:'fp',id,dx:p.x-f.x,dy:p.y-f.y,origin:{x:f.x,y:f.y},members}, e);
   };
   const onViaDown = (id: string) => (e: RPE<SVGElement>) => {
     if (e.button !== 0 || view.spaceDown || !isSelectLike) return;
@@ -321,17 +378,10 @@ export function PcbCanvas() {
   const onOutlinePtDown = (index: number) => (e: RPE<SVGElement>) => { if (e.button !== 0) return; begin('编辑板框', { kind: 'outlinePt', index }, e); };
   const onZoneDown = (id: string) => (e: RPE<SVGElement>) => { if (e.button !== 0 || !isSelectLike) return; e.stopPropagation(); select(id, e); };
 
-  const previewPath = (raw: Vec): Vec[] => {
-    const r = app.routing!;
-    const last = r.points[r.points.length - 1];
-    const pad = padAt(raw);
-    if (pad && pad.net === r.net) { const mid = bend45(last, pad.center); return mid ? [mid, pad.center] : [pad.center]; }
-    return [snap45(last, { x: sg(raw.x), y: sg(raw.y) })];
-  };
-
   /** 右键 / 双指轻触：结束当前走线 / 草稿 / 工具。 */
   const onContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
+    if(drag.current){editor.rollback();drag.current=null;setMovingIds([]);setAlignmentGuides([]);setMarquee(null);return;}
     if (app.routing) { if (app.routing.points.length >= 2) finishRoute(); else app.patch({ routing: null }); }
     else if (app.zoneDraft || app.outlineDraft || app.measure) app.patch({ zoneDraft: null, outlineDraft: null, measure: null });
     else if (app.autoroute.status === 'done') app.patch({ autoroute: { status: 'idle', result: null } });
@@ -463,7 +513,12 @@ export function PcbCanvas() {
   const gs = step * vp.k;
   const bb = boardBounds(board);
   const cursorSnap = { x: sg(app.cursorWorld.x), y: sg(app.cursorWorld.y) };
-  const routePreview = app.routing ? previewPath(app.cursorWorld) : null;
+  const plan=app.routing?routePlan(app.cursorWorld):null;
+  const routePreview=plan?plan.points.slice(1).length?plan.points.slice(1):[plan.points[0]]:null;
+  const previewBad=!!plan?.reason;
+  const hoverTarget=tool==='route'?plan?.target??(!app.routing?snapTarget(app.cursorWorld):null):null;
+  const routeReference=app.routing?flatPads.filter(p=>!p.def.npth&&p.net===app.routing!.net&&!hidden.has(p.footprintId)&&dist(p.center,app.routing!.points[0])>.01).sort((a,b)=>dist(a.center,app.cursorWorld)-dist(b.center,app.cursorWorld))[0]:null;
+  const moveIssues=movingIds.length?analysis.drc.items.filter(i=>i.rule!=='unrouted'&&i.objectIds?.some(id=>movingIds.includes(id))):[];
   const drcMarks = analysis.drc.items.filter((i) => i.location && i.rule !== 'outside-board');
   const cursor = tool === 'route' || tool === 'zone' || tool === 'measure' || tool === 'via' || tool === 'edge' || tool === 'hole' ? 'crosshair' : view.panning ? 'grabbing' : view.spaceDown ? 'grab' : 'default';
   const hlItem = app.checkHighlight ? analysis.drc.items.find((i) => i.id === app.checkHighlight) : null;
@@ -495,8 +550,8 @@ export function PcbCanvas() {
             const d = t.points.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${p.y}`).join('');
             const sel = app.pcbSelection.includes(t.id), hlt = hl && t.net === hl;
             return <g key={t.id} onPointerDown={onTraceDown(t.id)} style={{ cursor: isSelectLike ? 'pointer' : undefined }}>
-              {(sel || hlt) && <path d={d} stroke="#FFD84D" strokeWidth={t.width + 0.3} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={0.5} />}
-              <path d={d} stroke={LAYER_COLORS[t.layer]} strokeWidth={t.width} opacity={opOf(t.layer) * dimIf(t.net)} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              <title>{`${t.net||'—'} · ${t.layer} · ${pcbWidthText(t.width)} mm`}</title>
+              <path data-trace-copper={t.id} d={d} stroke={sel||hlt?PCB_DISPLAY.selected:LAYER_COLORS[t.layer]} strokeWidth={t.width} opacity={opOf(t.layer) * dimIf(t.net)} fill="none" strokeLinecap="round" strokeLinejoin="round" />
               <path d={d} stroke="transparent" strokeWidth={Math.max(t.width, 0.6)} fill="none" />
             </g>;
           })}
@@ -506,14 +561,14 @@ export function PcbCanvas() {
             const silk: Layer = fp.side === 'F' ? 'F.Silk' : 'B.Silk';
             const sel = app.pcbSelection.includes(fp.id);
             return (
-              <g key={fp.id} onPointerDown={onFootprintDown(fp.id)} style={{ cursor: isSelectLike ? 'move' : undefined }}>
+              <g key={fp.id} data-footprint-id={fp.id} onPointerDown={onFootprintDown(fp.id)} style={{ cursor: isSelectLike ? 'move' : undefined }}>
+                {movingIds.includes(fp.id) && <rect data-placement-preview x={body.x-.2} y={body.y-.2} width={body.w+.4} height={body.h+.4} fill="none" stroke={moveIssues.some(i=>i.objectIds?.includes(fp.id))?PCB_DISPLAY.error:'#58C7A0'} strokeWidth={2/vp.k}/> }
                 {sel && <rect x={body.x - 0.6} y={body.y - 0.6} width={body.w + 1.2} height={body.h + 1.2} rx={0.3} fill="rgba(255,216,77,.08)" stroke="#FFD84D" strokeWidth={0.15} />}
                 {visible(silk) && <rect x={body.x} y={body.y} width={body.w} height={body.h} fill="transparent" stroke={LAYER_COLORS[silk]} strokeWidth={0.12} opacity={fp.side === 'F' ? 1 : 0.6} />}
                 {ps.map((pd, i) => {
-                  const color = pd.through ? LAYER_COLORS[app.activeLayer] : LAYER_COLORS[pd.layers[0]];
                   const hlp = hl && pd.net === hl;
-                  return <g key={i} opacity={(pd.through || pd.layers.includes(app.activeLayer) ? 1 : app.otherLayerOpacity) * dimIf(pd.net)}>
-                    {hlp && <rect x={pd.rect.x - 0.2} y={pd.rect.y - 0.2} width={pd.rect.w + 0.4} height={pd.rect.h + 0.4} rx={0.2} fill="rgba(255,216,77,.5)" />}
+                  const color = hlp ? PCB_DISPLAY.selected : pd.through ? PCB_DISPLAY.plated : padColor(pd.layers[0]);
+                  return <g key={i} data-pad={`${fp.ref}.${pd.number}`} opacity={(pd.through || pd.layers.includes(app.activeLayer) ? 1 : app.otherLayerOpacity) * dimIf(pd.net)}>
                     {pd.def.shape === 'circle' || pd.def.shape === 'oval'
                       ? <ellipse cx={pd.center.x} cy={pd.center.y} rx={pd.rect.w / 2} ry={pd.rect.h / 2} fill={pd.def.npth ? 'none' : color} stroke={pd.def.npth ? LAYER_COLORS['Edge.Cuts'] : 'none'} strokeWidth={0.1} />
                       : <rect x={pd.rect.x} y={pd.rect.y} width={pd.rect.w} height={pd.rect.h} rx={pd.def.shape === 'roundrect' ? Math.min(pd.rect.w, pd.rect.h) * 0.25 : 0} fill={color} />}
@@ -530,7 +585,7 @@ export function PcbCanvas() {
           {/* 过孔 */}
           {board.vias.map((v) => (
             <g key={v.id} onPointerDown={onViaDown(v.id)} style={{ cursor: isSelectLike ? 'move' : undefined }} opacity={dimIf(v.net) * (viaLayers(board,v).includes(app.activeLayer as CopperLayer)?1:.25)}>
-              <circle cx={v.x} cy={v.y} r={v.size / 2} fill={app.pcbSelection.includes(v.id) ? '#FFD84D' : LAYER_COLORS[app.activeLayer]} />
+              <circle cx={v.x} cy={v.y} r={v.size / 2} fill={app.pcbSelection.includes(v.id) ? PCB_DISPLAY.selected : PCB_DISPLAY.plated} />
               <title>{`${v.startLayer??'F.Cu'} → ${v.endLayer??'B.Cu'}${v.backdrill?' · Backdrill':''}`}</title>
               {v.backdrill && <circle cx={v.x} cy={v.y} r={v.backdrill.diameter/2} fill="none" stroke="#F0A040" strokeWidth={0.08} strokeDasharray=".2 .15"/>}
               <circle cx={v.x} cy={v.y} r={v.drill / 2} fill="#1A1D23" />
@@ -540,9 +595,11 @@ export function PcbCanvas() {
           {board.texts.filter((t) => visible(t.layer)).map((t) => <text key={t.id} x={t.x} y={t.y} fontSize={t.size * 1.2} fill={app.pcbSelection.includes(t.id) ? '#FFD84D' : LAYER_COLORS[t.layer]} textAnchor="middle" letterSpacing={0.1} onPointerDown={onTextDown(t.id)} style={{ cursor: isSelectLike ? 'move' : undefined }}>{t.text}</text>)}
           {alignmentGuides.map((g,i)=><line data-alignment-guide={g.axis} key={`align${i}`} x1={g.axis==='x'?g.value:g.from} y1={g.axis==='y'?g.value:g.from} x2={g.axis==='x'?g.value:g.to} y2={g.axis==='y'?g.value:g.to} stroke="#F0A040" strokeWidth={1/vp.k} strokeDasharray={`${4/vp.k} ${3/vp.k}`} pointerEvents="none"/>)}
           {/* 飞线 */}
-          <g stroke="#FFFFFF" strokeOpacity={0.45} strokeWidth={0.08} strokeDasharray="0.3 0.3">
+          <g data-ratsnest pointerEvents="none" stroke="#FFFFFF" strokeOpacity={0.45} strokeWidth={0.08} strokeDasharray="0.3 0.3">
             {analysis.ratsnest.lines.map((l, i) => <line key={i} x1={l.a.x} y1={l.a.y} x2={l.b.x} y2={l.b.y} opacity={dimIf(l.net)} stroke={hl === l.net ? '#FFD84D' : undefined} />)}
           </g>
+          {routeReference&&app.routing&&<line data-route-reference x1={app.cursorWorld.x} y1={app.cursorWorld.y} x2={routeReference.center.x} y2={routeReference.center.y} stroke="#FFD84D" strokeWidth={1/vp.k} strokeDasharray={`${5/vp.k} ${4/vp.k}`} pointerEvents="none"/>}
+          {hoverTarget&&<circle data-route-snap cx={hoverTarget.point.x} cy={hoverTarget.point.y} r={7/vp.k} fill="none" stroke="#58D8BA" strokeWidth={2/vp.k} pointerEvents="none"/>}
           {/* 选中走线的顶点手柄 */}
           {selTrace && isSelectLike && selTrace.points.map((p, i) => <rect key={i} x={p.x - hs / 2} y={p.y - hs / 2} width={hs} height={hs} fill="#16181D" stroke="#FFD84D" strokeWidth={hs / 5} style={{ cursor: 'crosshair' }} onPointerDown={onTracePtDown(selTrace.id, i)} />)}
           {/* 板框顶点手柄（板框工具） */}
@@ -555,12 +612,20 @@ export function PcbCanvas() {
           {/* 走线预览 */}
           {app.routing && routePreview && (
             <g pointerEvents="none">
+              <ClearanceOutline points={plan!.points} width={app.routing.width} clearance={router.clearance(app.routing)} scale={vp.k} blocked={previewBad}/>
               <path d={app.routing.points.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${p.y}`).join('')} stroke={LAYER_COLORS[app.routing.layer]} strokeWidth={app.routing.width} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
-              <path d={`M${app.routing.points[app.routing.points.length - 1].x} ${app.routing.points[app.routing.points.length - 1].y}` + routePreview.map((q) => `L${q.x} ${q.y}`).join('')} stroke={previewBad ? '#FF3B30' : LAYER_COLORS[app.routing.layer]} strokeWidth={app.routing.width} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
-              <circle cx={routePreview[routePreview.length - 1].x} cy={routePreview[routePreview.length - 1].y} r={app.routing.width} fill="none" stroke={previewBad ? '#FF3B30' : '#fff'} strokeWidth={0.06} />
+              <path data-route-preview d={`M${app.routing.points[app.routing.points.length - 1].x} ${app.routing.points[app.routing.points.length - 1].y}` + routePreview.map((q) => `L${q.x} ${q.y}`).join('')} stroke={LAYER_COLORS[app.routing.layer]} strokeWidth={app.routing.width} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
+              {previewBad&&<PcbCheckMarker point={routePreview[routePreview.length-1]} scale={vp.k} severity="error"/>}
             </g>
           )}
-          {tool === 'hole' && (() => { const d = app.hole.drill, pad = app.hole.plated ? d + 2 * app.hole.ring : d; return <g pointerEvents="none" opacity={0.7}><circle cx={cursorSnap.x} cy={cursorSnap.y} r={pad / 2} fill={app.hole.plated ? '#3D8BFF' : 'none'} stroke="#3D8BFF" strokeWidth={0.1} strokeDasharray="0.3 0.2" /><circle cx={cursorSnap.x} cy={cursorSnap.y} r={d / 2} fill="#1A1D23" stroke="#D0D2D6" strokeWidth={0.08} /></g>; })()}
+          {tool==='hole'&&(()=>{
+            try{
+              const half=app.hole.mode==='castellated',def=half?castellatedFootprint(app.hole.drill,app.hole.ring,app.hole.count??4,app.hole.pitch??2.54):holeFootprint(app.hole.drill,app.hole.plated,app.hole.ring);
+              const edge=half?snapCastellatedRow(board,app.cursorWorld,def.body.w,Math.max(.8,14/vp.k)):null;
+              const pos=edge??cursorSnap;
+              return <g data-hole-preview transform={`translate(${pos.x} ${pos.y}) rotate(${edge?.rotation??0})`} pointerEvents="none" opacity={.8}>{def.pads.map(pd=><g key={pd.number}><circle cx={pd.x} cy={pd.y} r={pd.w/2} fill={pd.npth?'none':PCB_DISPLAY.plated} stroke={half&&!edge?PCB_DISPLAY.error:'#58D8BA'} strokeWidth={.1}/><circle cx={pd.x} cy={pd.y} r={pd.drill/2} fill="#1A1D23" stroke="#D0D2D6" strokeWidth={.06}/></g>)}</g>;
+            }catch{return null;}
+          })()}
           {/* 板级封装放置预览 */}
           {tool === 'place' && app.pcbPlacing && (() => { const ghost = { id: 'ghost', ref: '?', footprintId: app.pcbPlacing.footprintId, value: '', x: cursorSnap.x, y: cursorSnap.y, rotation: app.pcbPlacing.rotation, side: (app.activeLayer === 'B.Cu' ? 'B' : 'F') as 'F' | 'B', padNets: {} }; const b = footprintBody(ghost); return (
             <g pointerEvents="none" opacity={0.75}>
@@ -618,15 +683,14 @@ export function PcbCanvas() {
           {/* DRC 标记 */}
           {drcMarks.map((m) => {
             const on = app.checkHighlight === m.id;
-            return <g key={m.id} transform={`translate(${m.location!.x} ${m.location!.y})`} pointerEvents="none" opacity={app.checkHighlight && !on ? 0.35 : 1}>
-              {on && <circle r={2.2} fill={m.severity === 'error' ? '#FF3B30' : '#FFB020'} className="drc-pulse" opacity={0.15} />}
-              <circle r={1.1} fill="none" stroke={m.severity === 'error' ? '#FF3B30' : '#FFB020'} strokeWidth={0.18} />
+            return <g key={m.id} opacity={app.checkHighlight && !on ? 0.35 : 1}>
+              <PcbCheckMarker point={m.location!} scale={vp.k} severity={m.severity} active={on}/>
             </g>;
           })}
           {hlItem?.location && (
             <g transform={`translate(${hlItem.location.x + 1.6} ${hlItem.location.y - 3})`} pointerEvents="none">
-              <rect x={0} y={0} width={Math.max(10, hlItem.message.length * 0.75 + 1.5)} height={2.2} rx={0.4} fill={hlItem.severity === 'error' ? '#FF3B30' : '#FFB020'} />
-              <text x={0.8} y={1.5} fontSize={1.05} fill="#fff" fontFamily="Inter,'Noto Sans SC',sans-serif">● {hlItem.message}</text>
+              <rect x={0} y={0} width={Math.max(10, hlItem.message.length * 0.75 + 1.5)} height={2.2} rx={0.4} fill={PCB_DISPLAY.backdrop} stroke={hlItem.severity==='error'?PCB_DISPLAY.error:PCB_DISPLAY.warning} strokeWidth={.1}/>
+              <text x={0.8} y={1.5} fontSize={1.05} fill={hlItem.severity==='error'?PCB_DISPLAY.error:PCB_DISPLAY.warning} fontFamily="Inter,'Noto Sans SC',sans-serif">! {hlItem.message}</text>
             </g>
           )}
         </g>
@@ -637,24 +701,19 @@ export function PcbCanvas() {
       <div className="float" style={{ left: 30, top: 32 }}>
         <span style={{ width: 8, height: 8, borderRadius: '50%', background: LAYER_COLORS[app.activeLayer] }} /><span>{app.activeLayer}</span><span className="dim">· 当前层 · 数字键 1–{cu.length} 切换</span>
       </div>
-      {app.routing && (
-        <div className="banner" style={{ borderColor: previewBad ? 'var(--error)' : undefined }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: LAYER_COLORS[app.routing.layer] }} />
-          走线中 <span className="mono">{app.routing.net || '无网络'}</span> · {app.routing.layer} · <span className="mono">{fmt(app.routing.width)}mm</span>
-          {previewBad ? <span style={{ color: 'var(--error)' }}>间距不足（&lt; {analysis.rules.minClearance}mm）</span> : <span className="dim">点击加点 · 双击或点同网络焊盘结束 · V 过孔换层 · Esc 取消</span>}
+      {tool==='route' && <div className="pcb-assist" data-no-translate>
+        <div className="row" style={{flexWrap:'wrap',gap:8}}>
+          <strong>{app.routing?.net??t('pcb.route.title')}</strong>
+          {app.routing&&<span>{app.routing.layer} · {t('pcb.display.width')} {pcbWidthText(app.routing.width)} mm · {t('pcb.display.clearance')} {pcbWidthText(router.clearance(app.routing))} mm · {fmt(routeLength([...app.routing.points,...plan!.points.slice(1)]))} mm</span>}
+          <button className="btn sm" aria-pressed={straightFirst} onClick={()=>setStraightFirst(v=>!v)}>{t('pcb.route.bend')} /</button>
+          <button className="btn sm" aria-pressed={walkAround} onClick={()=>setWalkAround(v=>!v)}>{t('pcb.route.walk')} {walkAround?'✓':'—'}</button>
+          {app.routing&&<><button className="btn sm" onClick={undoRoutePoint}>{t('pcb.route.back')}</button><button className="btn sm" onClick={()=>finishRoute()}>{t('pcb.route.finish')}</button><button className="btn sm" onClick={()=>app.patch({routing:null})}>{t('pcb.route.cancel')}</button></>}
         </div>
-      )}
-      {tool === 'hole' && (
-        <div className="banner" style={{ gap: 8, flexWrap: 'wrap', width: 'max-content', maxWidth: 'calc(100% - 24px)' }} onPointerDown={(e) => e.stopPropagation()}>
-          <span className="dim">开孔</span>
-          {SCREW_HOLES.map((h) => <span key={h.label} className={`chip mono${Math.abs(app.hole.drill - h.drill) < 1e-6 ? ' on' : ''}`} onClick={() => app.set('hole', { ...app.hole, drill: h.drill })}>{h.label} ⌀{h.drill}</span>)}
-          <span className="row mono xs" style={{ gap: 4 }}>⌀<input className="input mono" style={{ width: 56, height: 22 }} key={app.hole.drill} defaultValue={app.hole.drill} onBlur={(e) => { const v = Number(e.target.value); if (v >= 0.3 && v <= 20) app.set('hole', { ...app.hole, drill: v }); }} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} /> mm</span>
-          <span className={`chip${!app.hole.plated ? ' on' : ''}`} onClick={() => app.set('hole', { ...app.hole, plated: false })}>非金属化（螺丝孔）</span>
-          <span className={`chip${app.hole.plated ? ' on' : ''}`} onClick={() => app.set('hole', { ...app.hole, plated: true })}>金属化（可接地 / 接线）</span>
-          {app.hole.plated && <span className="row mono xs" style={{ gap: 4 }}>环宽<input className="input mono" style={{ width: 48, height: 22 }} key={app.hole.ring} defaultValue={app.hole.ring} onBlur={(e) => { const v = Number(e.target.value); if (v >= 0.15 && v <= 3) app.set('hole', { ...app.hole, ring: v }); }} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} /></span>}
-          <span className="dim">点击板面放置 · 盘中孔：用过孔工具点在焊盘中心 · Esc 结束</span>
-        </div>
-      )}
+        <div style={{color:previewBad?PCB_DISPLAY.error:'var(--text-2)'}}>{previewBad?`! ${reasonText(plan!.reason)}`:plan?.detour?t('pcb.route.detour'):hoverTarget?`${t('pcb.route.snap')} ${hoverTarget.label} · ${hoverTarget.net}`:t(app.routing?'pcb.route.hint':'pcb.route.startHint')}</div>
+        <div className="dim xs">{t('pcb.display.hint')}</div>
+      </div>}
+      {movingIds.length>0&&<div className="pcb-assist" data-no-translate><strong>{movingIds.length} · {t('pcb.move.title')}</strong> · X {fmt(board.footprints.find(f=>f.id===movingIds[0])!.x)} · Y {fmt(board.footprints.find(f=>f.id===movingIds[0])!.y)} mm<div>{moveIssues.length?t('pcb.move.conflict'):t('pcb.move.hint')}</div></div>}
+      {tool==='hole'&&<HoleControls nets={[...new Set([...analysis.netlist.nets.map(n=>n.name),...flatPads.map(p=>p.net),...board.traces.map(t=>t.net),...board.vias.map(v=>v.net)].filter(Boolean))].sort()}/>}
       {tool === 'edge' && !app.routing && (
         <div className="banner" style={{ gap: 10, flexWrap: 'wrap', width: 'max-content', maxWidth: 'calc(100% - 24px)' }} onPointerDown={(e) => e.stopPropagation()}>
           <span className="dim">板框</span>
@@ -674,7 +733,7 @@ export function PcbCanvas() {
       {hidden.size > 0 && tool !== 'edge' && app.placement.status === 'idle' && ar.status === 'idle' && (
         <div className="banner" style={{ width: 'max-content', gap: 8, top: 'auto', bottom: 52, left: 'auto', right: 12, transform: 'none' }}><span>已隐藏 {hidden.size} 个元件（{board.footprints.filter((f) => hidden.has(f.id)).slice(0, 6).map((f) => f.ref).join('、')}{hidden.size > 6 ? '…' : ''}）</span><button className="btn sm" onClick={() => app.set('hiddenFootprints', [])}>全部显示</button></div>
       )}
-      <button className="btn sm" data-no-translate title={placementT('pcb.alignSnapHint')} aria-pressed={alignmentEnabled} onClick={()=>setAlignmentEnabled(!alignmentEnabled)} style={{position:'absolute',left:30,bottom:100,zIndex:3}}>{placementT('pcb.alignSnap')}{alignmentEnabled?' ✓':''}</button>
+      {tool!=='route'&&tool!=='hole'&&!movingIds.length&&<button className="btn sm" data-no-translate title={placementT('pcb.alignSnapHint')} aria-pressed={alignmentEnabled} onClick={()=>setAlignmentEnabled(!alignmentEnabled)} style={{position:'absolute',left:30,bottom:100,zIndex:3}}>{placementT('pcb.alignSnap')}{alignmentEnabled?' ✓':''}</button>}
       {placementChooser && <div className="banner" data-no-translate style={{flexDirection:'column',whiteSpace:'normal',width:'min(500px, calc(100% - 24px))'}}>
         <span>{placementT('placement.help')}</span>
         <span className="dim">{placementT('placement.antennaProtection')}</span>
@@ -731,7 +790,7 @@ export function PcbCanvas() {
           {ALIGN.map(([m, label]) => <button key={m} className="btn sm" disabled={alignSel.length < 2} onClick={() => doAlign(m)}>{label}</button>)}
         </div>
       )}
-      <Hint space="pcb" />
+      {tool!=='route'&&tool!=='hole'&&!movingIds.length&&<Hint space="pcb" />}
       <div className="float" style={{ right: 12, top: 32, cursor: 'pointer' }} title="点击编辑板框尺寸 / 位置" onClick={() => app.setPcbTool('edge')}><span className="dim">板</span><span>{fmt(bb.w)}×{fmt(bb.h)} mm</span><span className="dim">✎</span></div>
     </div>
   );

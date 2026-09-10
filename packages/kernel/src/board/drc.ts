@@ -8,6 +8,7 @@ import { allPads, footprintBody, netClassFor } from './geometry.js';
 import { gapBetween } from './routingModel.js';
 import { electricalChecks } from './routingQuality.js';
 import { computeRatsnest } from './ratsnest.js';
+import { padOnStraightEdge } from './holes.js';
 
 const mid = (a: Vec, b: Vec): Vec => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 const f = (v: number) => v.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
@@ -17,6 +18,7 @@ export function runDrc(board: Board, rules: RuleSet): CheckReport {
   let n = 0;
   const push = (i: Omit<CheckItem, 'id'>) => items.push({ id: `drc_${++n}`, ...i });
   const pads = allPads(board);
+  for(const p of pads)if(p.def.castellated&&(!p.through||p.def.npth||!padOnStraightEdge(board,p.center,Math.max(p.def.w,p.def.h))))push({rule:'castellated-edge',severity:'error',message:'Castellated hole must be plated and centred on a straight board edge, away from corners',why:'Half-hole copper requires an explicit castellation process.',refs:[`${p.ref}.${p.number}`],location:p.center,objectIds:[p.footprintId]});
   // 2oz 外层铜：线宽 / 线距按重铜规则收紧（内层铜厚 ≥2oz 同理）
   const outerHeavy = (board.stackup?.copperWeight ?? 1) >= 2, innerHeavy = (board.stackup?.innerCopperWeight ?? 0.5) >= 2;
   const heavyOn = (layer: string) => (/^(F|B)\.Cu$/.test(layer) ? outerHeavy : innerHeavy);
@@ -165,6 +167,7 @@ export function runDrc(board: Board, rules: RuleSet): CheckReport {
   if (inner) {
     for (const p of pads) {
       if (p.def.npth) continue; // 非金属化孔没有铜
+      if(p.def.castellated&&p.through&&padOnStraightEdge(board,p.center,Math.max(p.def.w,p.def.h)))continue;
       const r = expandRect(p.rect, rules.copperToEdge);
       const corners = [{ x: r.x, y: r.y }, { x: r.x + r.w, y: r.y }, { x: r.x + r.w, y: r.y + r.h }, { x: r.x, y: r.y + r.h }];
       if (!corners.every((c) => pointInPolygon(c, inner))) push({ rule: 'copper-to-edge', severity: 'warning', message: `焊盘靠近板边 < ${f(rules.copperToEdge)}mm`, why: '切割公差可能切到铜，导致露铜或短路。', refs: [`${p.ref}.${p.number}`], location: p.center, objectIds: [p.footprintId] });

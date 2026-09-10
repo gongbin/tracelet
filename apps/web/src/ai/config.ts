@@ -17,3 +17,16 @@ export const useAiConfig = create<AiConfigState>((set, get) => ({
   save: () => { try { localStorage.setItem(KEY, JSON.stringify(get().cfg)); } catch { /* ignore */ } }
 }));
 export const isAiConfigured = (cfg: AiConfig) => cfg.apiKey.trim().length > 0;
+
+/** Empty base URL intentionally selects the official Anthropic endpoint. */
+export function aiConfigIssue(cfg: AiConfig): 'apiKey' | 'model' | 'baseUrl' | null {
+  if (!cfg.apiKey.trim()) return 'apiKey';
+  if (!cfg.model.trim()) return 'model';
+  if (cfg.baseUrl.trim()) {
+    try {
+      const url = new URL(cfg.baseUrl.trim());
+      if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) return 'baseUrl';
+    } catch { return 'baseUrl'; }
+  }
+  return null;
+}

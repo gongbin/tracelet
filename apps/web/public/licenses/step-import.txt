@@ -1,0 +1,15 @@
+Tracelet STEP import uses occt-import-js 0.0.23 by Viktor Kovacs.
+License: GNU Lesser General Public License 2.1 (see occt-import-js-LGPL-2.1.txt).
+Source and build instructions: https://github.com/kovacsv/occt-import-js
+Exact distributed npm source: https://registry.npmjs.org/occt-import-js/-/occt-import-js-0.0.23.tgz
+
+The occt-import-js distribution contains Open CASCADE Technology (OCCT),
+copyright Open CASCADE SAS and contributors. OCCT uses LGPL 2.1 with an
+additional exception (see OCCT_LGPL_EXCEPTION.txt).
+Source and licensing: https://github.com/Open-Cascade-SAS/OCCT
+The occt-import-js source tree pins the OCCT revision in its occt submodule.
+
+The WebAssembly runtime is a separate, unmodified, dynamically loaded asset.
+Rebuild/replace it using the upstream build instructions and the locateFile
+integration in apps/web/src/editors/three/step.worker.ts.
+Imported component models retain their respective source licenses.

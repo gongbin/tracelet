@@ -146,7 +146,7 @@ export function paintSheet(project: Project, sheet: Sheet, index: number, opts: 
     P.color(ink); P.color(SCH_COLORS.fill, false);
     for (const ln of lay.lines) P.polyline(ln, 16);
     for (const ci of lay.circles) P.circle(ci.c, ci.r, 16, true);
-    P.color(lay.glyph === 'text' ? SCH_COLORS.netLabel : SCH_COLORS.text, false); P.text(lay.text.x, lay.text.y, l.text, 100, lay.text.anchor);
+    P.color(lay.glyph === 'text' ? SCH_COLORS.netLabel : SCH_COLORS.text, false); P.text(lay.text.x, lay.text.y, l.text, lay.text.size ?? 100, lay.text.anchor, { rotate: -(lay.text.rotation ?? 0) });
   }
   return { w: pw, h: ph, content: P.content() };
 }

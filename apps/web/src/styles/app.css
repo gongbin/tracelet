@@ -214,13 +214,16 @@ a:hover { color: var(--accent-hover); }
 .part-row:hover { background: var(--bg-raised); }
 .part-row.on { background: var(--bg-raised); border-color: var(--accent); }
 .part-thumb { width: 44px; height: 44px; flex: none; border-radius: var(--radius); background: var(--bg-canvas-sch); display: flex; align-items: center; justify-content: center; }
-.lib-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); }
-.lib-tabs span { padding: 6px 8px; color: var(--text-2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.lib-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); font-size: 11.5px; overflow-x: auto; scrollbar-width: none; }
+.lib-tabs::-webkit-scrollbar { display: none; }
+.lib-tabs span, .lib-tabs a { flex: none; white-space: nowrap; display: flex; align-items: center; }
+.lib-tabs span { padding: 6px 6px; color: var(--text-2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.lib-tabs a { padding: 6px 2px 8px; font-size: inherit; }
 .lib-tabs span.on { color: var(--text); border-bottom-color: var(--accent); }
 
 .issue { background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; gap: 6px; }
 .issue.error { border-color: var(--error); }
-.issue .why { color: var(--text-3); font-size: 11px; padding-left: 16px; }
+.issue .why { color: var(--text-2); font-size: 11.5px; line-height: 1.6; padding-left: 16px; }
 .warn-row { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: var(--radius); cursor: pointer; }
 .warn-row:hover { background: var(--bg-raised); }
 
@@ -294,8 +297,15 @@ table.data tr:hover td { background: var(--bg-raised); }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
-.label-prompt { position: absolute; z-index: 5; display: flex; gap: 6px; align-items: center; background: var(--bg-panel); border: 1px solid var(--accent); border-radius: var(--radius); padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+.label-prompt { position: absolute; z-index: 5; display: flex; flex-wrap: wrap; max-width: calc(100% - 16px); gap: 6px; align-items: center; background: var(--bg-panel); border: 1px solid var(--accent); border-radius: var(--radius); padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
 .label-prompt input { width: 140px; height: 26px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 3px; padding: 0 8px; color: var(--text); font-family: var(--font-mono); font-size: 12px; }
+.label-prompt select { height: 26px; max-width: 120px; color: var(--text); background: var(--bg-raised); border: 1px solid var(--border); border-radius: 3px; }
+.sch-assist { position: absolute; bottom: 12px; left: 12px; max-width: calc(100% - 24px); display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 7px 10px; border-radius: 6px; background: #fffdf5; color: #5b6472; box-shadow: 0 2px 10px #0002; font-size: 11px; pointer-events: none; z-index: 3; }
+.sch-assist .attached { color: #1768bd; font-weight: 600; }
+.sch-tidy-menu { position: absolute; top: calc(100% + 8px); right: 0; width: 300px; max-width: calc(100vw - 24px); padding: 14px; background: var(--bg-panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 12px 36px #0004; z-index: 25; font-size: 12px; white-space: normal; }
+.sch-tidy-menu p { margin: 8px 0 12px; line-height: 1.6; }
+.check-warning { width: 100%; text-align: left; border: 0; color: var(--text); background: transparent; font: inherit; }
+.check-warning:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* ---------- 元器件分类图标（线性版用 mask 着色） ---------- */
 .cat-icon { width: 20px; height: 20px; flex: none; background-color: currentColor; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; display: inline-block; }
@@ -323,6 +333,9 @@ table.data tr:hover td { background: var(--bg-raised); }
   .topbar .search-box { display: none; }
 }
 @media (max-width: 760px) {
+  .subbar.sch-sheetbar { height: auto; min-height: 36px; flex-wrap: wrap; overflow: visible; padding-right: 108px; }
+  .sch-sheetbar > .ml-auto { display: none; }
+  .sch-tidy-menu { position: fixed; top: 142px; left: 56px; right: 8px; width: auto; }
   .home-nav { flex-wrap: wrap; height: auto; min-height: 48px; padding-block: 8px; gap: 10px; }
   .home-nav > .search-box { display: none; }
   .home-nav .header-preferences { margin-left: auto; }
@@ -414,3 +427,27 @@ table.data tr:hover td { background: var(--bg-raised); }
   .gerber-preview-layout { flex-direction: column; }
   .gerber-preview-files { width: 100% !important; max-height: 150px; border-right: 0 !important; border-bottom: 1px solid var(--border); }
 }
+
+/* AI project creation uses the existing home cards and responsive dialog surface. */
+.action-cards:has(.ai-create-card) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ai-create-card { text-align: left; font: inherit; color: var(--text); }
+.ai-project-dialog { width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow-y: auto; padding: 24px; gap: 12px; }
+.ai-project-dialog h2, .ai-project-dialog h3, .ai-project-dialog p { margin: 0; }
+.ai-project-dialog textarea { height: auto; min-height: 120px; resize: vertical; line-height: 1.5; }
+.ai-project-settings { gap: 10px; border: 1px solid var(--border); padding: 12px; min-width: 0; }
+.ai-project-settings label { display: grid; gap: 5px; }
+.ai-project-plan { gap: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+.ai-project-table { overflow-x: auto; }
+.ai-project-table table { width: 100%; border-collapse: collapse; }
+.ai-project-table th, .ai-project-table td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; overflow-wrap: anywhere; }
+.ai-project-error { color: var(--error); overflow-wrap: anywhere; }
+@media (max-width: 1100px) { .action-cards:has(.ai-create-card) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .action-cards:has(.ai-create-card) { grid-template-columns: minmax(0, 1fr); } .ai-project-dialog { padding: 16px; } }
+
+.pcb-assist { position:absolute; left:30px; bottom:12px; z-index:5; max-width:calc(100% - 44px); box-sizing:border-box; padding:10px 12px; display:flex; flex-direction:column; gap:7px; background:var(--bg-panel, #242832); color:var(--text); border:1px solid var(--border); border-radius:8px; box-shadow:0 4px 18px #0003; font-size:12px; line-height:1.5; }
+.pcb-assist .btn { flex-shrink:0; white-space:nowrap; }
+.pcb-assist .btn[aria-pressed="true"] { color:var(--accent); background:var(--bg-raised); }
+.pcb-hole-controls label { display:flex; align-items:center; gap:5px; }
+.pcb-hole-controls input[type="number"] { width:65px; height:26px; }
+.pcb-hole-controls select { max-width:160px; height:26px; }
+@media (max-width:700px) { .pcb-assist { left:26px; max-height:40%; overflow:auto; bottom:8px; padding:8px; } }

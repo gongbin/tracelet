@@ -29,8 +29,8 @@ export const TOOL_DEFS: Anthropic.Tool[] = [
   T('move_footprint', '移动 PCB 上的封装到指定坐标（mm）。', { ref: { type: 'string' }, x: { type: 'number' }, y: { type: 'number' } }, ['ref', 'x', 'y']),
   T('autoroute', '对未布线连接运行内置自动布线并直接应用（可 Undo）。', { nets: { type: 'array', items: { type: 'string' }, description: '可选，只布这些网络' } }),
   T('locate', '在界面里高亮并定位某个 ERC/DRC 问题（id 来自 run_erc / run_drc）。', { id: { type: 'string' } }, ['id']),
-  T('generate_sheet_from_spec', '把你从用户附件（原理图 PDF / 图片）或描述中抽取出的电路，生成为一张新的原理图图纸（自动生成符号、放置元件、按网络名连线）。用户上传原理图让你"识别 / 导入 / 画出来"时用这个。位号必须唯一；电源网络写 3V3 / 5V / VBUS，地写 GND；没有连接的引脚 net 写空串。始终新增一张图纸，不会删除或修改用户原有图纸。',
-    { title: { type: 'string', description: '图纸名 / 电路名' }, components: { type: 'array', items: { type: 'object', properties: { ref: { type: 'string' }, value: { type: 'string' }, kind: { type: 'string', description: 'resistor / capacitor / inductor / diode / led / transistor / ic / module / connector / crystal / switch …' }, footprint: { type: 'string', description: '封装提示，如 0402、SOT-23、LQFP-48，未知写空串' }, pins: { type: 'array', items: { type: 'object', properties: { number: { type: 'string' }, name: { type: 'string' }, net: { type: 'string' } }, required: ['number', 'net'] } } }, required: ['ref', 'pins'] } }, notes: { type: 'array', items: { type: 'string' }, description: '不确定项' } }, ['components']),
+  T('generate_sheet_from_spec', '把你从用户附件（原理图 PDF / 图片）或描述中抽取出的电路，生成为一张新的原理图图纸（自动生成符号、放置元件、按网络名连线）。用户上传原理图让你"识别 / 导入 / 画出来"时用这个。位号必须唯一；网络标签严格保留原图（包括AGND/DGND、+3V0）；没有连接的引脚 net 写空串。始终新增一张图纸，不会删除或修改用户原有图纸。',
+    { title: { type: 'string', description: '图纸名 / 电路名' }, components: { type: 'array', items: { type: 'object', properties: { ref: { type: 'string' }, value: { type: 'string' }, kind: { type: 'string', description: 'resistor / capacitor / inductor / diode / led / transistor / ic / module / connector / crystal / switch …' }, footprint: { type: 'string', description: '封装提示，如 0402、SOT-23、LQFP-48，未知写空串' }, position: {type:'object',description:'原图本体中心百分比坐标，左上0,0右下100,100；截图识别时应提供',properties:{x:{type:'number',minimum:0,maximum:100},y:{type:'number',minimum:0,maximum:100}},required:['x','y']}, pins: { type: 'array', items: { type: 'object', properties: { number: { type: 'string' }, name: { type: 'string' }, net: { type: 'string' }, side:{type:'string',enum:['L','R','T','B'],description:'原图引脚朝向，按各侧视觉顺序排列引脚'} }, required: ['number', 'net'] } } }, required: ['ref', 'pins'] } }, notes: { type: 'array', items: { type: 'string' }, description: '不确定项' } }, ['components']),
   T('delete_components', '删除当前图纸上的元件（连同其连线端点），可 Undo。', { refs: { type: 'array', items: { type: 'string' } } }, ['refs']),
   T('move_component', '移动原理图元件到指定位置（mil，100 的倍数）。', { ref: { type: 'string' }, x: { type: 'number' }, y: { type: 'number' } }, ['ref', 'x', 'y']),
   T('rotate_component', '旋转原理图元件（每次 90°，可指定 times）。', { ref: { type: 'string' }, times: { type: 'number', description: '默认 1' } }, ['ref']),
@@ -129,7 +129,7 @@ export async function runTool(name: string, input: Record<string, unknown>, ctx:
     }
     case 'locate': { const a = getAnalysis(p()); const item = [...a.erc.items, ...a.drc.items].find((i) => i.id === input.id); if (!item) return '没有这个问题 id'; locateItem(item, a.drc.items.includes(item) ? 'pcb' : 'sch'); ctx.log(`定位 ${item.message}`); return '已定位'; }
     case 'generate_sheet_from_spec': {
-      const spec = input as unknown as ExtractedSchematic;
+      const spec = { ...input, preserveNetNames: true } as unknown as ExtractedSchematic;
       if (!Array.isArray(spec.components) || !spec.components.length) return '没有元件，无法生成';
       const r = generateSchematic(spec, { sheetName: (spec.title || '识别的原理图').slice(0, 24) });
       // 只新增图纸，不动用户原有的任何图纸（是否删除由用户自己决定）

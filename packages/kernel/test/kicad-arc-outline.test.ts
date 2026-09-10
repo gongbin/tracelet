@@ -66,3 +66,42 @@ describe('KiCad 5 圆弧板框', () => {
     expect(b.h).toBeCloseTo(10, 1);
   });
 });
+
+/**
+ * KiCad 库名里的 `_Vertical` / `_Horizontal` 是封装作者写的约定，可以读；
+ * 但**只读对接方式、绝不读出方向**——方向错了整块板报废，那个值只能来自核对过实物的人。
+ */
+describe('从封装名读对接方式', () => {
+  const connOf = (lib: string) => {
+    const { board, footprints } = importKicadPcb(`(kicad_pcb (version 20171130) (host pcbnew "(5.1.5)-3")
+      (general (thickness 1.6))
+      (layers (0 F.Cu signal) (31 B.Cu signal) (44 Edge.Cuts user))
+      (gr_line (start 0 0) (end 20 0) (layer Edge.Cuts) (width 0.05))
+      (gr_line (start 20 0) (end 20 10) (layer Edge.Cuts) (width 0.05))
+      (gr_line (start 20 10) (end 0 10) (layer Edge.Cuts) (width 0.05))
+      (gr_line (start 0 10) (end 0 0) (layer Edge.Cuts) (width 0.05))
+      (module ${lib} (layer F.Cu) (at 5 5)
+        (fp_text reference J1 (at 0 0) (layer F.SilkS))
+        (pad 1 smd rect (at 0 0) (size 1 1) (layers F.Cu))
+      )
+    )`);
+    const id = board.footprints[0].footprintId;
+    return footprints.find((d) => d.id === id)!.connector;
+  };
+
+  it('_Vertical → 立式，无面内方向', () => {
+    const c = connOf('Connector_PinHeader_1.27mm:PinHeader_2x05_P1.27mm_Vertical');
+    expect(c?.mounting).toBe('vertical');
+    expect(c?.direction).toBeUndefined();   // 立式没有方向，也绝不编一个
+  });
+
+  it('EdgeMount → 卧式，但方向仍然未知', () => {
+    const c = connOf('Connector_Coaxial:SMA_Samtec_SMA-J-P-X-ST-EM1_EdgeMount');
+    expect(c?.mounting).toBe('horizontal');
+    expect(c?.direction).toBeUndefined();   // 名字里没有方向信息，仍需人工确认
+  });
+
+  it('厂商料号名 → 什么都不声明', () => {
+    expect(connOf('10118193-0001LF:101181930001LF')).toBeUndefined();
+  });
+});

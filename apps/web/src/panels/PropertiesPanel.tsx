@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { sch, pcb, getSymbol, BUILTIN_FOOTPRINTS, allParts, findFootprint, footprintPads, milToMm, formatLength, copperLayers, registeredFootprints, crossSheetLabelNames, traceLengthStats, polylineLength } from '@tracelet/kernel';
 import { useApp, useEditor, useProject, useSheet } from '../store/app.js';
 import { getAnalysis } from '../store/analysis.js';
+import { useT } from '../i18n/index.js';
 
 function ValueInput({ value, onCommit, mono = true }: { value: string; onCommit: (v: string) => void; mono?: boolean }) {
   const [v, setV] = useState(value);
@@ -14,6 +15,7 @@ function ValueInput({ value, onCommit, mono = true }: { value: string; onCommit:
 }
 
 export function PropertiesPanel() {
+  const t = useT();
   const project = useProject();
   const editor = useEditor();
   const app = useApp();
@@ -35,7 +37,7 @@ export function PropertiesPanel() {
           <div className="row"><span className="mono" style={{ fontWeight: 500, background: 'var(--bg-raised)', padding: '2px 6px', borderRadius: 4 }}>{fp.ref}</span><span className="muted" style={{ fontWeight: 500 }}>{fp.value}</span></div>
           <div className="kv">
             <span className="k">封装</span><span className="field mono nowrap">{def?.name ?? fp.footprintId}</span>
-            <span className="k">位置</span><div className="row" style={{ gap: 6 }}><span className="field mono grow"><span className="dim">X</span>{fp.x.toFixed(2)}</span><span className="field mono grow"><span className="dim">Y</span>{fp.y.toFixed(2)}</span></div>
+            <span className="k">位置</span><div className="row" style={{ gap: 6 }}>{(['x','y'] as const).map(axis=><label key={axis} className="row" style={{minWidth:0,gap:4}}><span>{axis.toUpperCase()}</span><input aria-label={`PCB ${axis.toUpperCase()} mm`} className="input mono" type="number" step=".05" disabled={!!fp.locked||!!fp.placement?.fixed} key={`${fp.id}:${axis}:${fp[axis]}`} defaultValue={fp[axis].toFixed(3)} onBlur={e=>{const v=e.target.valueAsNumber;if(Number.isFinite(v)&&Math.abs(v)<=10000)editor.dispatch(pcb.moveFootprint(fp.id,{x:fp.x,y:fp.y,[axis]:v}));}} onKeyDown={e=>{e.stopPropagation();if(e.key==='Enter')e.currentTarget.blur();}}/></label>)}</div>
             <span className="k">旋转</span><div className="seg sm">{[0, 90, 180, 270].map((r) => <span key={r} className={`seg-opt mono${fp.rotation === r ? ' on' : ''}`} onClick={() => editor.dispatch(pcb.rotateFootprint(fp.id, r - fp.rotation))}>{r}°</span>)}</div>
             <span className="k">面</span><div className="seg sm"><span className={`seg-opt${fp.side === 'F' ? ' on' : ''}`} onClick={() => fp.side !== 'F' && editor.dispatch(pcb.flipFootprint(fp.id))}>顶层</span><span className={`seg-opt${fp.side === 'B' ? ' on' : ''}`} onClick={() => fp.side !== 'B' && editor.dispatch(pcb.flipFootprint(fp.id))}>底层</span></div>
           </div>
@@ -44,7 +46,7 @@ export function PropertiesPanel() {
           <div className="divider" />
           <div className="col" style={{ gap: 6 }}>
             <div className="row"><span className="muted">焊盘</span><span className="mono">{pads.length}</span></div>
-            {pads.map((p, i) => <div key={i} className="pin-row"><span className="dot" style={{ background: p.net ? 'var(--success)' : 'var(--text-3)' }} /><span>{p.number}</span><span className="ml-auto muted">{p.net || '—'}</span></div>)}
+            {pads.map((p, i) => <div key={i} className="pin-row"><span className="dot" style={{ background: p.net ? 'var(--success)' : 'var(--text-3)' }} /><span>{p.number}</span>{!fp.componentId&&!p.def.npth?<select aria-label={`${fp.ref}.${p.number} ${t('pcb.hole.net')}`} className="input mono" style={{marginLeft:'auto',maxWidth:170}} value={p.net} onChange={e=>editor.dispatch(pcb.setBoardPadNet(fp.id,p.number,e.target.value))}><option value="">{t('pcb.hole.isolated')}</option>{[...new Set([...a.netlist.nets.map(n=>n.name),...project.board.footprints.flatMap(f=>Object.values(f.padNets)),...project.board.traces.map(t=>t.net),...project.board.vias.map(v=>v.net)].filter(Boolean))].sort().map(n=><option key={n}>{n}</option>)}</select>:<span className="ml-auto muted">{p.net || '—'}</span>}</div>)}
           </div>
           <div className="row"><span className="muted">原理图</span><span className="ml-auto" style={{ color: 'var(--accent)', cursor: 'pointer' }} onClick={() => { if (fp.componentId) app.patch({ selection: [fp.componentId] }); app.go('sch'); }}>在原理图中定位 →</span></div>
         </div>
@@ -56,7 +58,7 @@ export function PropertiesPanel() {
         <div className="kv">
           <span className="k">网络</span><span className="field mono">{tr.net || '—'}</span>
           <span className="k">层</span><select className="input mono" value={tr.layer} onChange={(e) => editor.dispatch(pcb.setTraceProps(tr.id, { layer: e.target.value as typeof tr.layer }))}>{copperLayers(project.board.copperCount).map((l) => <option key={l} value={l}>{l}</option>)}</select>
-          <span className="k">宽度 (mm)</span><ValueInput value={String(tr.width)} onCommit={(v) => { const n = Number(v); if (n > 0) editor.dispatch(pcb.setTraceProps(tr.id, { width: n })); }} />
+          <span className="k">宽度 (mm)</span><ValueInput value={String(tr.width)} onCommit={(v) => { const n = Number(v); if (Number.isFinite(n) && n > 0) editor.dispatch(pcb.setTraceProps(tr.id, { width: n })); }} />
           <span className="k">段数</span><span className="field mono">{tr.points.length - 1}</span>
           <span className="k">本段长度</span><span className="field mono">{polylineLength(tr.points).toFixed(2)} mm</span>
           {tr.net && (() => { const st = traceLengthStats(project.board).nets.find((n) => n.net === tr.net); return st ? <><span className="k">网络总长</span><span className="field mono" title={Object.entries(st.byLayer).map(([l, v]) => `${l} ${v} mm`).join(' · ')}>{st.length.toFixed(2)} mm · {st.segments} 段 · {st.vias} 过孔</span></> : null; })()}
@@ -144,8 +146,9 @@ export function PropertiesPanel() {
   if (label) return (
     <div className="panel-pad">
       <div className="row"><span style={{ fontWeight: 500 }}>网络标签</span><span className="ml-auto muted" style={{ cursor: 'pointer' }} onClick={() => { editor.dispatch(sch.deleteLabels(sheet.id, [label.id])); app.patch({ selection: [] }); }}>删除</span></div>
-      <div className="kv"><span className="k">名称</span><span className="field mono">{label.text}</span></div>
-      <div className="dim xs">同名标签自动相连（含其他图纸）{crossSheetNames.has(label.text) ? ' · 此网络也出现在其他图纸' : ''}。</div>
+      <div className="kv"><span className="k">名称</span><ValueInput value={label.text} onCommit={value => { if (value.trim()) editor.dispatch(sch.updateLabel(sheet.id, label.id, { text: value.trim() })); }} /></div>
+      <div className="kv"><span className="k">{t('sch.scope.title')}</span><select className="input" aria-label={t('sch.scope.title')} value={label.scope ?? 'global'} onChange={e => editor.dispatch(sch.updateLabel(sheet.id, label.id, { scope: e.target.value as 'local' | 'global' }))}><option value="local">{t('sch.scope.local')}</option><option value="global">{t('sch.scope.global')}</option>{label.scope === 'hierarchical' && <option value="hierarchical" disabled>{t('sch.scope.hierarchical')}</option>}</select></div>
+      <div className="dim xs" data-no-translate>{t(label.scope === 'local' ? 'sch.labelScope.local' : label.scope === 'hierarchical' ? 'sch.labelScope.hierarchical' : 'sch.labelScope.global')}{(!label.scope || label.scope === 'global') && crossSheetNames.has(label.text) ? ` ${t('sch.labelScope.otherSheets')}` : ''}</div>
     </div>
   );
   if (!comp) return (
@@ -164,8 +167,8 @@ export function PropertiesPanel() {
   );
   const sym = getSymbol(comp.symbolId);
   const part = allParts().find((p) => p.mpn === (comp.props.mpn ?? comp.value));
-  const pinNets = sym.pins.map((p) => ({ name: p.name, net: a.netlist.pinNet.get(`${comp.id}:${p.number}`) ?? '' }));
-  const open = pinNets.filter((p) => !p.net).length;
+  const pinNets = sym.pins.map((p) => ({ number: p.number, nc: comp.noConnectPins?.includes(p.number) ?? false, name: p.name, net: a.netlist.pinNet.get(`${comp.id}:${p.number}`) ?? '' }));
+  const open = pinNets.filter((p) => !p.net && !p.nc).length;
   const pos = (v: number) => formatLength(milToMm(v), unit, unit === 'mm' ? 2 : 0);
   return (
     <div className="panel-pad">
@@ -191,7 +194,7 @@ export function PropertiesPanel() {
       <div className="divider" />
       <div className="col" style={{ gap: 6 }}>
         <div className="row"><span className="muted">引脚</span><span className="mono">{part?.pinCount ?? sym.pins.length}</span><span className="ml-auto muted">{sym.power ? '' : open ? `${open} 未连接` : '全部已连接'}</span></div>
-        {pinNets.map((p, i) => <div key={i} className="pin-row"><span className="dot" style={{ background: p.net || sym.power ? 'var(--success)' : 'var(--error)' }} /><span>{p.name}</span><span className="ml-auto muted">{sym.power ? comp.value : p.net || '—'}</span></div>)}
+        {pinNets.map((p, i) => <div key={i} className="pin-row"><span className="dot" style={{ background: p.net || p.nc || sym.power ? 'var(--success)' : 'var(--error)' }} /><span>{p.name}</span><span className="ml-auto muted">{sym.power ? comp.value : p.net || (p.nc ? 'NC' : '—')}</span>{!sym.power && <button className="btn sm" title="不连接标记" aria-label={`NC ${comp.ref}.${p.number}`} aria-pressed={p.nc} onClick={() => editor.dispatch(sch.toggleNoConnect(sheet.id, comp.id, p.number))}>NC</button>}</div>)}
       </div>
       <div className="col" style={{ gap: 6 }}>
         <div className="row"><span className="muted">自定义属性</span><span className="ml-auto" style={{ color: 'var(--accent)', cursor: 'pointer' }} onClick={() => { const k = prompt('属性名（如 mpn、lcsc、datasheet、tolerance、note）'); const key = k?.trim(); if (!key) return; if (key in comp.props) { app.toast('已有同名属性'); return; } editor.dispatch(sch.setComponentProps(sheet.id, comp.id, { ...comp.props, [key]: '' })); }}>+ 添加</span></div>

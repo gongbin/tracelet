@@ -45,7 +45,7 @@ export function exportPanelFiles(project:Project,options:PanelOptions):FabFile[]
     assembly.schematic.sheets.push(...project.schematic.sheets.map(s=>({...s,id:`${instance.id}_${s.id}`,components:s.components.map(c=>({...c,id:`${instance.id}_${c.id}`,ref:`${instance.id}_${c.ref}`}))})));
   }
   const tooling=[{x:options.rail/2,y:options.rail/2},{x:plan.width-options.rail/2,y:options.rail/2},{x:options.rail/2,y:plan.height-options.rail/2}];
-  const drill=['M48','METRIC','T1C0.500','T2C1.500','M95','G90','G05','T1',...plan.holes.map(p=>`X${p.x.toFixed(4)}Y${(-p.y).toFixed(4)}`),'T2',...tooling.map(p=>`X${p.x.toFixed(4)}Y${(-p.y).toFixed(4)}`),'M30'].join('\n');
+  const drill=['M48','METRIC',`T1C${plan.options.mouseBiteDrill!.toFixed(3)}`,'T2C1.500','M95','G90','G05','T1',...plan.holes.map(p=>`X${p.x.toFixed(4)}Y${(-p.y).toFixed(4)}`),'T2',...tooling.map(p=>`X${p.x.toFixed(4)}Y${(-p.y).toFixed(4)}`),'M30'].join('\n');
   const npth=[...grouped].find(([name])=>name.endsWith('-NPTH.drl'))!;npth[1].sources.push(drill);
   for(const [suffix,fn,dia] of [['.gtl','Copper,L1,Top',1],['.gts','Soldermask,Top',2]] as const){
     const w=new GerberWriter(fn,suffix==='.gts'?'Negative':'Positive'),ap=w.circle(dia);plan.fiducials.forEach(p=>w.flash(ap,p));
@@ -56,6 +56,6 @@ export function exportPanelFiles(project:Project,options:PanelOptions):FabFile[]
     {name:'panel-Edge_Cuts.gm1',kind:'gerber',content:profile.toString()},
     {name:'panel-BOM.csv',kind:'bom',content:exportBomCsv(assembly)},
     {name:'panel-PickAndPlace.csv',kind:'pnp',content:exportPickAndPlaceCsv(assembly)},
-    {name:'panel-manifest.json',kind:'readme',content:JSON.stringify({...plan,tooling,units:'mm',xy:'X right, Y up in Gerber/drill/placement; plan coordinates Y down',rotation:assembly.settings.manufacturing.bottomRotation,sourceProject:project.id,sourceUpdatedAt:project.updatedAt,notes:'0.5 mm mouse bites, 1.5 mm tooling holes, 1 mm top fiducials with 2 mm mask openings and no paste. Straight milling contours; fabricator must confirm router radius, breakaway strength and assembly rotation.'},null,2)}
+    {name:'panel-manifest.json',kind:'readme',content:JSON.stringify({...plan,tooling,units:'mm',xy:'X right, Y up in Gerber/drill/placement; plan coordinates Y down',rotation:assembly.settings.manufacturing.bottomRotation,sourceProject:project.id,sourceUpdatedAt:project.updatedAt,notes:`${plan.options.mouseBiteDrill} mm mouse bites, ${plan.options.mouseBitePitch} mm pitch, 1.5 mm tooling holes, 1 mm top fiducials with 2 mm mask openings and no paste. Straight milling contours; fabricator must confirm router radius, breakaway strength and assembly rotation.`},null,2)}
   ]);
 }

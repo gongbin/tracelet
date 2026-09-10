@@ -3,6 +3,7 @@ import type { Project } from '../model/project.js';
 import { buildSchematicNetlist } from '../schematic/connectivity.js';
 import { getSymbol } from '../library/symbols.js';
 import { findFootprint } from '../library/footprints.js';
+import { componentPackages } from '../schematic/units.js';
 
 export interface NetlistJson {
   project: string;
@@ -12,13 +13,15 @@ export interface NetlistJson {
 }
 
 export function exportNetlistJson(project: Project): NetlistJson {
-  const comps = project.schematic.sheets.flatMap((s) => s.components);
+  const packages = componentPackages(project.schematic.sheets.flatMap((s) => s.components));
+  const comps = packages.map(group => group[0]);
+  const physicalIds = new Map(packages.flatMap(group => group.map(c => [c.id, group[0].id] as const)));
   const nl = buildSchematicNetlist(project.schematic);
   return {
     project: project.name,
     generatedAt: new Date().toISOString(),
     components: comps.filter((c) => !getSymbol(c.symbolId).power).map((c) => ({ ref: c.ref, value: c.value, footprint: findFootprint(c.footprint)?.name ?? c.footprint, symbol: getSymbol(c.symbolId).name })),
-    nets: nl.nets.map((n) => ({ name: n.name, pins: n.pins.map((p) => ({ ref: p.ref, pin: p.pinNumber, name: p.pinName })) }))
+    nets: nl.nets.map((n) => ({ name: n.name, pins: [...new Map(n.pins.map(p => [`${physicalIds.get(p.componentId)}:${p.pinNumber}`, p])).values()].map((p) => ({ ref: p.ref, pin: p.pinNumber, name: p.pinName })) }))
   };
 }
 
@@ -32,7 +35,8 @@ export function isAssemblyComponent(c: SchComponent, project: Project): boolean 
 
 export function buildBom(project: Project): BomRow[] {
   const groups = new Map<string, BomRow>();
-  for (const c of project.schematic.sheets.flatMap((s) => s.components)) {
+  for (const group of componentPackages(project.schematic.sheets.flatMap((s) => s.components))) {
+    const c = group[0];
     if (!isAssemblyComponent(c, project)) continue;
     const fp = findFootprint(c.footprint)?.name ?? c.footprint;
     const k = JSON.stringify([c.value, fp, c.props.mpn ?? c.props.MPN ?? '', c.props.lcsc ?? c.props.LCSC ?? c.props['LCSC Part #'] ?? '']);

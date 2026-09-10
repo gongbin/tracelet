@@ -1,9 +1,67 @@
 import type { Schematic, Sheet } from '../model/schematic.js';
 import { buildSchematicNetlist } from './connectivity.js';
-import { componentBounds, pinGeoms } from './geometry.js';
-import { symbolTextPositions } from './render.js';
+import { componentBounds, componentBody, pinGeoms } from './geometry.js';
+import { symbolTextPositions, netLabelLayout, netLabelBounds } from './render.js';
 import { getSymbol } from '../library/symbols.js';
-import { pointOnSeg, UnionFind, type Vec } from '../geometry.js';
+import { pointOnSeg, rectsOverlap, segRectDist, UnionFind, type Vec, type Rect } from '../geometry.js';
+import { paperSize } from '../model/schematic.js';
+
+const textWidth = (text: string, size: number) => [...text].reduce((n, c) => n + (c.charCodeAt(0) > 255 ? 1 : 0.62) * size, 0);
+const textBox = (text: string, size: number, pos: { x: number; y: number; anchor: 'start' | 'middle' | 'end' }): Rect => {
+  const w = Math.max(size / 2, textWidth(text, size));
+  return { x: pos.x - (pos.anchor === 'middle' ? w / 2 : pos.anchor === 'end' ? w : 0) - 8, y: pos.y - size * 0.85 - 8, w: w + 16, h: size + 16 };
+};
+
+/** Move only colliding visible annotations. Keep imported positions, sizes and hidden fields. */
+function arrangeTexts(sheet: Sheet): number {
+  const fixed: Rect[] = [];
+  for (const l of sheet.labels) fixed.push(netLabelBounds(l, netLabelLayout(sheet, l)));
+  for (const g of sheet.graphics) if (g.kind === 'text') fixed.push(textBox(g.text, g.size, { ...g, anchor: 'start' }));
+  const segments = [...sheet.wires.flatMap(w => w.points.slice(1).map((b, i) => ({ a: w.points[i], b }))),
+    ...sheet.components.flatMap(c => pinGeoms(c).filter(p => !p.def.hidden).map(p => ({ a: p.end, b: p.base })))];
+  const annotations = sheet.components.flatMap(c => {
+    const sym = getSymbol(c.symbolId), pos = symbolTextPositions(c, sym);
+    return (['ref', 'value'] as const).filter(field => !(field === 'ref' && sym.power) && !c.textStyle?.[field].hidden).map(field => {
+      const size = c.textStyle?.[field].size ?? (field === 'ref' ? 120 : sym.power ? 100 : 110);
+      return { c, field, size, pos: pos[field], box: textBox(c[field], size, pos[field]) };
+    });
+  });
+  const bodies = sheet.components.map(c => ({ id: c.id, box: componentBody(c) }));
+  const page = paperSize(sheet.frame);
+  let moved = 0;
+  for (const item of annotations) {
+    const own = getSymbol(item.c.symbolId);
+    const blocked = (box: Rect) => fixed.some(b => rectsOverlap(b, box)) || annotations.some(other => other !== item && rectsOverlap(other.box, box)) ||
+      bodies.some(b => !(b.id === item.c.id && item.field === 'value' && own.graphic === 'box' && own.width >= 1000) && rectsOverlap(b.box, box)) ||
+      segments.some(s => segRectDist(s.a, s.b, box) < 15);
+    if (!blocked(item.box)) continue;
+    const original = item.box;
+    const step = Math.max(100, Math.ceil(item.size * 1.5 / 50) * 50);
+    let found = false;
+    // Nearby positions first; prevent a dense area from scattering labels far away.
+    for (let radius = 1; radius <= 12 && !found; radius++) {
+      const offsets = [[0, -radius], [0, radius], [radius, 0], [-radius, 0], [radius, -radius], [-radius, -radius], [radius, radius], [-radius, radius]];
+      for (const [x, y] of offsets) {
+        const dx = x * step, dy = y * step, box = { ...original, x: original.x + dx, y: original.y + dy };
+        if (page && (box.x < 220 || box.y < 220 || box.x + box.w > page.w - 220 || box.y + box.h > page.h - 220)) continue;
+        if (blocked(box)) continue;
+        const old = item.c.textOffset ?? { ref: { x: 0, y: 0 }, value: { x: 0, y: 0 } };
+        item.c.textOffset = { ...old, [item.field]: { x: old[item.field].x + dx, y: old[item.field].y + dy } };
+        item.box = box; moved++; found = true; break;
+      }
+    }
+  }
+  return moved;
+}
+
+/** Annotation-only cleanup preserves component and wire positions exactly. */
+export function tidySchematicTexts(source: Schematic, sheetId: string): { schematic: Schematic; movedTexts: number } {
+  const schematic = structuredClone(source), sheet = schematic.sheets.find(s => s.id === sheetId);
+  if (!sheet) throw new Error('Unknown sheet');
+  const movedTexts = arrangeTexts(sheet);
+  assertElectricalIdentity(source, schematic);
+  return { schematic, movedTexts };
+}
 
 /** Compare identities and electrical partitions, including aliases and isolated pins. */
 export function electricalIdentity(schematic:Schematic):string {
@@ -40,6 +98,7 @@ export function tidySchematic(source:Schematic,sheetId:string):{schematic:Schema
   // Graphics/buses carry user-authored spatial intent; retain placement in those sheets.
   if(!sheet.buses.length && !sheet.graphics.length){
     let x=700,y=700,rowH=0;
+    const right = (paperSize(sheet.frame)?.w ?? 10700) - 700;
     for(const ids of groups){
       const set=new Set(ids), points:Vec[]=[];
       for(const id of ids)points.push(...nodes.get(id)!);
@@ -48,7 +107,7 @@ export function tidySchematic(source:Schematic,sheetId:string):{schematic:Schema
       if(!points.length)continue;
       const minX=Math.min(...points.map(p=>p.x)),minY=Math.min(...points.map(p=>p.y));
       const w=Math.max(...points.map(p=>p.x))-minX,h=Math.max(...points.map(p=>p.y))-minY;
-      if(x>700 && x+w>10000){x=700;y+=rowH+600;rowH=0;}
+      if(x>700 && x+w>right){x=700;y+=rowH+600;rowH=0;}
       const dx=x-minX,dy=y-minY; const move=(p:Vec)=>{p.x+=dx;p.y+=dy;};
       for(const c of sheet.components)if(set.has(c.id))move(c);
       for(const w of sheet.wires)if(set.has(w.id))w.points.forEach(move);
@@ -58,26 +117,14 @@ export function tidySchematic(source:Schematic,sheetId:string):{schematic:Schema
   }
   // Remove redundant collinear vertices only if the full netlist stays identical.
   let cleanedWires=0;
+  const identity = electricalIdentity(source);
   for(const w of sheet.wires){
     const old=w.points;
     w.points=old.filter((p,i)=>i===0||i===old.length-1||!pointOnSeg(p,old[i-1],old[i+1],1e-7));
-    if(w.points.length<2 || electricalIdentity(source)!==electricalIdentity(schematic))w.points=old;
+    if(w.points.length<2 || identity!==electricalIdentity(schematic))w.points=old;
     else if(w.points.length!==old.length)cleanedWires++;
   }
-  const boxes=sheet.components.map(c=>componentBounds(c));let movedTexts=0;
-  for(const c of sheet.components){
-    if(getSymbol(c.symbolId).power)continue;
-    c.textOffset={ref:{x:0,y:0},value:{x:0,y:0}};
-    const pos=symbolTextPositions(c,getSymbol(c.symbolId));
-    for(const field of ['ref','value'] as const){
-      const width=Math.max(80,c[field].length*80),p=pos[field];
-      for(let step=0;step<80;step++){
-        const b={x:p.x-(p.anchor==='middle'?width/2:0),y:p.y-100-step*150,w:width,h:130};
-        if(boxes.some(a=>a.x<b.x+b.w && b.x<a.x+a.w && a.y<b.y+b.h && b.y<a.y+a.h))continue;
-        c.textOffset[field]={x:0,y:-step*150};boxes.push(b);if(step)movedTexts++;break;
-      }
-    }
-  }
+  const movedTexts = arrangeTexts(sheet);
   assertElectricalIdentity(source,schematic);
   return {schematic,groups:groups.length,cleanedWires,movedTexts};
 }

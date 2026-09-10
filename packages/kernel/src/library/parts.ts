@@ -38,13 +38,16 @@ export const PART_CATEGORIES: { id: string; name: string; group: string; /** 英
 ];
 
 import { PARTS_BASE, icSymbol } from './partsBase.js';
-import { registerSymbols, registeredSymbol } from './registry.js';
+import { MCU_PARTS, MCU_SYMBOLS, MCU_FOOTPRINTS } from './mcu.js';
+import { registerSymbols, registerFootprints, registeredSymbol } from './registry.js';
 import { findSymbol } from './symbols.js';
 import { footprintFromName } from './generators.js';
 import { findFootprint } from './footprints.js';
 
-/** 内置基础零件库（见 partsBase.ts）。 */
-export const BUILTIN_PARTS: Part[] = PARTS_BASE.map((p) => ({ ...p, source: 'builtin' as const }));
+registerSymbols(MCU_SYMBOLS);
+registerFootprints(MCU_FOOTPRINTS);
+/** 内置基础零件库（通用件见 partsBase.ts，MCU 见 mcu.ts）。 */
+export const BUILTIN_PARTS: Part[] = [...PARTS_BASE, ...MCU_PARTS].map((p) => ({ ...p, source: 'builtin' as const }));
 
 const extra = new Map<PartSource, Part[]>();
 /** 注册社区 / 用户零件（整体替换该来源），没有符号的会按 pins / 类别自动补一个符号。 */

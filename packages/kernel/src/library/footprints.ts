@@ -22,6 +22,8 @@ function dualRow(numbers: string[], pitch: number, span: number, pw: number, ph:
 }
 
 export const BUILTIN_FOOTPRINTS: FootprintDef[] = [
+  {id:'fp:TestPoint_Pad_D1.0mm',name:'TestPoint_Pad_D1.0mm',body:{w:1,h:1},height:0,
+    description:'1 mm 圆形贴片测试焊盘 / SMD test pad',pads:[{number:'1',x:0,y:0,w:1,h:1,shape:'circle',drill:0,npth:false}]},
   twoPad('fp:R_0402', 'R_0402', 0.96, 0.56, 0.62, 1.0, 0.5, 0.35, '0402 电阻'),
   twoPad('fp:R_0603', 'R_0603', 1.5, 0.8, 0.95, 1.6, 0.8, 0.45, '0603 电阻'),
   twoPad('fp:R_0805', 'R_0805', 1.9, 1.0, 1.25, 2.0, 1.25, 0.5, '0805 电阻'),
@@ -35,10 +37,6 @@ export const BUILTIN_FOOTPRINTS: FootprintDef[] = [
     pads: dualRow(['1', '2', '3', '4', '5', '6', '7', '8'], 2.54, 17, 1.5, 0.9)
   },
   {
-    id: 'fp:ESP32-C3-MINI-1', name: 'ESP32-C3-MINI-1', body: { w: 13.2, h: 16.6 }, height: 2.4, description: 'ESP32-C3-MINI-1 模块（简化 6 焊盘）',
-    pads: dualRow(['1', '2', '3', '4', '5', '6'], 2.0, 12.4, 1.2, 0.8)
-  },
-  {
     id: 'fp:SOT-223', name: 'SOT-223', body: { w: 6.5, h: 3.5 }, height: 1.8, description: 'SOT-223',
     pads: [
       { number: '1', x: -2.3, y: 3.1, w: 1.0, h: 2.0, shape: 'rect', drill: 0, npth: false },
@@ -49,6 +47,12 @@ export const BUILTIN_FOOTPRINTS: FootprintDef[] = [
   },
   {
     id: 'fp:USB-C-16P', name: 'USB-C-16P', body: { w: 9.0, h: 7.4 }, height: 3.2, description: 'USB-C 16P 母座（简化）',
+    // 卧式接口（沿板边对接），但**方向未声明**：本封装是简化焊盘图（5 个信号焊盘 + 2 个壳体焊盘，
+    // 真实器件是 16 引脚 + 4 固定脚），焊盘重心相对本体的偏移推不出真实器件的开口朝向。
+    // 按几何看开口大概率在 +y（direction: 90），但没有实物核对过，不写进元数据——
+    // 接口方向错了整块板报废，这类值只能来自核对过实物 / 数据手册的人。
+    // 核对后把 `direction: 90` 加进下面这行即可，解码器会立刻改用它并停止提示人工确认。
+    connector: { mounting: 'horizontal', clearance: 3 },
     pads: [
       { number: 'A1', x: -3.25, y: -2.0, w: 0.6, h: 1.2, shape: 'rect', drill: 0, npth: false },
       { number: 'A4', x: -2.25, y: -2.0, w: 0.6, h: 1.2, shape: 'rect', drill: 0, npth: false },

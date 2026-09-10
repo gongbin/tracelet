@@ -31,3 +31,7 @@ ui-demo/
 
 # Entire deployment directory is local-only
 /deploy/
+.mcu-cache/
+
+# AI 布局模型的训练 / 评估工作区：数据、权重、方案文档都不入库
+/ai/

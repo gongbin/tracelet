@@ -15,15 +15,19 @@ function updateBoard(p: Project, fn: (b: Board) => Board): Project {
 }
 
 export function moveFootprint(id: string, pos: Vec): Command {
-  return command('移动封装', (proj) => updateBoard(proj, (b) => ({ ...b, footprints: b.footprints.map((f) => (f.id === id ? { ...f, x: pos.x, y: pos.y } : f)) })));
+  return command('移动封装', (proj) => updateBoard(proj, (b) => ({ ...b, footprints: b.footprints.map((f) => (f.id === id && !f.locked && !f.placement?.fixed ? { ...f, x: pos.x, y: pos.y } : f)) })));
+}
+
+export function setFootprintLocked(id:string,locked:boolean):Command {
+  return command('锁定封装',proj=>updateBoard(proj,b=>({...b,footprints:b.footprints.map(f=>f.id===id?{...f,locked,placement:{...f.placement,fixed:locked}}:f)})));
 }
 
 export function rotateFootprint(id: string, delta = 90): Command {
-  return command('旋转封装', (proj) => updateBoard(proj, (b) => ({ ...b, footprints: b.footprints.map((f) => (f.id === id ? { ...f, rotation: ((f.rotation + delta) % 360 + 360) % 360 } : f)) })));
+  return command('旋转封装', (proj) => updateBoard(proj, (b) => ({ ...b, footprints: b.footprints.map((f) => (f.id === id && !f.locked && !f.placement?.fixed ? { ...f, rotation: ((f.rotation + delta) % 360 + 360) % 360 } : f)) })));
 }
 
 export function flipFootprint(id: string): Command {
-  return command('翻面', (proj) => updateBoard(proj, (b) => ({ ...b, footprints: b.footprints.map((f) => (f.id === id ? { ...f, side: f.side === 'F' ? 'B' : 'F' } : f)) })));
+  return command('翻面', (proj) => updateBoard(proj, (b) => ({ ...b, footprints: b.footprints.map((f) => (f.id === id && !f.locked && !f.placement?.fixed ? { ...f, side: f.side === 'F' ? 'B' : 'F' } : f)) })));
 }
 
 export function addTrace(t: Omit<Trace, 'id'>): { command: Command; id: string } {
@@ -102,7 +106,7 @@ export function clearRouting(what: { traces?: boolean; vias?: boolean; zones?: b
 /** 批量移动封装（对齐 / 分布）。 */
 export function moveFootprints(moves: { id: string; x: number; y: number }[]): Command {
   const m = new Map(moves.map((x) => [x.id, x]));
-  return command('对齐 / 分布', (proj) => updateBoard(proj, (b) => ({ ...b, footprints: b.footprints.map((f) => (m.has(f.id) ? { ...f, x: m.get(f.id)!.x, y: m.get(f.id)!.y } : f)) })));
+  return command('对齐 / 分布', (proj) => updateBoard(proj, (b) => ({ ...b, footprints: b.footprints.map((f) => (m.has(f.id) && !f.locked && !f.placement?.fixed ? { ...f, x: m.get(f.id)!.x, y: m.get(f.id)!.y } : f)) })));
 }
 
 /** 应用自动布线结果。 */
@@ -220,7 +224,7 @@ export function setBoardProps(props: { thickness?: number; stackup?: Partial<Sta
   })));
 }
 
-export interface AddBoardFootprintArgs { footprintId: string; x: number; y: number; ref?: string; prefix?: string; value?: string; side?: 'F' | 'B'; rotation?: number }
+export interface AddBoardFootprintArgs { footprintId: string; x: number; y: number; ref?: string; prefix?: string; value?: string; side?: 'F' | 'B'; rotation?: number; padNets?: Record<string,string> }
 
 /**
  * 在 PCB 上直接放置一个"仅板级"封装（定位孔、基准点、Logo、测试点等），不出现在原理图 / BOM。
@@ -238,9 +242,18 @@ export function addBoardFootprint(p: Project, args: AddBoardFootprintArgs): { co
   }
   const id = newId('fp');
   const padNets: Record<string, string> = {};
-  for (const pd of def.pads) padNets[pd.number] = '';
-  const cmd = command(`放置 ${ref}`, (proj) => updateBoard(proj, (b) => ({ ...b, footprints: [...b.footprints, { id, ref: ref!, footprintId: args.footprintId, value: args.value ?? def.name, x: args.x, y: args.y, rotation: args.rotation ?? 0, side: args.side ?? 'F', padNets }] })));
+  for (const pd of def.pads) padNets[pd.number] = pd.npth ? '' : args.padNets?.[pd.number] ?? '';
+  const cmd = command(`放置 ${ref}`, (proj) => updateBoard(proj, (b) => ({ ...b, footprints: [...b.footprints, { id, ref: ref!, footprintId: args.footprintId, value: args.value ?? def.name, x: args.x, y: args.y, rotation: args.rotation ?? 0, side: args.side ?? 'F', padNets, ...(def.pads.some(p=>p.castellated)?{placement:{role:'mechanical' as const}}:{}) }] })));
   return { command: cmd, id, ref };
+}
+
+/** Assign a board-only conductive pad; schematic-linked identities remain owned by sync. */
+export function setBoardPadNet(id:string,pad:string,net:string):Command {
+  return command('焊盘网络',proj=>updateBoard(proj,b=>({...b,footprints:b.footprints.map(f=>{
+    if(f.id!==id||f.componentId)return f;
+    const def=findFootprint(f.footprintId),pd=def?.pads.find(p=>p.number===pad);
+    return pd&&!pd.npth?{...f,padNets:{...f.padNets,[pad]:net}}:f;
+  })})));
 }
 
 /** 删除板上封装（仅板级封装可直接删除；来自原理图的封装应在原理图中删除后同步）。 */

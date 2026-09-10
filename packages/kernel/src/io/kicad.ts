@@ -15,6 +15,7 @@ import { buildSchematicNetlist } from '../schematic/connectivity.js';
 import { getSymbol } from '../library/symbols.js';
 import { symbolTextPositions } from '../schematic/render.js';
 import { pinGeoms } from '../schematic/geometry.js';
+import { componentPackages } from '../schematic/units.js';
 
 const MIL = 1000 / 25.4;
 const mil = (mm: number) => Math.round(mm * MIL * 100) / 100;
@@ -28,7 +29,7 @@ export interface PcbImportResult { board: Board; footprints: FootprintDef[]; war
 
 const PIN_TYPES: Record<string, PinType> = { input: 'input', output: 'output', bidirectional: 'bidirectional', tri_state: 'bidirectional', passive: 'passive', free: 'passive', unspecified: 'passive', power_in: 'power_in', power_out: 'power_out', open_collector: 'open_collector', open_emitter: 'open_collector', no_connect: 'no_connect' };
 
-interface RawSymbol { id: string; name: string; power: boolean; pinNamesHidden: boolean; pinNumbersHidden: boolean; units: Map<number, SList[]>; props: Record<string, string> }
+interface RawSymbol { id: string; name: string; power: boolean; pinNamesHidden: boolean; pinNumbersHidden: boolean; units: Map<number, SList[]>; props: Record<string, string>; resolutionError?: string }
 
 function parseLibSymbols(root: SList): Map<string, RawSymbol> {
   const lib = child(root, 'lib_symbols');
@@ -38,12 +39,14 @@ function parseLibSymbols(root: SList): Map<string, RawSymbol> {
 /** 解析一组 (symbol ...) 节点（lib_symbols 内或 .kicad_sym 顶层）。派生符号（extends）继承父符号图形与引脚。 */
 export function parseSymbolNodes(nodes: SList[]): Map<string, RawSymbol> {
   const out = new Map<string, RawSymbol>();
-  const pending: [RawSymbol, string][] = [];
+  const parents = new Map<string, string>();
+  const visibility = new Map<string, { names?: boolean; numbers?: boolean }>();
   for (const sym of nodes) {
     const name = str(sym[1]);
     const props: Record<string, string> = {};
     for (const p of children(sym, 'property')) props[str(p[1])] = str(p[2]);
     const pinNames = child(sym, 'pin_names'), pinNumbers = child(sym, 'pin_numbers');
+    visibility.set(name, { names: pinNames ? hasFlag(pinNames, 'hide') : undefined, numbers: pinNumbers ? hasFlag(pinNumbers, 'hide') : undefined });
     const raw: RawSymbol = { id: name, name, power: hasFlag(sym, 'power') || ['global', 'local'].includes(str(child(sym, 'power')?.[1])), pinNamesHidden: !!pinNames && hasFlag(pinNames, 'hide'), pinNumbersHidden: !!pinNumbers && hasFlag(pinNumbers, 'hide'), units: new Map(), props };
     for (const sub of children(sym, 'symbol')) {
       const m = /_(\d+)_(\d+)$/.exec(str(sub[1]));
@@ -55,22 +58,41 @@ export function parseSymbolNodes(nodes: SList[]): Map<string, RawSymbol> {
     const direct = sym.filter((x): x is SList => isList(x) && ['polyline', 'rectangle', 'circle', 'arc', 'pin', 'text'].includes(String(x[0])));
     if (direct.length) raw.units.set(0, [...(raw.units.get(0) ?? []), direct as unknown as SList]);
     const ext = child(sym, 'extends');
-    if (ext) pending.push([raw, str(ext[1])]);
+    if (ext) parents.set(name, str(ext[1]));
     out.set(name, raw);
   }
-  for (const [raw, parentName] of pending) {
+  const resolved = new Set<string>(), resolving = new Set<string>();
+  const inherit = (name: string): void => {
+    if (resolved.has(name)) return;
+    const raw = out.get(name)!;
+    if (resolving.has(name)) { raw.resolutionError = `Cyclic symbol inheritance: ${name}`; return; }
+    const parentName = parents.get(name);
+    if (!parentName) { resolved.add(name); return; }
     const parent = out.get(parentName);
-    if (!parent) continue;
-    raw.units = new Map(parent.units);
-    raw.pinNamesHidden = parent.pinNamesHidden; raw.pinNumbersHidden = parent.pinNumbersHidden; raw.power = raw.power || parent.power;
+    if (!parent) { raw.resolutionError = `Missing parent symbol: ${parentName} (${name})`; resolved.add(name); return; }
+    resolving.add(name); inherit(parentName);
+    raw.units = new Map([...parent.units, ...raw.units]);
+    raw.resolutionError = parent.resolutionError ?? raw.resolutionError;
+    raw.pinNamesHidden = visibility.get(name)?.names ?? parent.pinNamesHidden; raw.pinNumbersHidden = visibility.get(name)?.numbers ?? parent.pinNumbersHidden; raw.power = raw.power || parent.power;
     raw.props = { ...parent.props, ...raw.props };
-  }
+    resolving.delete(name); resolved.add(name);
+  };
+  for (const name of parents.keys()) inherit(name);
   return out;
 }
 export type { RawSymbol };
 
+// Stable 64-bit fingerprint, usable synchronously in both browsers and the CLI.
+function symbolFingerprint(raw: RawSymbol): string {
+  const text = JSON.stringify({ ...raw, units: [...raw.units] });
+  let hash = 0xcbf29ce484222325n;
+  for (let i = 0; i < text.length; i++) hash = BigInt.asUintN(64, (hash ^ BigInt(text.charCodeAt(i))) * 0x100000001b3n);
+  return hash.toString(16);
+}
+
 /** 把一个库符号（指定 unit）转成通用 SymbolDef（局部坐标：外接框左上角，mil，y 向下）。 */
 export function buildSymbolDef(raw: RawSymbol, unit: number, libId: string): SymbolDef {
+  if (raw.resolutionError) throw new Error(raw.resolutionError);
   const shapes: SymbolShape[] = [];
   const pins: (PinDef & { _base: Vec })[] = [];
   const P = (x: SExpr | undefined, y: SExpr | undefined): Vec => ({ x: mil(num(x)), y: -mil(num(y)) });
@@ -141,13 +163,14 @@ export function importKicadSchematic(text: string, opts: { sheetName?: string; s
   if (root[0] !== 'kicad_sch') throw new Error('不是 KiCad 原理图文件（kicad_sch）');
   const warnings: ImportWarning[] = [];
   const raws = parseLibSymbols(root);
+  const identities = new Map([...raws].map(([id, raw]) => [id, `sym:kicad:${id}#${symbolFingerprint(raw)}`]));
   const defs = new Map<string, SymbolDef & { anchor?: Vec }>();
   const defFor = (libId: string, unit: number) => {
-    const key = `sym:kicad:${libId}#u${unit}`;
+    const key = `${identities.get(libId) ?? `sym:kicad:${libId}#missing`}#u${unit}`;
     let d = defs.get(key);
     if (!d) {
       const raw = raws.get(libId);
-      if (raw) d = buildSymbolDef(raw, unit, key);
+      if (raw && !raw.resolutionError) d = buildSymbolDef(raw, unit, key);
       else {
         warnings.push({ where: libId, message: '缺少嵌入的库符号定义，保留占位器件；请在 KiCad 更新原理图中的符号后重新导入，不能推断引脚位置。' });
         d = { id: key, name: libId, kind: '导入', prefix: 'U', width: 400, height: 400, graphic: 'box', pins: [], showPinNames: false, power: false, defaultValue: '', defaultFootprint: '', description: 'Missing embedded symbol definition', source: `kicad:${libId}`, anchor: { x: 200, y: 200 } };
@@ -169,8 +192,11 @@ export function importKicadSchematic(text: string, opts: { sheetName?: string; s
     for (const p of children(inst, 'property')) props[str(p[1])] = str(p[2]);
     const placed = placeInstance(def, def.anchor ?? { x: 0, y: 0 }, P(at[1], at[2]), num(at[3]), mirror);
     const ref = props.Reference ?? def.prefix + '?';
-    components.push({ id: newId('c'), ref, symbolId: def.id, value: props.Value ?? def.defaultValue, footprint: props.Footprint ? `fp:kicad:${props.Footprint.split(':').pop()}` : '', x: placed.x, y: placed.y, rotation: placed.rotation, mirror: placed.mirror, props: { ...props, ...(!raws.has(libId) ? { unresolvedSymbol: libId } : {}), ...(str(child(inst,'dnp')?.[1])==='yes'?{dnp:'true'}:{}), ...(str(child(inst,'in_bom')?.[1])==='no'?{exclude_from_bom:'true'}:{}), ...(str(child(inst,'on_board')?.[1])==='no'?{exclude_from_board:'true'}:{}), ...(props.Footprint ? { kicadFootprint: props.Footprint } : {}), ...(props.Datasheet && props.Datasheet !== '~' ? { datasheet: props.Datasheet } : {}) } });
+    components.push({ id: newId('c'), ref, symbolId: def.id, value: props.Value ?? def.defaultValue, footprint: props.Footprint ? `fp:kicad:${props.Footprint.split(':').pop()}` : '', x: placed.x, y: placed.y, rotation: placed.rotation, mirror: placed.mirror, props: { ...props, ...(!raws.has(libId) || raws.get(libId)?.resolutionError ? { unresolvedSymbol: raws.get(libId)?.resolutionError ?? libId } : {}), ...(str(child(inst,'dnp')?.[1])==='yes'?{dnp:'true'}:{}), ...(str(child(inst,'in_bom')?.[1])==='no'?{exclude_from_bom:'true'}:{}), ...(str(child(inst,'on_board')?.[1])==='no'?{exclude_from_board:'true'}:{}), ...(props.Footprint ? { kicadFootprint: props.Footprint } : {}), ...(props.Datasheet && props.Datasheet !== '~' ? { datasheet: props.Datasheet } : {}) } });
     const c = components[components.length - 1];
+    if ([...(raws.get(libId)?.units.keys() ?? [])].filter(n => n > 0).length > 1) {
+      c.unit = { number: unit, symbolId: identities.get(libId)! };
+    }
     const defaults = symbolTextPositions(c, def);
     const styles = {} as NonNullable<SchComponent['textStyle']>;
     const offsets = { ref: { x: 0, y: 0 }, value: { x: 0, y: 0 } };
@@ -192,7 +218,22 @@ export function importKicadSchematic(text: string, opts: { sheetName?: string; s
   for (const be of children(root, 'bus_entry')) { const at = child(be, 'at')!, sz = child(be, 'size')!; const a = P(at[1], at[2]); wires.push({ id: newId('w'), points: [a, { x: a.x + mil(num(sz[1])), y: a.y + mil(num(sz[2])) }] }); }
   const junctions: Junction[] = children(root, 'junction').map((j) => { const at = child(j, 'at')!; return { id: newId('j'), ...P(at[1], at[2]) }; });
   const labels: NetLabel[] = [];
-  for (const kind of ['label', 'global_label', 'hierarchical_label']) for (const l of children(root, kind)) { const at = child(l, 'at')!; labels.push({ id: newId('l'), text: str(l[1]), ...P(at[1], at[2]) }); }
+  for (const kind of ['label', 'global_label', 'hierarchical_label']) for (const l of children(root, kind)) {
+    const at = child(l, 'at')!;
+    const effects = child(l, 'effects'), justify = child(effects ?? [], 'justify');
+    const size = mil(num(child(child(effects ?? [], 'font') ?? [], 'size')?.[1], 1.27));
+    const angle = ((num(at[3]) % 360) + 360) % 360;
+    const vertical = angle === 90 || angle === 270;
+    const anchor = justify?.includes('right') ? 'end' : justify?.includes('left') ? 'start' : angle === 180 || angle === 270 ? 'end' : 'start';
+    const side = anchor === 'end' ? -1 : 1, gap = kind === 'label' ? 0 : size * 0.4;
+    const baseline = kind === 'label' ? -size * 0.2 : size * 0.35;
+    const textStyle = { size, anchor: anchor as 'start' | 'end', rotation: vertical ? -90 : 0, offset: vertical ? { x: baseline, y: -side * gap } : { x: side * gap, y: baseline } };
+    labels.push({ id: newId('l'), text: str(l[1]), kind: 'net', scope: kind === 'label' ? 'local' : kind === 'global_label' ? 'global' : 'hierarchical', textStyle, ...P(at[1], at[2]) });
+  }
+  const unresolvedHierarchy = children(root, 'sheet').length > 0 || labels.some(l => l.scope === 'hierarchical');
+  if (unresolvedHierarchy) {
+    warnings.push({ where: 'hierarchy', message: '导入尚未展开父子图纸端口，当前网表不完整；请核对原始层次连接。' });
+  }
   const graphics: Graphic[] = [];
   for (const t of children(root, 'text')) { const at = child(t, 'at')!; graphics.push({ id: newId('g'), kind: 'text', x: mil(num(at[1])), y: mil(num(at[2])), text: str(t[1]), size: mil(num(child(child(child(t, 'effects') ?? [], 'font') ?? [], 'size')?.[1], 1.27)) }); }
   for (const pl of children(root, 'polyline')) { const pts = children(child(pl, 'pts') ?? [], 'xy').map((xy) => P(xy[1], xy[2])); if (pts.length >= 2) graphics.push({ id: newId('g'), kind: 'line', points: pts }); }
@@ -207,11 +248,29 @@ export function importKicadSchematic(text: string, opts: { sheetName?: string; s
     const pins = pinGeoms(c).filter((g) => noConnects.some((p) => dist(p, g.end) < 0.5)).map((g) => g.def.number);
     if (pins.length) c.noConnectPins = pins;
   }
-  const sheet: Sheet = { id: opts.sheetId ?? newId('sheet'), name: opts.sheetName ?? (frame.title || '主图'), frame, components, wires, labels, junctions, buses, graphics };
+  const sheet: Sheet = { id: opts.sheetId ?? newId('sheet'), name: opts.sheetName ?? (frame.title || '主图'), ...(unresolvedHierarchy ? { unresolvedHierarchy: true } : {}), frame, components, wires, labels, junctions, buses, graphics };
   return { sheet, symbols, warnings };
 }
 
 // ---------------- PCB ----------------
+
+/**
+ * 从 KiCad 的封装名读对接方式。
+ *
+ * `_Vertical` / `_Horizontal` 是 KiCad 库的**命名约定**，由封装作者写死，
+ * 和"按焊盘重心反推开口朝向"那种几何猜测完全不同——后者已经删掉了。
+ *
+ * 只声明 `mounting`，**永远不声明 `direction`**：立式接口朝板面上方对接，面内本来就没有方向；
+ * 卧式接口有方向，但名字里没有这个信息，仍然是"未知"，解码器会锁定旋转并提示人工确认。
+ *
+ * 判断错了的后果是可控的：立式判成卧式只是多一条警告；卧式判成立式会少一条警告，
+ * 但**不会凭空断言一个方向**——而方向才是"接口朝内就报废"的那个量。
+ */
+function connectorFromName(name: string): { connector?: { mounting: 'horizontal' | 'vertical'; clearance: number } } {
+  if (/_Vertical(_|$)/i.test(name)) return { connector: { mounting: 'vertical', clearance: 0 } };
+  if (/_Horizontal(_|$)|EdgeMount/i.test(name)) return { connector: { mounting: 'horizontal', clearance: 3 } };
+  return {};
+}
 
 const CU: Record<string, CopperLayer> = { 'F.Cu': 'F.Cu', 'B.Cu': 'B.Cu', 'In1.Cu': 'In1.Cu', 'In2.Cu': 'In2.Cu', 'In3.Cu': 'In3.Cu', 'In4.Cu': 'In4.Cu' };
 
@@ -374,7 +433,8 @@ export function importKicadPcb(text: string): PcbImportResult {
   if (cuNames.length > 6) warnings.push({ where: 'layers', message: `${cuNames.length} 层板暂按 6 层导入` });
   const nets = new Map<number, string>();
   for (const n of children(root, 'net')) nets.set(num(n[1]), str(n[2]).replace(/^\//, ''));
-  const netName = (node: SList | undefined) => (node ? (str(node[2]) || nets.get(num(node[1])) || '').replace(/^\//, '') : '');
+  // KiCad 10 may store (net "name") directly; older formats use an ID plus the net table.
+  const netName = (node: SList | undefined) => (node ? (str(node[2]) || (typeof node[1] === 'number' ? nets.get(node[1]) : str(node[1])) || '').replace(/^\//, '') : '');
   const P = (node: SList | undefined): Vec => ({ x: num(node?.[1]), y: num(node?.[2]) });
 
   // 封装
@@ -385,7 +445,7 @@ export function importKicadPcb(text: string): PcbImportResult {
     const sig = JSON.stringify(r.def.pads.map((p) => [p.number, p.x, p.y, p.w, p.h, p.shape, p.drill]));
     let id = `fp:kicad:${r.shortName}`;
     for (let k = 2; fpDefs.has(id) && JSON.stringify(fpDefs.get(id)!.pads.map((p) => [p.number, p.x, p.y, p.w, p.h, p.shape, p.drill])) !== sig; k++) id = `fp:kicad:${r.shortName}#${k}`;
-    if (!fpDefs.has(id)) fpDefs.set(id, { ...r.def, id });
+    if (!fpDefs.has(id)) fpDefs.set(id, { ...r.def, id, ...connectorFromName(r.shortName) });
     // KiCad 的角度是逆时针，我们的模型是顺时针，所以要取负；但底面封装我们额外做了 x 镜像
     // （geometry.ts::padWorld），镜像会翻转旋转的手性，此时**不能再取负**，否则焊盘会左右对调
     // （实测：keezyboost40 的二极管 1/2 脚互换，整块板连通性断掉）。
@@ -396,12 +456,12 @@ export function importKicadPcb(text: string): PcbImportResult {
   for (const s of children(root, 'segment')) {
     const layer = CU[str(child(s, 'layer')?.[1])];
     if (!layer) continue;
-    board.traces.push({ id: newId('t'), layer, points: [P(child(s, 'start')), P(child(s, 'end'))], width: num(child(s, 'width')?.[1], 0.25), net: nets.get(num(child(s, 'net')?.[1])) ?? '' } as Trace);
+    board.traces.push({ id: newId('t'), layer, points: [P(child(s, 'start')), P(child(s, 'end'))], width: num(child(s, 'width')?.[1], 0.25), net: netName(child(s, 'net')) } as Trace);
   }
   for (const v of children(root, 'via')) {
     const at = P(child(v, 'at'));
     const vl=child(v,'layers');
-    board.vias.push({ startLayer: CU[str(vl?.[1])]??'F.Cu', endLayer: CU[str(vl?.[2])]??'B.Cu', id: newId('v'), x: at.x, y: at.y, size: num(child(v, 'size')?.[1], 0.6), drill: num(child(v, 'drill')?.[1], 0.3), net: nets.get(num(child(v, 'net')?.[1])) ?? '' } as Via);
+    board.vias.push({ startLayer: CU[str(vl?.[1])]??'F.Cu', endLayer: CU[str(vl?.[2])]??'B.Cu', id: newId('v'), x: at.x, y: at.y, size: num(child(v, 'size')?.[1], 0.6), drill: num(child(v, 'drill')?.[1], 0.3), net: netName(child(v, 'net')) } as Via);
   }
   // 铺铜
   for (const z of children(root, 'zone')) {
@@ -409,7 +469,7 @@ export function importKicadPcb(text: string): PcbImportResult {
     if (!layer) continue;
     const poly = child(z, 'polygon');
     const pts = poly ? children(child(poly, 'pts') ?? [], 'xy').map((xy) => ({ x: num(xy[1]), y: num(xy[2]) })) : [];
-    if (pts.length >= 3) board.zones.push({ id: newId('z'), layer, net: str(child(z, 'net_name')?.[1]).replace(/^\//, '') || nets.get(num(child(z, 'net')?.[1])) || '', polygon: pts } as Zone);
+    if (pts.length >= 3) board.zones.push({ id: newId('z'), layer, net: str(child(z, 'net_name')?.[1]).replace(/^\//, '') || netName(child(z, 'net')), polygon: pts } as Zone);
   }
   // 板框 + 文字
   const edgeSegs: Vec[][] = [];
@@ -482,9 +542,14 @@ export function importKicadProject(input: KicadImportInput): KicadImportResult {
     try {
       const r = importKicadPcb(input.pcb);
       project.board = r.board; footprints = r.footprints; warnings.push(...r.warnings);
-      const byRef = new Map<string, SchComponent>();
-      for (const sh of project.schematic.sheets) for (const c of sh.components) if (!getSymbol(c.symbolId).power) byRef.set(c.ref, c);
-      for (const f of project.board.footprints) { const c = byRef.get(f.ref); if (c) { f.componentId = c.id; if (!c.footprint || !footprints.some((d) => d.id === c.footprint)) c.footprint = f.footprintId; } }
+      const byRef = new Map(componentPackages(project.schematic.sheets.flatMap(sh => sh.components).filter(c => !getSymbol(c.symbolId).power)).map(group => [group[0].ref, group]));
+      for (const f of project.board.footprints) {
+        const group = byRef.get(f.ref);
+        if (group) {
+          f.componentId = group[0].id;
+          for (const c of group) if (!c.footprint || !footprints.some((d) => d.id === c.footprint)) c.footprint = f.footprintId;
+        }
+      }
       // 用原理图网表补全焊盘网络（PCB 尚未“从原理图更新”时 pad 上没有 net）
       if (sheets.length) {
         const nl = buildSchematicNetlist(project.schematic);
@@ -492,7 +557,7 @@ export function importKicadProject(input: KicadImportInput): KicadImportResult {
           if (!f.componentId) continue;
           const def = footprints.find((d) => d.id === f.footprintId);
           const numbers = new Set([...(def?.pads.map((pd) => pd.number) ?? []), ...Object.keys(f.padNets)]);
-          for (const k of numbers) if (!f.padNets[k]) { const n = nl.pinNet.get(`${f.componentId}:${k}`); if (n) f.padNets[k] = n; }
+          for (const k of numbers) if (!f.padNets[k]) { const n = (byRef.get(f.ref) ?? []).map(c => nl.pinNet.get(`${c.id}:${k}`)).find(Boolean); if (n) f.padNets[k] = n; }
         }
       }
     } catch (e) { warnings.push({ where: 'pcb', message: (e as Error).message }); }

@@ -88,12 +88,14 @@ export function previewRoute(a: PinGeom, m: Vec): Vec[] {
   return [p, { x: p.x, y: m.y }, m];
 }
 
-/**
- * 放置时把符号中心对齐到栅格。内置符号的引脚端点相对中心都是 100mil 的整数倍，
- * 因此无论怎样旋转，引脚端点都落在栅格上。
- */
-export function snapComponentOrigin(sym: SymbolDef, center: Vec): Vec {
-  return { x: snapTo(center.x, SCH_GRID) - sym.width / 2, y: snapTo(center.y, SCH_GRID) - sym.height / 2 };
+/** Imported symbols may have asymmetric bounds. Snap a real pin, not the bounding-box centre. */
+export function snapComponentOrigin(sym: SymbolDef, center: Vec, rotation = 0, mirror = false, grid = SCH_GRID): Vec {
+  const origin = { x: snapTo(center.x, grid) - sym.width / 2, y: snapTo(center.y, grid) - sym.height / 2 };
+  const pin = sym.pins.find((p) => !p.hidden) ?? sym.pins[0];
+  if (sym.graphic !== 'shapes' || !pin) return origin;
+  const c: SchComponent = { id: '', ref: '', symbolId: sym.id, value: '', footprint: '', ...origin, rotation, mirror, props: {} };
+  const end = pinGeom(c, pin, sym).end;
+  return { x: origin.x + snapTo(end.x, grid) - end.x, y: origin.y + snapTo(end.y, grid) - end.y };
 }
 
 export const _internal = { localToWorld, add };

@@ -21,7 +21,10 @@ export const PinDefSchema = z.object({
   at: VecSchema.optional(),
   /** 通用符号：从端点指向本体的方向（0 右 / 90 上 / 180 左 / 270 下，屏幕坐标） */
   dir: z.number().optional(),
-  hidden: z.boolean().optional()
+  hidden: z.boolean().optional(),
+  graphic: z.string().optional(),
+  nameSize: z.number().optional(),
+  numberSize: z.number().optional()
 });
 export type PinDef = z.infer<typeof PinDefSchema>;
 
@@ -49,6 +52,7 @@ export const SymbolDefSchema = z.object({
   graphic: SymbolGraphicSchema,
   pins: z.array(PinDefSchema),
   showPinNames: z.boolean().default(false),
+  showPinNumbers: z.boolean().optional(),
   /** 电源符号：值即为网络名，不参与 BOM。 */
   power: z.boolean().default(false),
   color: z.string().optional(),
@@ -74,6 +78,14 @@ export const SchComponentSchema = z.object({
   rotation: z.number().default(0),
   mirror: z.boolean().default(false),
   pinMap: z.record(z.string()).optional(),
+  /** Explicit unused pins; retained when moving, copying and serializing the instance. */
+  noConnectPins: z.array(z.string()).optional(),
+  /** Multiple schematic units of one physical package; symbolId identifies the complete source definition. */
+  unit: z.object({ number: z.number().int().positive(), symbolId: z.string() }).optional(),
+  textStyle: z.object({
+    ref: z.object({ size: z.number(), hidden: z.boolean(), anchor: z.enum(['start', 'middle', 'end']) }),
+    value: z.object({ size: z.number(), hidden: z.boolean(), anchor: z.enum(['start', 'middle', 'end']) })
+  }).optional(),
   textOffset: z.object({ ref:VecSchema, value:VecSchema }).optional(),
   props: z.record(z.string()).default({})
 });
@@ -95,7 +107,11 @@ export const NetLabelSchema = z.object({
   x: z.number(),
   y: z.number(),
   /** net：普通网络标签（纯文字）；port：跨页端口（导线末端空心圆 + 文字）。省略时按"同名标签是否出现在其他图纸"自动判断 */
-  kind: z.enum(['net', 'port']).optional()
+  kind: z.enum(['net', 'port']).optional(),
+  /** Electrical scope, independent of glyph. Omitted retains legacy cross-sheet connectivity. */
+  scope: z.enum(['local', 'global', 'hierarchical']).optional(),
+  /** Imported text geometry relative to the electrical anchor; does not change connectivity. */
+  textStyle: z.object({ size: z.number().positive(), anchor: z.enum(['start', 'middle', 'end']), rotation: z.number(), offset: VecSchema }).optional()
 });
 export type NetLabel = z.infer<typeof NetLabelSchema>;
 
@@ -166,6 +182,8 @@ export function paperSize(frame: SheetFrame): { w: number; h: number } | null {
 export const SheetSchema = z.object({
   id: z.string(),
   name: z.string(),
+  /** Import could not resolve parent/child sheet wiring; retained for ERC after reopening. */
+  unresolvedHierarchy: z.boolean().optional(),
   frame: SheetFrameSchema.default(DEFAULT_FRAME),
   components: z.array(SchComponentSchema),
   wires: z.array(WireSchema),

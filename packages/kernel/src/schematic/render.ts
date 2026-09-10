@@ -5,7 +5,7 @@
 import type { SchComponent, SymbolDef, SymbolShape, NetLabel, Sheet, Schematic } from '../model/schematic.js';
 import { getSymbol } from '../library/symbols.js';
 import { componentBody, pinGeoms, _internal } from './geometry.js';
-import type { Vec } from '../geometry.js';
+import { rotate, type Vec, type Rect } from '../geometry.js';
 
 /** 标准原理图配色（OrCAD / 数据手册风格）：符号蓝、导线暗红、网络标签红、引脚号 / 电源名黑。 */
 export const SCH_COLORS = { symbol: '#1A1AE6', wire: '#800000', bus: '#2C5AA0', netLabel: '#D40000', text: '#201E1D', pinNumber: '#333333', junction: '#800000', fill: '#FFFFFF' } as const;
@@ -14,6 +14,13 @@ export interface StrokeText { x: number; y: number; text: string; size: number; 
 export interface StrokeSet { lines: { points: Vec[]; width: number; fill?: boolean }[]; circles: { c: Vec; r: number; width: number; fill?: boolean }[]; texts: StrokeText[] }
 
 const SW = 16;
+
+/** KiCad background fills sit behind graphics from every common/unit section. */
+export function orderedSymbolShapes(sym: SymbolDef): SymbolShape[] {
+  const shapes = sym.shapes ?? [];
+  const background = (shape: SymbolShape) => 'fill' in shape && shape.fill === 'background';
+  return [...shapes.filter(background), ...shapes.filter(s => !background(s))];
+}
 
 /** 三点弧 → 折线采样。 */
 export function arcToPolyline(a: SymbolShape & { kind: 'arc' }, n = 16): Vec[] {
@@ -33,13 +40,27 @@ export function arcToPolyline(a: SymbolShape & { kind: 'arc' }, n = 16): Vec[] {
 /** 出现在多张图纸上的标签名（这些标签默认画成跨页端口）。 */
 export function crossSheetLabelNames(schematic: Schematic): Set<string> {
   const count = new Map<string, Set<string>>();
-  for (const sh of schematic.sheets) for (const l of sh.labels) { if (!count.has(l.text)) count.set(l.text, new Set()); count.get(l.text)!.add(sh.id); }
+  for (const sh of schematic.sheets) for (const l of sh.labels) {
+    if (l.scope === 'local' || l.scope === 'hierarchical') continue;
+    if (!count.has(l.text)) count.set(l.text, new Set()); count.get(l.text)!.add(sh.id);
+  }
   return new Set([...count].filter(([, sheets]) => sheets.size > 1).map(([n]) => n));
 }
 export const GND_NET_RE = /^(?:[ADP]?GND[A-Z0-9_]*|VSS[A-Z0-9_]*|GROUND|EARTH|0V)$/i;
 export const POWER_NET_RE = /^(?:[+-]?\d+(?:\.\d+)?V\d*[A-Z0-9_]*|V(?:CC|DD|EE|BUS|BAT|IN|OUT|SYS|PP|REF|AUX|IO)[A-Z0-9_]*|\+?[0-9]V[0-9]+[A-Z0-9_]*)$/i;
 export type NetLabelGlyph = 'text' | 'gnd' | 'power';
-export interface NetLabelLayout { glyph: NetLabelGlyph; text: { x: number; y: number; anchor: 'start' | 'middle' | 'end' }; lines: Vec[][]; circles: { c: Vec; r: number }[] }
+export interface NetLabelLayout { glyph: NetLabelGlyph; text: { x: number; y: number; anchor: 'start' | 'middle' | 'end'; size?: number; rotation?: number }; lines: Vec[][]; circles: { c: Vec; r: number }[] }
+/** Shared selection/cleanup bounds, including rotated imported label text. */
+export function netLabelBounds(label: NetLabel, layout: NetLabelLayout): Rect {
+  const t = layout.text, size = t.size ?? 100;
+  const width = [...label.text].reduce((n, c) => n + (c.charCodeAt(0) > 255 ? 1 : 0.62) * size, 0);
+  const x = t.anchor === 'end' ? -width : t.anchor === 'middle' ? -width / 2 : 0;
+  const pts = [{ x, y: -size }, { x: x + width, y: -size }, { x, y: size * 0.25 }, { x: x + width, y: size * 0.25 }].map(p => { const r = rotate(p, t.rotation ?? 0); return { x: t.x + r.x, y: t.y + r.y }; });
+  pts.push({x:label.x-30,y:label.y-30},{x:label.x+30,y:label.y+30},...layout.lines.flat());
+  for (const ci of layout.circles) pts.push({x:ci.c.x-ci.r,y:ci.c.y-ci.r},{x:ci.c.x+ci.r,y:ci.c.y+ci.r});
+  const minX = Math.min(...pts.map(p => p.x)), minY = Math.min(...pts.map(p => p.y));
+  return { x: minX - 20, y: minY - 20, w: Math.max(...pts.map(p => p.x)) - minX + 40, h: Math.max(...pts.map(p => p.y)) - minY + 40 };
+}
 /**
  * 网络标签布局：
  * - 普通网络：红色纯文字贴在导线末端（芯片引脚引出一根线 + 文字），文字顺着导线方向排。
@@ -57,6 +78,10 @@ export function netLabelLayout(sheet: Sheet, label: NetLabel, _crossSheet?: Set<
   }
   const { x, y } = label;
   const glyph: NetLabelGlyph = label.kind === 'net' ? 'text' : GND_NET_RE.test(label.text) ? 'gnd' : POWER_NET_RE.test(label.text) ? 'power' : 'text';
+  if (label.textStyle && glyph === 'text') {
+    const style = label.textStyle;
+    return { glyph, lines: [], circles: [], text: { x: x + style.offset.x, y: y + style.offset.y, size: style.size, rotation: style.rotation, anchor: style.anchor } };
+  }
   if (glyph === 'gnd') {
     const sgn = dir === 'down' ? -1 : 1; // 导线在下方 → 地符号朝上；其余朝下
     const lines: Vec[][] = [[{ x, y }, { x, y: y + sgn * 100 }]];
@@ -86,13 +111,13 @@ export function resistorZigzag(w: number, h: number): Vec[] {
   return pts;
 }
 /** 位号 / 值的标准位置：电源端口文字在圆点外侧（朝上时居上、朝下时居下），地符号文字居下，其余在右侧或大器件上方。 */
-export function symbolTextPositions(comp: SchComponent, sym: SymbolDef): { ref: { x: number; y: number; anchor: 'start' | 'middle' }; value: { x: number; y: number; anchor: 'start' | 'middle' } } {
+export function symbolTextPositions(comp: SchComponent, sym: SymbolDef): { ref: { x: number; y: number; anchor: 'start' | 'middle' | 'end' }; value: { x: number; y: number; anchor: 'start' | 'middle' | 'end' } } {
   const b = componentBody(comp, sym);
   const big = sym.graphic === 'box' && sym.width >= 1000;
   const cx = b.x + b.w / 2;
   const rot = ((comp.rotation % 360) + 360) % 360;
-  let ref = { x: b.x + b.w + 80, y: b.y + b.h / 2 - 20, anchor: 'start' as 'start' | 'middle' };
-  let value = { x: b.x + b.w + 80, y: b.y + b.h / 2 + 110, anchor: 'start' as 'start' | 'middle' };
+  let ref = { x: b.x + b.w + 80, y: b.y + b.h / 2 - 20, anchor: 'start' as 'start' | 'middle' | 'end' };
+  let value = { x: b.x + b.w + 80, y: b.y + b.h / 2 + 110, anchor: 'start' as 'start' | 'middle' | 'end' };
   if (big) { ref = { x: cx, y: b.y - 80, anchor: 'middle' }; value = { x: cx, y: b.y + b.h / 2 + 40, anchor: 'middle' }; }
   if (sym.graphic === 'power') {
     const up = rot === 0; // 圆点朝上：文字居上；朝下：文字居下
@@ -100,6 +125,7 @@ export function symbolTextPositions(comp: SchComponent, sym: SymbolDef): { ref: 
   }
   if (sym.graphic === 'gnd') value = rot === 90 || rot === 270 ? { x: cx, y: b.y + b.h + 120, anchor: 'middle' } : rot === 180 ? { x: cx, y: b.y - 50, anchor: 'middle' } : { x: cx, y: b.y + b.h + 120, anchor: 'middle' }; // 地：GND 文字居中放在远离导线的一侧（朝下在下方，朝上在上方）
   if(comp.textOffset) { ref={...ref,x:ref.x+comp.textOffset.ref.x,y:ref.y+comp.textOffset.ref.y}; value={...value,x:value.x+comp.textOffset.value.x,y:value.y+comp.textOffset.value.y}; }
+  if (comp.textStyle) { ref.anchor = comp.textStyle.ref.anchor; value.anchor = comp.textStyle.value.anchor; }
   return { ref, value };
 }
 /** 符号本体（局部坐标，不含引脚）。 */
@@ -108,7 +134,7 @@ export function symbolLocalStrokes(sym: SymbolDef): StrokeSet {
   const w = sym.width, h = sym.height;
   const rect = (x: number, y: number, rw: number, rh: number, width = SW, fill = false) => out.lines.push({ points: [{ x, y }, { x: x + rw, y }, { x: x + rw, y: y + rh }, { x, y: y + rh }, { x, y }], width, fill });
   if (sym.graphic === 'shapes') {
-    for (const sh of sym.shapes ?? []) {
+    for (const sh of orderedSymbolShapes(sym)) {
       const width = Math.max(sh.kind === 'text' ? 0 : sh.width, 10);
       if (sh.kind === 'polyline') out.lines.push({ points: sh.fill !== 'none' ? [...sh.points, sh.points[0]] : sh.points, width, fill: sh.fill !== 'none' });
       else if (sh.kind === 'rect') rect(Math.min(sh.a.x, sh.b.x), Math.min(sh.a.y, sh.b.y), Math.abs(sh.b.x - sh.a.x), Math.abs(sh.b.y - sh.a.y), width, sh.fill !== 'none');
@@ -142,6 +168,18 @@ export function symbolLocalStrokes(sym: SymbolDef): StrokeSet {
 }
 
 /** 元件在世界坐标下的全部几何：本体、引脚、引脚名 / 号、位号与值。 */
+/** Common IEC/IEEE clock and inversion marks shared by canvas and vector export. */
+export function pinDecoration(g: ReturnType<typeof pinGeoms>[number]): StrokeSet {
+  const out: StrokeSet = { lines: [], circles: [], texts: [] };
+  const length = Math.hypot(g.base.x - g.end.x, g.base.y - g.end.y);
+  if (!length || g.def.hidden) return out;
+  const dx = (g.base.x - g.end.x) / length, dy = (g.base.y - g.end.y) / length;
+  const style = g.def.graphic;
+  if (style === 'inverted' || style === 'inverted_clock') out.circles.push({ c: { x: g.base.x - dx * 25, y: g.base.y - dy * 25 }, r: 25, width: 12 });
+  if (style === 'clock' || style === 'inverted_clock') out.lines.push({ points: [{ x: g.base.x - dy * 40, y: g.base.y + dx * 40 }, { x: g.base.x + dx * 65, y: g.base.y + dy * 65 }, { x: g.base.x + dy * 40, y: g.base.y - dx * 40 }], width: 12 });
+  return out;
+}
+
 export function componentStrokes(comp: SchComponent, sym: SymbolDef = getSymbol(comp.symbolId)): StrokeSet {
   const local = symbolLocalStrokes(sym);
   const T = (p: Vec) => _internal.localToWorld(comp, sym, p);
@@ -152,18 +190,24 @@ export function componentStrokes(comp: SchComponent, sym: SymbolDef = getSymbol(
   };
   const pins = pinGeoms(comp, sym);
   for (const g of pins) {
+    if (comp.noConnectPins?.includes(g.def.number)) for (const sign of [-1, 1]) out.lines.push({ points: [{ x: g.end.x - 40, y: g.end.y - sign * 40 }, { x: g.end.x + 40, y: g.end.y + sign * 40 }], width: 14 });
     if (g.def.hidden) continue;
-    out.lines.push({ points: [g.base, g.end], width: SW });
+    const dec = pinDecoration(g);
+    const bubble = dec.circles[0];
+    const len = Math.hypot(g.base.x - g.end.x, g.base.y - g.end.y);
+    const start = bubble && len ? { x: g.base.x - (g.base.x - g.end.x) / len * 50, y: g.base.y - (g.base.y - g.end.y) / len * 50 } : g.base;
+    out.lines.push({ points: [start, g.end], width: SW }, ...dec.lines);
+    out.circles.push(...dec.circles);
     if (sym.showPinNames && g.def.name !== g.def.number) {
       const dx = g.base.x - g.end.x, dy = g.base.y - g.end.y;
       const horiz = Math.abs(dx) >= Math.abs(dy);
       const tx = horiz ? g.base.x + Math.sign(dx || 1) * 50 : g.base.x, ty = horiz ? g.base.y + 35 : g.base.y + Math.sign(dy || 1) * 60 + (dy > 0 ? 60 : 0);
-      out.texts.push({ x: tx, y: ty, text: g.def.name, size: sym.graphic === 'shapes' ? 90 : 100, anchor: horiz ? (dx >= 0 ? 'start' : 'end') : 'middle', color: '#4A4A4A' });
+      out.texts.push({ x: tx, y: ty, text: g.def.name, size: g.def.nameSize ?? (sym.graphic === 'shapes' ? 90 : 100), anchor: horiz ? (dx >= 0 ? 'start' : 'end') : 'middle', color: '#4A4A4A' });
     }
-    if (sym.graphic === 'shapes') out.texts.push({ x: (g.base.x + g.end.x) / 2, y: (g.base.y + g.end.y) / 2 - 25, text: g.def.number, size: 70, anchor: 'middle' });
+    if (sym.graphic === 'shapes' && sym.showPinNumbers !== false) out.texts.push({ x: (g.base.x + g.end.x) / 2, y: (g.base.y + g.end.y) / 2 - 25, text: g.def.number, size: g.def.numberSize ?? 70, anchor: 'middle' });
   }
   const tp = symbolTextPositions(comp, sym);
-  if (!sym.power) out.texts.push({ x: tp.ref.x, y: tp.ref.y, text: comp.ref, size: 120, anchor: tp.ref.anchor, bold: true, color: SCH_COLORS.symbol });
-  out.texts.push({ x: tp.value.x, y: tp.value.y, text: comp.value, size: sym.power ? 100 : 110, anchor: tp.value.anchor, color: sym.power ? SCH_COLORS.text : SCH_COLORS.symbol });
+  if (!sym.power && !comp.textStyle?.ref.hidden) out.texts.push({ x: tp.ref.x, y: tp.ref.y, text: comp.ref, size: comp.textStyle?.ref.size ?? 120, anchor: tp.ref.anchor, bold: true, color: SCH_COLORS.symbol });
+  if (!comp.textStyle?.value.hidden) out.texts.push({ x: tp.value.x, y: tp.value.y, text: comp.value, size: comp.textStyle?.value.size ?? (sym.power ? 100 : 110), anchor: tp.value.anchor, color: sym.power ? SCH_COLORS.text : SCH_COLORS.symbol });
   return out;
 }

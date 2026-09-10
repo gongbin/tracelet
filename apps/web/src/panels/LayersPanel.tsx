@@ -6,8 +6,11 @@ import { pcb, LAYER_COLORS, copperLayers, type Layer } from '@tracelet/kernel';
 import { useApp, useEditor, useProject } from '../store/app.js';
 import { Icon } from '../components/Icon.js';
 import { I } from '../icons.js';
+import { useT } from '../i18n/index.js';
+import { PCB_DISPLAY } from '../editors/pcb/display.js';
 
 export function LayersPanel() {
+  const t=useT();
   const project = useProject();
   const editor = useEditor();
   const app = useApp();
@@ -32,7 +35,7 @@ export function LayersPanel() {
           const ki = (cu as string[]).indexOf(l);
           const active = l === app.activeLayer;
           return (
-            <div key={l} className={`layer-row${active ? ' on' : ''}`} onClick={() => ki >= 0 && app.set('activeLayer', cu[ki])}>
+            <div key={l} className={`layer-row${active ? ' on' : ''}`} onClick={() => ki >= 0 && app.selectPcbLayer(cu[ki])}>
               <span style={{ width: 10, height: 10, borderRadius: '50%', flex: 'none', background: LAYER_COLORS[l], opacity: hidden(l) ? 0.3 : 1 }} />
               <span className="mono" style={{ color: active ? 'var(--text)' : hidden(l) ? 'var(--text-3)' : 'var(--text-2)' }}>{l}</span>
               <span className="dim xs">{ki >= 0 ? ki + 1 : ''}</span>
@@ -53,6 +56,8 @@ export function LayersPanel() {
         </div>
         <span className="mono" style={{ color: 'var(--text)' }}>{Math.round(app.otherLayerOpacity * 100)}%</span>
       </div>
+      <div className="divider" />
+      <div className="dim xs" data-no-translate style={{lineHeight:1.6}}><span style={{color:PCB_DISPLAY.error}}>◆ !</span> · <span style={{color:PCB_DISPLAY.warning}}>△ !</span> · {t('pcb.display.legend')}</div>
       <div className="divider" />
       <div className="col" style={{ gap: 6 }}>
         <div className="kicker">网络类</div>

@@ -12,9 +12,10 @@ export function padCenterOf(def: { pads: { x: number; y: number; w: number; h: n
 }
 export function needsModel(f: BoardFootprint): boolean {
   const d = footprintDef(f);
+  if (d.height === 0 && d.pads.length > 0 && d.pads.every(p => p.drill > 0 || p.castellated)) return false;
   return !(d.pads.length > 0 && d.pads.every(p => p.npth)) && !(/^TestPoint_Pad_/i.test(d.name.replace(/^.*:/, '')) || (/^TP\d/i.test(f.ref) && d.pads.length === 1 && d.pads[0].drill === 0));
 }
-/** 允许"同系列近似"的封装族（连接器类外形差异可接受；阻容 / IC 尺寸敏感，不做近似）。 */
+/** Similar names are search candidates only, never evidence of mechanical compatibility. */
 const APPROX_FAMILIES = ['USB_C_Receptacle', 'USB_C_Plug', 'USB_Micro-B', 'USB_Mini-B', 'USB_A', 'USB_B', 'microSD', 'SD_', 'RJ45', 'BarrelJack', 'Barrel_Jack', 'JST_', 'Molex_', 'TerminalBlock', 'PinHeader_', 'PinSocket_', 'IDC-Header', 'Screw_Terminal'];
 /** 标准目录里没有精确同名模型时，在同系列里挑共同前缀最长的一个作为近似模型。 */
 export function approximateCatalogKey(key: string): string | undefined {
@@ -32,15 +33,17 @@ export function modelFor(f: BoardFootprint, board: Board): Model3d | undefined {
   const override = board.models3d?.[f.footprintId];
   if (override) return override;
   const key = f.footprintId.split(':').pop()!;
-  if (MODEL_CATALOG[key]) return { name: key, source: `catalog:${key}`, scale: 1000, offset: [0, 0, 0], rotation: [0, 0, 0] };
-  const approx = approximateCatalogKey(key);
-  if (approx) {
-    // 近似模型的原点约定可能不同：把它的焊盘区中心对到本封装的焊盘区中心（场景 y 轴与 KiCad 相反）
-    const mine = padCenterOf(footprintDef(f)), theirs = MODEL_CATALOG[approx].padCenter;
-    const offset: [number, number, number] = mine && theirs ? [Math.round((mine[0] - theirs[0]) * 1000) / 1000, Math.round(-(mine[1] - theirs[1]) * 1000) / 1000, 0] : [0, 0, 0];
-    return { name: `${approx}（同系列近似）`, source: `catalog:${approx}`, scale: 1000, offset, rotation: [0, 0, 0] };
-  }
-  return undefined;
+  return MODEL_CATALOG[key] ? catalogModel(f, key) : undefined;
+}
+/** Use the same pad-origin correction for automatic and manually selected catalog models. */
+export function catalogModel(f: BoardFootprint, matched: string): Model3d {
+  const key = f.footprintId.split(':').pop()!;
+  if (!MODEL_CATALOG[matched]) throw new Error('Unknown catalog model');
+  // Even exact names can have different origins: generated headers are centered,
+  // while KiCad headers use pin 1. Align in local coordinates before scene rotation/mirroring.
+  const mine = padCenterOf(footprintDef(f)), theirs = MODEL_CATALOG[matched].padCenter;
+  const offset: [number, number, number] = mine && theirs ? [Math.round((mine[0] - theirs[0]) * 1000) / 1000, Math.round(-(mine[1] - theirs[1]) * 1000) / 1000, 0] : [0, 0, 0];
+  return { name: matched, source: `catalog:${matched}`, scale: 1000, offset, rotation: [0, 0, 0], provenance: { kind: matched === key ? 'catalog' : 'approximate', source: `https://gitlab.com/kicad/libraries/kicad-packages3D/-/tree/master/${MODEL_CATALOG[matched].source.split('/').map(encodeURIComponent).join('/')}`, license: 'CC-BY-SA-4.0 with KiCad library exception' } };
 }
 /** GLB imports must be self-contained; never fetch external buffers/images from uploaded files. */
 export function validateGlb(buffer: ArrayBuffer) {
@@ -51,12 +54,13 @@ export function validateGlb(buffer: ArrayBuffer) {
   const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 20, n)));
   if ([...(json.buffers ?? []), ...(json.images ?? [])].some(x => x.uri && !x.uri.startsWith('data:'))) throw new Error('请导出包含纹理和缓冲数据的单文件 GLB');
 }
-export async function loadModel(source: string): Promise<THREE.Group> {
+export async function loadModel(source: string, signal?: AbortSignal, refresh = false): Promise<THREE.Group> {
   const url = source.startsWith('catalog:') ? `${import.meta.env.BASE_URL}models3d/kicad/${MODEL_CATALOG[source.slice(8)]?.file ?? 'missing.glb'}` : source;
-  const response = await fetch(url); if (!response.ok) throw new Error(`模型加载失败 (${response.status})`);
+  const response = await fetch(url, { signal, cache: refresh ? 'reload' : 'default' }); if (!response.ok) throw new Error(`模型加载失败 (${response.status})`);
   const buffer = await response.arrayBuffer(); validateGlb(buffer);
   const result = await new GLTFLoader().parseAsync(buffer, '');
-  if (new THREE.Box3().setFromObject(result.scene).isEmpty()) throw new Error('模型没有可显示的几何');
+  const bounds = new THREE.Box3().setFromObject(result.scene);
+  if (bounds.isEmpty() || [...bounds.min.toArray(), ...bounds.max.toArray()].some(v => !Number.isFinite(v))) { disposeObject(result.scene); throw new Error('模型没有可显示的几何'); }
   return result.scene;
 }
 export function disposeObject(group: THREE.Object3D) {

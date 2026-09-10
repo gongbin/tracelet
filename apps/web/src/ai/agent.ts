@@ -12,6 +12,7 @@ export const SYSTEM_PROMPT = `你是 Tracelet（开源在线 PCB 设计工具）
 - 用户可以在对话里直接附上原理图 PDF / 图片。收到附件时：先把电路抽取出来（位号、值、类别、封装提示、每个引脚的网络名），调用 generate_sheet_from_spec 生成图纸，然后用 run_erc / review_schematic 复核，把不确定的地方告诉用户。用户要求"按附件修改现有图纸"时，用 get_netlist 对照差异，再用 place_component / connect_pins / add_net_label / set_component_value / delete_components 逐项修改。
 - 你有完整的读写工具，不要回答"无法修改图纸"；做不到的具体原因要说清楚（比如缺少某个符号），并给出替代做法。
 - 识别原理图的流程：一次性把全部元件放进同一个 generate_sheet_from_spec 调用（每个元件必须有 ref 和至少一个 pin；pins 的 number 用数据手册 / 图上的引脚号，net 用图上的网络标签或电源名）。工具返回的 components 列表就是真正落到图纸上的元件，若为空或 emptyNets 非空，说明生成失败，要检查输入重来，不要给用户"已生成"的结论。生成后调用 run_erc 与 get_netlist 核对每个网络的引脚数。识别总是新增图纸，不要删除或改动用户原有图纸；只有用户明确要求时才用 delete_sheet / delete_dangling 清理。
+- 附件还原时必须提供元件本体中心 position（图像百分比0–100）和每个引脚的 side（L/R/T/B，按各侧视觉顺序列出），保留测试点和原位号。严格按原图读数值：39M不可改为39k，+3V0不可改为3V3，AGND/DGND不可自动合并。沿导线和结点逐网追踪，不要根据芯片常用接法补画；不确定项留空并列入notes。生成后逐网比较ref.pin清单，而不仅是ERC数量；不要自动应用经验审查建议改变原电路。
 - 推断出来的内容（引脚编号、阻值、封装）必须明确标注"推断"，并给出核对方法；不要虚构图上没有的元件或连接。`;
 
 export interface AgentStep { text: string }
@@ -41,6 +42,7 @@ export async function chatWithTools(cfg: AiConfig, history: Anthropic.Beta.BetaM
         ...(isOpus5 ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const } : {})
       }).on('text', (delta, snapshot) => { if (delta) onText?.(snapshot); }).finalMessage();
     } catch (e) { throw new Error(describeError(e)); }
+    if (response.stop_reason === 'max_tokens') throw new Error('模型输出被截断，请裁剪图片或拆页识别；未执行本轮不完整的工具调用。');
     if (response.stop_reason === 'refusal') { return { reply: { text: '模型拒绝了这个请求（安全策略）。', steps, refused: true }, history: messages }; }
     const text = response.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text').map((b) => b.text).join('\n');
     if (text) { finalText = text; onText?.(text); }

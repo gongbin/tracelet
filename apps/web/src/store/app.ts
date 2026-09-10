@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { usePrefs } from '../i18n/index.js';
+import { usePrefs, translate } from '../i18n/index.js';
 import { ProjectEditor, pcb, type sch, type Project, type CopperLayer, type Layer, type Vec, type AutorouteResult, type PlacementResult, type Sheet } from '@tracelet/kernel';
 type Clipboard = sch.Clipboard;
 import { createProjectStore, type ProjectMeta, type ProjectStore } from './projectStore.js';
@@ -12,7 +12,7 @@ export type RightTab = 'props' | 'layers' | 'lib' | 'check' | 'ai' | '3d';
 
 export interface Placing { symbolId: string; value: string; footprint: string; props?: Record<string, string>; rotation: number; partLabel?: string }
 export interface PcbPlacing { footprintId: string; label: string; rotation: number }
-export interface Routing { points: Vec[]; net: string; layer: CopperLayer; width: number; startPad?: { footprintId: string; number: string } }
+export interface Routing { points: Vec[]; net: string; layer: CopperLayer; width: number; checkpoints?: number[]; startPad?: { footprintId: string; number: string } }
 export interface Toast { id: number; text: string; kind?: 'info' | 'error' | 'success' }
 
 export interface AppState {
@@ -31,6 +31,7 @@ export interface AppState {
   hiddenFootprints: string[];
   focusMode: boolean;
   bottomExpanded: boolean;
+  fabPanelOpen: boolean;
   bottomTab: 'problems' | 'nets' | 'console' | 'history';
   rightTab: RightTab | null;
   hoverTool: number;
@@ -59,13 +60,14 @@ export interface AppState {
   activeLayer: CopperLayer;
   pcbSelection: string[];
   routing: Routing | null;
+  selectPcbLayer(layer:CopperLayer):void;
   zoneDraft: Vec[] | null;
   outlineDraft: Vec[] | null;
   measure: Vec[] | null;
   /** 仅板级封装放置（定位孔 / 基准点 / Logo） */
   pcbPlacing: PcbPlacing | null;
   /** 开孔工具参数 */
-  hole: { drill: number; plated: boolean; ring: number };
+  hole: { drill: number; plated: boolean; ring: number; net?: string; mode?: 'round' | 'castellated'; count?:number; pitch?:number };
   /** 请求画布适配全部内容（递增触发） */
   fitSeq: number;
   /** 栅格与走线 / 过孔覆盖（null = 跟随网络类） */
@@ -82,6 +84,7 @@ export interface AppState {
   otherLayerOpacity: number;
   highlightNet: string | null;
   checkHighlight: string | null;
+  showSchCheckMarkers: boolean;
   flyTo: { x: number; y: number; space: 'sch' | 'pcb'; seq: number } | null;
   // 3D
   view3d: 'front' | 'back' | 'top' | 'iso';
@@ -130,6 +133,7 @@ export const useApp = create<AppState>((set, get) => ({
   hiddenFootprints: [],
   focusMode: false,
   bottomExpanded: false,
+  fabPanelOpen: false,
   bottomTab: 'problems',
   rightTab: null,
   hoverTool: -1,
@@ -156,6 +160,10 @@ export const useApp = create<AppState>((set, get) => ({
   activeLayer: 'F.Cu',
   pcbSelection: [],
   routing: null,
+  selectPcbLayer(layer) {
+    if(get().routing && get().routing!.layer!==layer){get().toast(translate(usePrefs.getState().locale,'pcb.route.changeLayer'));return;}
+    set({activeLayer:layer});
+  },
   zoneDraft: null,
   outlineDraft: null,
   measure: null,
@@ -173,6 +181,7 @@ export const useApp = create<AppState>((set, get) => ({
   otherLayerOpacity: 0.4,
   highlightNet: null,
   checkHighlight: null,
+  showSchCheckMarkers: false,
   flyTo: null,
   view3d: 'iso',
 
@@ -200,7 +209,7 @@ export const useApp = create<AppState>((set, get) => ({
       set({ saving: true });
       saveTimer = setTimeout(() => { void flush(); }, 600);
     });
-    set({ editor, autoroute: { status: 'idle', result: null }, placement: { status: 'idle', result: null }, guideOpen: false, hiddenFootprints: [], screen: 'sch', rightTab: null, selection: [], pcbSelection: [], placing: null, pendingPin: null, routing: null, schTool: 'select', pcbTool: 'select', lastSavedAt: Date.now(), projMenuOpen: false, wizardOpen: false, highlightNet: null, checkHighlight: null, sheetId: p.schematic.sheets[0].id, wireDraft: null, busDraft: null, drawDraft: null, pasting: null });
+    set({ editor, autoroute: { status: 'idle', result: null }, placement: { status: 'idle', result: null }, guideOpen: false, hiddenFootprints: [], screen: 'sch', rightTab: null, selection: [], pcbSelection: [], placing: null, pendingPin: null, routing: null, schTool: 'select', pcbTool: 'select', lastSavedAt: Date.now(), projMenuOpen: false, wizardOpen: false, highlightNet: null, checkHighlight: null, showSchCheckMarkers: false, sheetId: p.schematic.sheets[0].id, wireDraft: null, busDraft: null, drawDraft: null, pasting: null });
     void get().store.save(p).then(() => get().refreshProjects());
   },
   closeProject() {
@@ -213,6 +222,7 @@ export const useApp = create<AppState>((set, get) => ({
     await get().refreshProjects();
   },
   go(screen) {
+    set({fabPanelOpen:false});
     set({ screen, rightTab: null, projMenuOpen: false, hoverTool: -1, pwrMenuOpen: false, placing: null, pcbPlacing: null, pendingPin: null, routing: null, zoneDraft: null, outlineDraft: null, measure: null, labelPrompt: null, wireDraft: null, busDraft: null, drawDraft: null, pasting: null, drawMenuOpen: false, cursorWorld: { x: 0, y: 0 } });
   },
   set(key, value) { set({ [key]: value } as Partial<AppState>); },

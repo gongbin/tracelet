@@ -1,5 +1,6 @@
 import type { Board, BoardFootprint } from '../model/board.js';
-import { footprintBody, footprintPads } from './geometry.js';
+import { footprintBody, footprintPads, footprintDef } from './geometry.js';
+import { padOnStraightEdge } from './holes.js';
 import { pointInPolygon, type Rect } from '../geometry.js';
 import { bodyInsideOutline } from './placementConstraints.js';
 
@@ -25,6 +26,13 @@ export function antennaGeometry(f: BoardFootprint, board: Board): { area: Rect; 
 
 export function placementBodyInside(f: BoardFootprint, board: Board): boolean {
   if(bodyInsideOutline(footprintBody(f),board.outline)) return true;
+  // A board-only half-hole row represents copper milled at the edge, not an
+  // overhanging component body. Restrict the exception to its actual land bounds.
+  const pads=footprintPads(f,board),body=footprintBody(f);
+  if(!f.componentId&&footprintDef(f).height===0&&pads.length&&pads.every(p=>p.def.castellated&&p.through&&!p.def.npth&&padOnStraightEdge(board,p.center,Math.max(p.def.w,p.def.h)))){
+    const x1=Math.min(...pads.map(p=>p.rect.x)),x2=Math.max(...pads.map(p=>p.rect.x+p.rect.w)),y1=Math.min(...pads.map(p=>p.rect.y)),y2=Math.max(...pads.map(p=>p.rect.y+p.rect.h));
+    if(body.x>=x1-1e-6&&body.y>=y1-1e-6&&body.x+body.w<=x2+1e-6&&body.y+body.h<=y2+1e-6)return true;
+  }
   const ant=antennaGeometry(f,board);
   if(!ant || board.outline.length<3 || pointInPolygon({x:ant.area.x+ant.area.w/2,y:ant.area.y+ant.area.h/2},board.outline))return false;
   // Only the pad-free antenna side may overhang; every copper pad and the support stay inside.

@@ -202,6 +202,8 @@ export function exportFabFiles(project: Project, opts: { bom?: boolean; pnp?: bo
   files.push({ name: `${s}-Edge_Cuts.gm1`, content: exportProfileLayer(board), kind: 'gerber' });
   files.push({ name: `${s}-PTH.drl`, content: exportExcellon(board, true), kind: 'drill' });
   files.push({ name: `${s}-NPTH.drl`, content: exportExcellon(board, false), kind: 'drill' });
+  const castellated=allPads(board).filter(p=>p.def.castellated);
+  if(castellated.length)files.push({name:`${s}-castellated-holes.json`,kind:'manifest',content:JSON.stringify({process:'Castellated plated half-holes REQUIRED; not ordinary NPTH or mouse bites',units:'mm',coordinates:'Manufacturing origin, top view, Y up',notes:'Confirm half-hole diameter, copper land, spacing, edge milling, panel supports and assembly process with the fabricator. PTH drilling and copper data describe full holes before edge milling.',holes:castellated.map(p=>({ref:p.ref,pad:p.number,x:p.center.x,y:-p.center.y,drill:p.def.drill,landWidth:p.def.w,landHeight:p.def.h,net:p.net}))},null,2)});
   if (opts.bom !== false) files.push({ name: `${s}-BOM.csv`, content: exportBomCsv(project), kind: 'bom' });
   if (opts.pnp !== false) files.push({ name: `${s}-PickAndPlace.csv`, content: exportPickAndPlaceCsv(project), kind: 'pnp' });
   if (opts.netlist) files.push({ name: `${s}-netlist.json`, content: JSON.stringify(exportNetlistJson(project), null, 2), kind: 'netlist' });

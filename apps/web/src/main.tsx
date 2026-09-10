@@ -5,10 +5,13 @@ import './styles/app.css';
 import { startRouter } from './store/router.js';
 import { initBridge } from './store/bridge.js';
 
-startRouter();
-initBridge();
+const isDocs = /^\/docs\/?$/.test(location.pathname);
+const Docs = React.lazy(() => import('./screens/Docs.js').then(module => ({ default: module.Docs })));
+if (!isDocs) { startRouter(); initBridge(); }
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <React.Suspense fallback={<div role="status" style={{ padding: 32 }}>Tracelet…</div>}>
+      {isDocs ? <Docs /> : <App />}
+    </React.Suspense>
   </React.StrictMode>
 );

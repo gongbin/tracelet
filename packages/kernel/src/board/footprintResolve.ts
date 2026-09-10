@@ -35,7 +35,7 @@ export function pinHeaderFootprint(rows: number, cols: number, pitch = 2.54): Fo
   return generateFootprint({ kind: 'header', rows: rows === 2 ? 2 : 1, cols, pitch });
 }
 
-export function resolveFootprint(c: SchComponent): ResolvedFootprint {
+export function resolveFootprint(c: SchComponent, packagePinNumbers?: string[]): ResolvedFootprint {
   if (c.footprint && findFootprint(c.footprint)) return { id: c.footprint, mapped: false, placeholder: false };
   const kicadName = (c.props.kicadFootprint ?? c.footprint ?? '').split(':').pop() ?? '';
   for (const [re, id] of KICAD_MAP) if (re.test(kicadName) && findFootprint(id)) return { id, mapped: true, placeholder: false };
@@ -53,8 +53,8 @@ export function resolveFootprint(c: SchComponent): ResolvedFootprint {
   if (sym.defaultFootprint && findFootprint(sym.defaultFootprint)) return { id: sym.defaultFootprint, mapped: false, placeholder: false };
   const genDefault = sym.defaultFootprint ? footprintFromName(sym.defaultFootprint) : undefined;
   if (genDefault) { const existing = findFootprint(genDefault.id); if (!existing) registerFootprints([genDefault]); return { id: genDefault.id, created: existing ?? genDefault, mapped: true, placeholder: false }; }
-  const pins = sym.pins.map((p) => p.number);
-  const key = `${pins.length}p_${(kicadName || sym.name).replace(/[^\w.-]+/g, '_')}`.slice(0, 60);
+  const pins = packagePinNumbers ?? sym.pins.map((p) => p.number);
+  const key = `${pins.length}p_${(kicadName || sym.name).replace(/[^\w.-]+/g, '_')}`.slice(0, 60) + (packagePinNumbers ? `_${pins.join('-')}` : '');
   const existing = findFootprint(`fp:placeholder:${key}`);
   if (existing) return { id: existing.id, created: existing, mapped: false, placeholder: true };
   const def = placeholderFootprint(pins, key);

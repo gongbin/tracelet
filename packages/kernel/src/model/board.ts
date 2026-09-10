@@ -27,6 +27,8 @@ export const PadDefSchema = z.object({
   drill: z.number().default(0),
   /** 非金属化孔（定位孔） */
   npth: z.boolean().default(false),
+  /** Explicit plated half-hole on a straight board edge; requires a castellation fabrication process. */
+  castellated: z.boolean().optional(),
   /**
    * 贴片焊盘落在**与封装相反**的那一面（如 Kailh 热插拔插座：本体从正面装、焊盘在背面焊）。
    * 存"相对封装面"而不是绝对层名，封装翻面时才会跟着一起翻。
@@ -183,8 +185,17 @@ export const Model3dSchema = z.object({
   name: z.string(),
   source: z.string().refine(s => s.startsWith('catalog:') || /^data:model\/gltf-binary;base64,[A-Za-z0-9+/=]+$/.test(s), 'Expected catalog model or embedded GLB'),
   scale: z.number().positive().finite().default(1000),
-  offset: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),
-  rotation: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0])
+  offset: z.tuple([z.number().finite(), z.number().finite(), z.number().finite()]).default([0, 0, 0]),
+  rotation: z.tuple([z.number().finite(), z.number().finite(), z.number().finite()]).default([0, 0, 0]),
+  /** Model origin and review state, retained with the portable project. */
+  provenance: z.object({
+    kind: z.enum(['catalog', 'approximate', 'import']),
+    source: z.string().optional(),
+    license: z.string().optional(),
+    format: z.enum(['glb', 'step']).optional(),
+    sha256: z.string().optional(),
+    reviewedAt: z.string().optional()
+  }).optional()
 });
 export type Model3d = z.infer<typeof Model3dSchema>;
 

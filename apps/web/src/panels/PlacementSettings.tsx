@@ -17,7 +17,7 @@ export function PlacementSettings({ fp }: { fp: BoardFootprint }) {
     <legend>{t('placement.title')}</legend>
     <div className="kv">
       <label htmlFor="placement-fixed">{t('placement.fixed')}</label>
-      <input id="placement-fixed" type="checkbox" checked={!!c.fixed || !!fp.locked} disabled={fp.locked} onChange={e => update({fixed:e.target.checked})}/>
+      <input id="placement-fixed" type="checkbox" checked={!!c.fixed || !!fp.locked} onChange={e => editor.dispatch(pcb.setFootprintLocked(fp.id,e.target.checked))}/>
       <label htmlFor="placement-role">{t('placement.role')}</label>
       <select id="placement-role" className="input" value={c.role ?? 'auto'} onChange={e => update({role:e.target.value as typeof c.role})}>
         {(['auto','mechanical','decoupling','connector'] as const).map(role => <option key={role} value={role}>{t(`placement.${role}`)}</option>)}

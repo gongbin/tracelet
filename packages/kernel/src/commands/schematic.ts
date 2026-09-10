@@ -48,6 +48,7 @@ export interface PlaceComponentArgs {
   value?: string;
   footprint?: string;
   rotation?: number;
+  grid?: number;
   props?: Record<string, string>;
 }
 
@@ -58,7 +59,7 @@ export function placeComponent(p: Project, args: PlaceComponentArgs): { command:
   const n = p.schematic.counters[sym.prefix] ?? 1;
   const ref = `${sym.prefix}${n}`;
   const cmd = command(`放置 ${ref}`, (proj) => {
-    const origin = snapComponentOrigin(sym, args.center);
+    const origin = snapComponentOrigin(sym, args.center, args.rotation ?? 0, false, args.grid);
     const comp: SchComponent = {
       id, ref, symbolId: sym.id, value: args.value ?? sym.defaultValue, footprint: args.footprint ?? sym.defaultFootprint,
       x: origin.x, y: origin.y, rotation: args.rotation ?? 0, mirror: false, props: args.props ?? {}
@@ -122,6 +123,15 @@ export function alignComponents(sheetId: string, ids: string[], mode: 'left' | '
     return sheet;
   }));
 }
+/** Explicit no-connect intent, undoable and attached to the pin rather than a screen coordinate. */
+export function toggleNoConnect(sheetId: string, id: string, pin: string): Command {
+  return command('不连接标记', (proj) => updateSheet(proj, sheetId, (s) => ({ ...s, components: s.components.map((c) => {
+    if (c.id !== id || !getSymbol(c.symbolId).pins.some((p) => p.number === pin)) return c;
+    const pins = c.noConnectPins ?? [];
+    return { ...c, noConnectPins: pins.includes(pin) ? pins.filter((n) => n !== pin) : [...pins, pin] };
+  }) })));
+}
+
 export function setComponentValue(sheetId: string, id: string, value: string): Command {
   return command('修改值', (proj) => updateSheet(proj, sheetId, (s) => ({ ...s, components: s.components.map((c) => (c.id === id ? { ...c, value } : c)) })));
 }
@@ -168,8 +178,15 @@ export function deleteWires(sheetId: string, ids: string[]): Command {
   return command('删除导线', (proj) => updateSheet(proj, sheetId, (s) => ({ ...s, wires: s.wires.filter((w) => !set.has(w.id)) })));
 }
 
-export function addLabel(sheetId: string, text: string, at: Vec, kind?: 'net' | 'port'): Command {
-  return command(`标签 ${text}`, (proj) => updateSheet(proj, sheetId, (s) => ({ ...s, labels: [...s.labels, { id: newId('l'), text, x: at.x, y: at.y, ...(kind ? { kind } : {}) }] })));
+export function addLabel(sheetId: string, text: string, at: Vec, kind?: 'net' | 'port', scope?: NetLabel['scope']): Command {
+  return command(`标签 ${text}`, (proj) => updateSheet(proj, sheetId, (s) => ({ ...s, labels: [...s.labels, { id: newId('l'), text, x: at.x, y: at.y, ...(kind ? { kind } : {}), ...(scope ? { scope } : {}) }] })));
+}
+
+/** Preserve label identity and imported metadata during repeated dragging/renaming. */
+export function updateLabel(sheetId: string, id: string, patch: Partial<Omit<NetLabel, 'id'>>): Command {
+  return command('修改标签', proj => updateSheet(proj, sheetId, sheet => ({ ...sheet,
+    labels: sheet.labels.map(label => label.id === id ? { ...label, ...patch, id } : label)
+  })));
 }
 
 /** 切换标签样式：普通网络标签 / 跨页端口（空心圆）。 */

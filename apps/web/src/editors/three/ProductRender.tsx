@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { disposeObject } from './models.js';
+import { studioLighting } from './studio.js';
 import { usePrefs } from '../../i18n/index.js';
 export function ProductRender({build,name,missing,onClose}:{build:()=>THREE.Group;name:string;missing:number;onClose:()=>void}){
   const zh=usePrefs(s=>s.locale).startsWith('zh'),host=useRef<HTMLDivElement>(null);
   const [side,setSide]=useState('iso'),[background,setBackground]=useState('white'),[size,setSize]=useState(1600),[error,setError]=useState('');
   const renderer=useRef<THREE.WebGLRenderer|null>(null);
   useEffect(()=>{
-    let r:THREE.WebGLRenderer|undefined,g:THREE.Group|undefined;const el=host.current!;
+    let r:THREE.WebGLRenderer|undefined,g:THREE.Group|undefined,disposeStudio:(()=>void)|undefined;const el=host.current!;
     try{
       r=new THREE.WebGLRenderer({alpha:true,antialias:true,preserveDrawingBuffer:true});renderer.current=r;r.setPixelRatio(1);r.setSize(size,Math.round(size*0.75));r.domElement.style.width='100%';r.domElement.style.height='auto';el.appendChild(r.domElement);
       r.shadowMap.enabled=true;r.shadowMap.type=THREE.PCFSoftShadowMap;r.toneMapping=THREE.ACESFilmicToneMapping;
@@ -17,12 +18,10 @@ export function ProductRender({build,name,missing,onClose}:{build:()=>THREE.Grou
       const camera=new THREE.OrthographicCamera(-radius*1.4,radius*1.4,radius*1.05,-radius*1.05,0.1,radius*15);
       const direction=side==='top'?new THREE.Vector3(0,0,1):side==='bottom'?new THREE.Vector3(0,0,-1):new THREE.Vector3(0.6,-0.8,1).normalize();
       camera.position.copy(center).addScaledVector(direction,radius*5);camera.up.set(0,1,0);camera.lookAt(center);
-      scene.add(new THREE.HemisphereLight(0xffffff,0x606875,2));
-      const key=new THREE.DirectionalLight(0xffffff,3);key.position.copy(center).add(new THREE.Vector3(radius,-radius,radius*3));key.target.position.copy(center);key.castShadow=true;key.shadow.mapSize.set(2048,2048);Object.assign(key.shadow.camera,{left:-radius*2,right:radius*2,top:radius*2,bottom:-radius*2,near:0.1,far:radius*8});scene.add(key,key.target);
-      const fill=new THREE.DirectionalLight(0xe0eaff,1.5);fill.position.copy(center).add(new THREE.Vector3(-radius,radius,-radius));scene.add(fill);
+      disposeStudio=studioLighting(r,scene,{center,radius});
       r.render(scene,camera);setError('');
     }catch(e){setError(String(e));}
-    return ()=>{renderer.current=null;if(g)disposeObject(g);if(r){r.dispose();r.domElement.remove();}};
+    return ()=>{renderer.current=null;disposeStudio?.();if(g)disposeObject(g);if(r){r.dispose();r.domElement.remove();}};
   },[build,side,background,size]);
   const save=()=>renderer.current?.domElement.toBlob(blob=>{if(!blob)return;const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${name.replace(/[^\w\u4e00-\u9fff-]+/g,'-')}-product-${side}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);},'image/png');
   return <div className="overlay" onClick={onClose}><div className="dialog" style={{width:900,maxHeight:'94vh',overflow:'auto'}} onClick={e=>e.stopPropagation()}><div className="dialog-head"><strong>{zh?'产品渲染':'Product render'}</strong><button className="btn ml-auto" onClick={onClose}>✕</button></div><div style={{padding:16}}>

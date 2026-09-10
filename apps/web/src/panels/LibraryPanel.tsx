@@ -13,7 +13,7 @@ import { usePartsStore, DEFAULT_PARTS_URL } from '../store/partsStore.js';
 import { useInventory, type InventoryItem } from '../store/inventory.js';
 import { downloadFile } from '../store/backup.js';
 
-const QUICK = [['R', '电阻', 'sym:R', '10kΩ', 'fp:R_0402'], ['C', '电容', 'sym:C', '100nF', 'fp:C_0402'], ['D', 'LED', 'sym:LED', '红 0603', 'fp:LED_0603']] as const;
+const QUICK = [['R', '电阻', 'sym:R', '10kΩ', 'fp:R_0402'], ['C', '电容', 'sym:C', '100nF', 'fp:C_0402'], ['D', 'LED', 'sym:LED', '红 0603', 'fp:LED_0603'], ['●', '测试点（实心）', 'sym:TP', 'TestPoint', 'fp:TestPoint_Pad_D1.0mm'], ['○', '测试点（空心）', 'sym:TP_Open', 'TestPoint', 'fp:TestPoint_Pad_D1.0mm']] as const;
 type Tab = 'all' | 'project' | 'fav' | 'builtin' | 'inv';
 const TABS: [Tab, string][] = [['all', '全部'], ['project', '项目库'], ['fav', '收藏'], ['inv', '我的库存'], ['builtin', '零件库']];
 
@@ -111,22 +111,24 @@ export function LibraryPanel() {
           <input className="mono grow" style={{ background: 'transparent', border: 0, color: 'var(--text)' }} placeholder={onPcb ? '封装名 · 型号 · 关键字' : '型号 · 参数 · 关键字'} value={app.libQuery} autoFocus onChange={(e) => app.set('libQuery', e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && sel) primary(sel); if (e.key === 'Escape') (e.target as HTMLInputElement).blur(); }} />
           {app.libQuery && <span className="dim" style={{ cursor: 'pointer' }} onClick={() => app.set('libQuery', '')}>✕</span>}
         </div>
-        {!onPcb && <div className="row" style={{ gap: 6 }}><span className="dim xs">通用件</span>
-          {QUICK.map(([k, label, symbolId, value, fp]) => <span key={k} className="chip row" style={{ gap: 6, padding: '3px 8px' }} onClick={() => app.startPlacing({ symbolId, value, footprint: fp, rotation: 0, partLabel: label })}><b className="mono" style={{ fontWeight: 500, color: 'var(--accent)' }}>{k}</b>{label}</span>)}
+        {!onPcb && <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}><span className="dim xs">通用件</span>
+          {QUICK.map(([k, label, symbolId, value, fp]) => <button type="button" key={k} className="chip row" style={{ font: 'inherit', color: 'inherit', cursor: 'pointer', gap: 6, padding: '3px 8px' }} onClick={() => app.startPlacing({ symbolId, value, footprint: fp, rotation: 0, partLabel: label })}><b className="mono" style={{ fontWeight: 500, color: 'var(--accent)' }}>{k}</b>{label}</button>)}
         </div>}
-        <div className="lib-tabs">{TABS.map(([id, label]) => <span key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}{id === 'project' && (project.library.symbols.length + project.library.footprints.length) > 0 ? ` ${project.library.symbols.length + project.library.footprints.length}` : ''}{id === 'fav' && app.favorites.length ? ` ${app.favorites.length}` : ''}</span>)}<a className="ml-auto xs" href={`https://so.szlcsc.com/global.html?k=${encodeURIComponent(app.libQuery || sel?.name || '')}`} target="_blank" rel="noreferrer" title="在立创商城搜索（新窗口）">LCSC ↗</a></div>
-        <div className="row" style={{ gap: 6 }}>
-          <button className="btn sm" onClick={() => fileRef.current?.click()} title={LIBRARY_FILE_HINT}>⇪ 导入库（KiCad / 立创）</button>
+        <div className="lib-tabs">{TABS.map(([id, label]) => <span key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}{id === 'project' && (project.library.symbols.length + project.library.footprints.length) > 0 ? ` ${project.library.symbols.length + project.library.footprints.length}` : ''}{id === 'fav' && app.favorites.length ? ` ${app.favorites.length}` : ''}</span>)}<a className="ml-auto" href={`https://so.szlcsc.com/global.html?k=${encodeURIComponent(app.libQuery || sel?.name || '')}`} target="_blank" rel="noreferrer" title="在立创商城搜索（新窗口）">LCSC ↗</a></div>
+        <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+          <button className="btn sm" onClick={() => fileRef.current?.click()} title={LIBRARY_FILE_HINT}>⇪ 导入库</button>
           <button className="btn sm" onClick={() => setGen(true)}>⚙ 参数化封装</button>
           <input ref={fileRef} type="file" accept=".kicad_sym,.kicad_mod,.json" multiple hidden onChange={(e) => { const fs = e.target.files ? Array.from(e.target.files) : []; if (fs.length) void importFiles(fs); e.target.value = ''; }} />
-          {tab === 'builtin' && <PartsTools />}
-          {tab === 'inv' && <>
+        </div>
+        {tab === 'builtin' && <PartsTools />}
+        {tab === 'inv' && (
+          <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
             <button className="btn sm" onClick={() => { const name = prompt('型号 / 名称（如 0603WAF1002T5E 或 10k 电阻）'); if (!name) return; const value = prompt('值（如 10kΩ）', '') ?? ''; const qty = Number(prompt('数量', '10') ?? 0) || 0; inventory.add({ name, value, symbolId: /电阻|res|\d+k|Ω/i.test(name + value) ? 'sym:R' : /电容|cap|[num]f/i.test(name + value) ? 'sym:C' : /led/i.test(name) ? 'sym:LED' : '', footprintId: '', qty, location: prompt('存放位置（可空）', '') ?? undefined }); }}>+ 手动添加</button>
             <button className="btn sm" onClick={() => csvRef.current?.click()} title="CSV 列：型号,值,符号,封装,LCSC,数量,位置,备注">⇪ 导入 CSV</button>
             <button className="btn sm" disabled={!inventory.items.length} onClick={() => downloadFile('tracelet-inventory.csv', '\ufeff' + inventory.exportCsv(), 'text/csv')}>⇩ 导出 CSV</button>
             <input ref={csvRef} type="file" accept=".csv,text/csv" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const n = inventory.importCsv(await f.text()); app.toast(`已导入 / 更新 ${n} 条库存`, 'success'); } e.target.value = ''; }} />
-          </>}
-        </div>
+          </div>
+        )}
         {tab !== 'project' && <div style={{ paddingBottom: 4 }}><CategoryFilter value={cat} onChange={setCat} /></div>}
       </div>
       <div className="grow" style={{ overflow: 'auto', padding: 6 }}>
@@ -145,9 +147,9 @@ export function LibraryPanel() {
         {entries.length === 0 && (
           <div className="col" style={{ padding: 12, gap: 8 }}>
             <div className="muted">{tab === 'fav' ? '还没有收藏：在条目右侧点 ☆' : tab === 'inv' ? '库存为空：点「+ 手动添加」、导入 CSV，或在任意元件预览里点「+ 库存」' : tab === 'project' ? '项目库为空：导入 KiCad 库文件、参数化生成封装，或导入 KiCad 工程时自动带入' : `没有找到「${app.libQuery}」`}</div>
-            <button className="btn" onClick={() => fileRef.current?.click()}>导入库文件（KiCad .kicad_sym / .kicad_mod，立创 EDA 符号 / 封装 JSON）</button>
-            <button className="btn" onClick={() => setGen(true)}>参数化生成封装</button>
-            <button className="btn ai" onClick={() => app.set('rightTab', 'ai')}>✨ 向 AI 描述让它画符号</button>
+            <button className="btn" style={{ justifyContent: 'center' }} title={LIBRARY_FILE_HINT} onClick={() => fileRef.current?.click()}>导入库文件（KiCad / 立创）</button>
+            <button className="btn" style={{ justifyContent: 'center' }} onClick={() => setGen(true)}>参数化生成封装</button>
+            <button className="btn ai" style={{ justifyContent: 'center' }} onClick={() => app.set('rightTab', 'ai')}>✨ 向 AI 描述让它画符号</button>
           </div>
         )}
         <div className="row dim xs" style={{ padding: '10px 8px 4px', gap: 6 }}><span style={{ color: 'var(--ai)' }}>✨</span>试试自然语言："能驱动 2A 电机的 H 桥"</div>
@@ -160,9 +162,9 @@ export function LibraryPanel() {
             <div style={{ height: 84, borderRadius: 4, background: 'var(--bg-canvas)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{findFootprint(sel.footprintId) ? <FootprintThumb fp={findFootprint(sel.footprintId)!} /> : <span className="dim xs">同步时按名称映射</span>}</div>
           </div>
           <div className="muted" style={{ fontSize: 11.5 }}>{sel.params}{sel.description && sel.params !== sel.description ? ` · ${sel.description}` : ''}</div>
-          <div className="row" style={{ gap: 6 }}>
-            {sel.symbolId && <button className="btn primary grow" style={{ height: 30, justifyContent: 'center' }} onClick={() => placeSymbol(sel)}>{onPcb ? '放到原理图' : '放置'} <span className="mono" style={{ opacity: .7 }}>⏎</span></button>}
-            {findFootprint(sel.footprintId) && <button className={`btn ${sel.symbolId ? '' : 'primary grow'}`} style={{ height: 30, justifyContent: 'center' }} title="仅板级封装：不出现在原理图 / BOM" onClick={() => placeFootprint(sel)}>{sel.symbolId ? '仅封装放到板上' : '放到板上'}</button>}
+          <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            {sel.symbolId && <button className="btn primary" style={{ flex: '1 1 auto', height: 30, justifyContent: 'center' }} onClick={() => placeSymbol(sel)}>{onPcb ? '放到原理图' : '放置'} <span className="mono" style={{ opacity: .7 }}>⏎</span></button>}
+            {findFootprint(sel.footprintId) && <button className={`btn ${sel.symbolId ? '' : 'primary'}`} style={{ flex: sel.symbolId ? undefined : '1 1 auto', height: 30, justifyContent: 'center' }} title="仅板级封装：不出现在原理图 / BOM" onClick={() => placeFootprint(sel)}>{sel.symbolId ? '仅封装' : '放到板上'}</button>}
             <button className="btn" style={{ height: 30 }} title="参数 / 外观 / 引脚 / 参考价" onClick={() => setDetail(sel)}>详情</button>
             {sel.source !== 'builtin' && sel.source !== 'inventory' && <button className="btn" style={{ height: 30 }} title="从项目库移除" onClick={() => { editor.dispatch(lib.removeLibraryItems([sel.id])); app.toast('已从项目库移除（可 Undo）'); }}>移除</button>}
             {sel.source !== 'inventory' && <button className="btn" style={{ height: 30 }} title="记录到我的库存（数量 / 位置）" onClick={() => addToInventory(sel)}>+ 库存</button>}
@@ -213,7 +215,7 @@ function PartsTools() {
   return (
     <div className="col" style={{ gap: 6, padding: '6px 0' }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) void onFile(f); }}>
       <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-        <button className="btn sm" onClick={() => fileRef.current?.click()} title="CSV 列：mpn/型号, maker/厂商, description/描述, package/封装, pins/引脚(数量或 1:VCC;2:GND), lcsc, value；也支持嘉立创 / LCSC 导出的表格">导入 CSV / JSON</button>
+        <button className="btn sm" onClick={() => fileRef.current?.click()} title="CSV 列：mpn/型号, maker/厂商, description/描述, package/封装, pins/引脚(数量或 1:VCC;2:GND), lcsc, value；也支持嘉立创 / LCSC 导出的表格">⇪ CSV / JSON</button>
         <button className="btn sm" onClick={() => setAdding(!adding)}>+ 录入</button>
         <button className="btn sm" disabled={parts.busy} onClick={() => void parts.updateFromUrl().then((r) => app.toast(`社区零件库已更新：${r.count} 个零件${r.version ? ` · ${r.version}` : ''}`, 'success')).catch((e) => app.toast(`更新失败：${(e as Error).message}`, 'error'))}>{parts.busy ? '更新中…' : '从网络更新'}</button>
         {parts.user.length > 0 && <button className="btn sm quiet" onClick={() => download('my-parts.csv', parts.exportUser('csv'))}>导出我的（{parts.user.length}）</button>}
@@ -224,7 +226,7 @@ function PartsTools() {
         <span style={{ cursor: 'pointer', marginLeft: 6, color: 'var(--accent)' }} onClick={() => setUrlEdit(!urlEdit)}>更新源</span>
         {parts.meta.lastError && <span style={{ color: 'var(--error)' }}> · 上次更新失败：{parts.meta.lastError}</span>}
       </div>
-      {urlEdit && <div className="row" style={{ gap: 6 }}><input className="input mono xs" style={{ flex: 1 }} defaultValue={parts.meta.url} placeholder={DEFAULT_PARTS_URL} onBlur={(e) => parts.setUrl(e.target.value.trim() || DEFAULT_PARTS_URL)} /><span className="dim xs">JSON：{'{ version, parts: [...] }'}</span></div>}
+      {urlEdit && <div className="col" style={{ gap: 4 }}><input className="input mono xs" defaultValue={parts.meta.url} placeholder={DEFAULT_PARTS_URL} onBlur={(e) => parts.setUrl(e.target.value.trim() || DEFAULT_PARTS_URL)} /><span className="dim xs">JSON：{'{ version, parts: [...] }'}</span></div>}
       {adding && (
         <div className="col" style={{ gap: 4, padding: 8, border: '1px solid var(--border)', borderRadius: 6 }}>
           <div className="row" style={{ gap: 4 }}><input className="input xs" placeholder="型号 *（如 STM32G030F6P6）" value={form.mpn} onChange={(e) => setForm({ ...form, mpn: e.target.value })} /><input className="input xs" style={{ width: 90 }} placeholder="厂商" value={form.maker} onChange={(e) => setForm({ ...form, maker: e.target.value })} /></div>

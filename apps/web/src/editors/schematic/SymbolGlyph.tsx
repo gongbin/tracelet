@@ -1,5 +1,5 @@
 import type { PointerEvent as RPE } from 'react';
-import { type SchComponent, type SymbolDef, type SymbolShape, componentBody, pinGeoms, resistorZigzag, symbolTextPositions, SCH_COLORS, GND_BARS } from '@tracelet/kernel';
+import { type SchComponent, type SymbolDef, type SymbolShape, componentBody, pinGeoms, pinDecoration, resistorZigzag, symbolTextPositions, orderedSymbolShapes, SCH_COLORS, GND_BARS } from '@tracelet/kernel';
 
 const INK = SCH_COLORS.symbol;
 const SW = 16; // 线宽 mil
@@ -23,7 +23,7 @@ function shapes(sym: SymbolDef, color: string, ghost: boolean) {
   const bg = ghost ? 'rgba(61,139,255,.08)' : SCH_COLORS.fill;
   const fillOf = (f: 'none' | 'background' | 'outline') => (f === 'background' ? bg : f === 'outline' ? color : 'none');
   return <g stroke={color} strokeLinecap="round" strokeLinejoin="round" fill="none">
-    {(sym.shapes ?? []).map((sh, i) => {
+    {orderedSymbolShapes(sym).map((sh, i) => {
       if (sh.kind === 'polyline') return <path key={i} d={sh.points.map((p, j) => `${j ? 'L' : 'M'}${p.x} ${p.y}`).join('') + (sh.fill !== 'none' ? 'Z' : '')} strokeWidth={Math.max(sh.width, 10)} fill={fillOf(sh.fill)} />;
       if (sh.kind === 'rect') return <rect key={i} x={Math.min(sh.a.x, sh.b.x)} y={Math.min(sh.a.y, sh.b.y)} width={Math.abs(sh.b.x - sh.a.x)} height={Math.abs(sh.b.y - sh.a.y)} strokeWidth={Math.max(sh.width, 10)} fill={fillOf(sh.fill)} />;
       if (sh.kind === 'circle') return <circle key={i} cx={sh.c.x} cy={sh.c.y} r={sh.r} strokeWidth={Math.max(sh.width, 10)} fill={fillOf(sh.fill)} />;
@@ -87,20 +87,24 @@ export function SymbolGlyph({ comp, sym, selected, ghost, wireMode, openPins, pi
         </g>
       </g>
       {pins.map((g) => {
+        const decoration = pinDecoration(g);
         const open = openPins?.has(g.def.number);
         const net = pinNets?.get(g.def.number);
         const hl = highlightNet && net === highlightNet;
         return (
           <g key={g.def.number}>
             {!g.def.hidden && <path d={`M${g.base.x} ${g.base.y}L${g.end.x} ${g.end.y}`} stroke={color} strokeWidth={SW} />}
+            {decoration.circles.map((circle, i) => <circle key={`bubble-${i}`} cx={circle.c.x} cy={circle.c.y} r={circle.r} fill={SCH_COLORS.fill} stroke={color} strokeWidth={circle.width} pointerEvents="none" />)}
+            {decoration.lines.map((line, i) => <path key={`clock-${i}`} d={line.points.map((p, j) => `${j ? 'L' : 'M'}${p.x} ${p.y}`).join('')} fill="none" stroke={color} strokeWidth={line.width} pointerEvents="none" />)}
             {sym.showPinNames && !g.def.hidden && g.def.name !== g.def.number && (() => {
               const dx = g.base.x - g.end.x, dy = g.base.y - g.end.y;
               const horiz = Math.abs(dx) >= Math.abs(dy);
               const tx = horiz ? g.base.x + Math.sign(dx || 1) * 50 : g.base.x, ty = horiz ? g.base.y + 35 : g.base.y + Math.sign(dy || 1) * 60 + (dy > 0 ? 60 : 0);
-              return <text x={tx} y={ty} fontSize={sym.graphic === 'shapes' ? 90 : 100} fill={color} textAnchor={horiz ? (dx >= 0 ? 'start' : 'end') : 'middle'} pointerEvents="none">{g.def.name}</text>;
+              return <text x={tx} y={ty} fontSize={g.def.nameSize ?? (sym.graphic === 'shapes' ? 90 : 100)} fill={color} textAnchor={horiz ? (dx >= 0 ? 'start' : 'end') : 'middle'} pointerEvents="none">{g.def.name}</text>;
             })()}
-            {sym.graphic === 'shapes' && !g.def.hidden && <text x={(g.base.x + g.end.x) / 2} y={(g.base.y + g.end.y) / 2 - 25} fontSize={70} fill={SCH_COLORS.pinNumber} textAnchor="middle" pointerEvents="none">{g.def.number}</text>}
-            {open && !sym.power && !ghost && <rect x={g.end.x - 30} y={g.end.y - 30} width={60} height={60} fill="#FF3B30" pointerEvents="none" />}
+            {sym.graphic === 'shapes' && sym.showPinNumbers !== false && !g.def.hidden && <text x={(g.base.x + g.end.x) / 2} y={(g.base.y + g.end.y) / 2 - 25} fontSize={g.def.numberSize ?? 70} fill={SCH_COLORS.pinNumber} textAnchor="middle" pointerEvents="none">{g.def.number}</text>}
+            {comp.noConnectPins?.includes(g.def.number) && <path d={`M${g.end.x - 40} ${g.end.y - 40}l80 80m-80 0l80 -80`} stroke={color} strokeWidth={14} fill="none" pointerEvents="none" />}
+            {open && !sym.power && !ghost && <rect x={g.end.x - 15} y={g.end.y - 15} width={30} height={30} fill={SCH_COLORS.fill} stroke="#D94A42" strokeWidth={6} pointerEvents="none" />}
             {hl && <circle cx={g.end.x} cy={g.end.y} r={90} fill="rgba(255,216,77,.35)" stroke="#E5B800" strokeWidth={14} pointerEvents="none" />}
             {!ghost && (
               <circle cx={g.end.x} cy={g.end.y} r={70} fill={wireMode ? 'rgba(61,139,255,.25)' : 'transparent'} stroke={wireMode ? '#3D8BFF' : 'transparent'} strokeWidth={14} style={{ cursor: 'crosshair' }}
@@ -111,8 +115,8 @@ export function SymbolGlyph({ comp, sym, selected, ghost, wireMode, openPins, pi
           </g>
         );
       })}
-      {!sym.power && <text x={refPos.x} y={refPos.y} fontSize={120} fontWeight={600} fill={ghost ? '#3D8BFF' : color} textAnchor={refPos.anchor} pointerEvents="none">{comp.ref}</text>}
-      <text x={valPos.x} y={valPos.y} fontSize={sym.power ? 100 : 110} fill={ghost ? '#3D8BFF' : sym.power ? SCH_COLORS.text : color} textAnchor={valPos.anchor} pointerEvents="none">{comp.value}</text>
+      {!sym.power && !comp.textStyle?.ref.hidden && <text x={refPos.x} y={refPos.y} fontSize={comp.textStyle?.ref.size ?? 120} fontWeight={600} fill={ghost ? '#3D8BFF' : color} textAnchor={refPos.anchor} pointerEvents="none">{comp.ref}</text>}
+      {!comp.textStyle?.value.hidden && <text x={valPos.x} y={valPos.y} fontSize={comp.textStyle?.value.size ?? (sym.power ? 100 : 110)} fill={ghost ? '#3D8BFF' : sym.power ? SCH_COLORS.text : color} textAnchor={valPos.anchor} pointerEvents="none">{comp.value}</text>}
     </g>
   );
 }

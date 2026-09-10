@@ -1,3 +1,4 @@
+import { AiProjectDialog } from '../components/AiProjectDialog.js';
 import { templateName } from '../i18n/templates.js';
 import { relativeTime } from '../i18n/format.js';
 import { AppearanceControls } from '../components/AppearanceControls.js';
@@ -23,6 +24,7 @@ const SAMPLES = [
 export function Home() {
   const { projects, openProject, deleteProject, set, toast, store, openProjectObject, go } = useApp();
   const [page, setPage] = useState(0); const PAGE = 24; const pageCount = Math.max(1, Math.ceil(projects.length / PAGE)); const shown = projects.slice(page * PAGE, page * PAGE + PAGE);
+  const [aiCreateOpen, setAiCreateOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const t = useT();
   const locale = usePrefs((s) => s.locale);
@@ -41,7 +43,7 @@ export function Home() {
           <a className="home-link on" href="#projects" onClick={(e) => { e.preventDefault(); document.getElementById('projects')?.scrollIntoView({ behavior: 'smooth' }); }}>{t('nav.projects')}</a>
           <a className="home-link" href="#library" title={t('nav.library.tip')} onClick={(e) => { e.preventDefault(); void openLibrary(); }}>{t('nav.library')}</a>
           <a className="home-link" href={`${REPO_URL}/discussions`} target="_blank" rel="noreferrer">{t('nav.community')}</a>
-          <a className="home-link" href={`${REPO_URL}#readme`} target="_blank" rel="noreferrer">{t('nav.docs')}</a>
+          <a className="home-link" href="/docs">{t('nav.docs')}</a>
         </div>
         <div className="search-box ml-auto" style={{ flexBasis: 260 }} onClick={() => set('paletteOpen', true)}><Icon d={I.search} size={14} stroke={2} /><span>{t('home.search')}</span><span className="ml-auto mono xs">⌘K</span></div>
         <div className="header-preferences"><a className="iconbtn" href={REPO_URL} target="_blank" rel="noreferrer" title="GitHub · gongbin/tracelet" aria-label="GitHub"><Icon d={I.github} size={18} stroke={0} fill /></a><AppearanceControls /></div>
@@ -68,7 +70,12 @@ export function Home() {
             <div className="row" style={{ fontWeight: 600, fontSize: 14 }}><Icon d={I.file} size={16} stroke={2} color="var(--text-2)" />{t('home.template')}</div>
             <div className="small muted">ESP32 · STM32 · Arduino 扩展板</div>
           </div>
+          <button className="action-card ai-create-card" onClick={() => setAiCreateOpen(true)}>
+            <div className="row" style={{ fontWeight: 600, fontSize: 14 }}>✦ {t('aiProject.title')}</div>
+            <div className="small muted">{t('aiProject.card')}</div>
+          </button>
         </div>
+        {aiCreateOpen && <AiProjectDialog onClose={() => setAiCreateOpen(false)} />}
         <div className="col" style={{ gap: 14 }}>
           <div className="row" style={{ gap: 12 }}>
             <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>{t('home.recent')}</h2>
@@ -121,9 +128,9 @@ export function Home() {
             </div>
             <div className="col" style={{ gap: 6 }}>
               <div className="xs muted" style={{ letterSpacing: '.04em' }}>{t('nav.docs')}</div>
-              <a className="home-flink" href={`${REPO_URL}#readme`} target="_blank" rel="noreferrer">{t('home.footer.readme')}</a>
+              <a className="home-flink" href="/docs">{t('nav.docs')}</a>
               <a className="home-flink" href={`${REPO_URL}/blob/main/MCP.md`} target="_blank" rel="noreferrer">{t('home.footer.mcp')}</a>
-              <a className="home-flink" href={`${REPO_URL}/tree/main/apps/server`} target="_blank" rel="noreferrer">{t('home.footer.selfhost')}</a>
+              <a className="home-flink" href="/docs#deploy">{t('home.footer.selfhost')}</a>
             </div>
           </div>
         </div>

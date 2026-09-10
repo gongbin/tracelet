@@ -3,6 +3,13 @@ import { registeredSymbol, registerSymbols } from './registry.js';
 
 /** 内置符号库（单位 mil，栅格 100）。后续通过 KiCad 库导入扩充。 */
 export const BUILTIN_SYMBOLS: SymbolDef[] = [
+  ...(['solid', 'open'] as const).map((style): SymbolDef => ({
+    id: style === 'solid' ? 'sym:TP' : 'sym:TP_Open', name: style === 'solid' ? '测试点（实心）' : '测试点（空心）',
+    kind: '测试点', prefix: 'TP', width: 200, height: 200, graphic: 'shapes', showPinNames: false, showPinNumbers: false, power: false,
+    defaultValue: 'TestPoint', defaultFootprint: 'fp:TestPoint_Pad_D1.0mm', description: '单引脚测试点 / Test point；圆圈样式不决定 PCB 工艺，可另选封装。',
+    shapes: [{kind:'circle',c:{x:100,y:100},r:90,width:12,fill:style==='solid'?'outline':'none'}],
+    pins: [{number:'1',name:'1',side:'B',offset:100,length:200,type:'passive'}]
+  })),
   {
     id: 'sym:R', name: '电阻', kind: '电阻', prefix: 'R', width: 240, height: 600, graphic: 'resistor', showPinNames: false, power: false,
     defaultValue: '10kΩ', defaultFootprint: 'fp:R_0402', description: '通用电阻',
@@ -49,18 +56,6 @@ export const BUILTIN_SYMBOLS: SymbolDef[] = [
       { number: '6', name: 'TXD0', side: 'R', offset: 900, length: 200, type: 'output' },
       { number: '7', name: 'RXD0', side: 'R', offset: 1300, length: 200, type: 'input' },
       { number: '8', name: 'GND', side: 'R', offset: 1700, length: 200, type: 'power_in' }
-    ]
-  },
-  {
-    id: 'sym:ESP32-C3-MINI-1', name: 'ESP32-C3-MINI-1', kind: '模块', prefix: 'U', width: 1600, height: 1600, graphic: 'box', showPinNames: true, power: false,
-    defaultValue: 'ESP32-C3-MINI-1', defaultFootprint: 'fp:ESP32-C3-MINI-1', description: 'RISC-V Wi-Fi/BLE 模块（简化 6 脚符号）',
-    pins: [
-      { number: '1', name: 'EN', side: 'L', offset: 400, length: 200, type: 'input' },
-      { number: '2', name: 'IO8', side: 'L', offset: 800, length: 200, type: 'bidirectional' },
-      { number: '3', name: 'IO9', side: 'L', offset: 1200, length: 200, type: 'bidirectional' },
-      { number: '4', name: '3V3', side: 'R', offset: 400, length: 200, type: 'power_in' },
-      { number: '5', name: 'TXD', side: 'R', offset: 800, length: 200, type: 'output' },
-      { number: '6', name: 'GND', side: 'R', offset: 1200, length: 200, type: 'power_in' }
     ]
   },
   {

@@ -90,7 +90,9 @@ function header(o: Extract<FootprintSpec, { kind: 'header' }>): FootprintDef {
   const x0 = -((o.rows - 1) * pitch) / 2, y0 = -((o.cols - 1) * pitch) / 2;
   for (let c = 0; c < o.cols; c++) for (let r = 0; r < o.rows; r++) pads.push(pad(String(k++), x0 + r * pitch, y0 + c * pitch, d, d, { shape: k === 2 ? 'rect' : 'oval', drill }));
   const name = `Pin${o.socket ? 'Socket' : 'Header'}_${o.rows}x${String(o.cols).padStart(2, '0')}_P${pitch}mm_Vertical`;
-  return { id: `fp:gen:${name}`, name, body: { w: r2(o.rows * pitch), h: r2(o.cols * pitch) }, height: o.socket ? 8.5 : 6, description: `${o.rows}×${o.cols} ${o.socket ? '排母' : '排针'} ${pitch}mm`, pads };
+  // 立式排针 / 排母朝板面上方对接，**面内没有对接方向**——这是确定的答案，不是"未知"。
+  // 声明成 vertical 之后，板边约束只管位置、不会去推断朝向（卧式排针要另加生成器）。
+  return { id: `fp:gen:${name}`, name, body: { w: r2(o.rows * pitch), h: r2(o.cols * pitch) }, height: o.socket ? 8.5 : 6, description: `${o.rows}×${o.cols} ${o.socket ? '排母' : '排针'} ${pitch}mm`, pads, connector: { mounting: 'vertical' as const, clearance: 0 } };
 }
 function sot23(pins: 3 | 5 | 6): FootprintDef {
   if (pins === 3) return { id: 'fp:gen:SOT-23', name: 'SOT-23', body: { w: 3.0, h: 1.4 }, height: 1.1, description: 'SOT-23 三脚', pads: [pad('1', -0.95, 1.0, 0.9, 0.8), pad('2', 0.95, 1.0, 0.9, 0.8), pad('3', 0, -1.0, 0.9, 0.8)] };
@@ -136,7 +138,7 @@ export function footprintFromName(rawName: string): FootprintDef | undefined {
   if ((m = /^(SOIC|SOP|TSSOP|SSOP|MSOP|SO)-(\d+)(?:-1EP)?_([\d.]+)x([\d.]+)mm_P([\d.]+)mm/i.exec(name))) return { ...soic({ kind: 'soic', pins: Number(m[2]), bodyW: Number(m[3]), bodyL: Number(m[4]), pitch: Number(m[5]) }), name, id: `fp:gen:${name}` };
   if ((m = /^(SOIC|SOP|TSSOP)-(\d+)(?:_|$)/i.exec(name))) return { ...soic({ kind: 'soic', pins: Number(m[2]), pitch: /^SOIC|^SOP/i.test(m[1]) ? 1.27 : 0.65 }), name, id: `fp:gen:${name}` };
   if ((m = /^(LQFP|TQFP|QFP)-(\d+)_([\d.]+)x([\d.]+)mm_P([\d.]+)mm/i.exec(name))) return { ...qfp({ kind: 'qfp', pins: Number(m[2]), body: Number(m[3]), pitch: Number(m[5]) }), name, id: `fp:gen:${name}` };
-  if ((m = /^(QFN|DFN|VQFN|WQFN|UQFN)-(\d+)(?:-1EP)?_([\d.]+)x([\d.]+)mm_P([\d.]+)mm(?:_EP([\d.]+)x([\d.]+)mm)?/i.exec(name))) return { ...qfn({ kind: 'qfn', pins: Number(m[2]), body: Number(m[3]), pitch: Number(m[5]), thermal: m[6] ? Number(m[6]) : undefined }), name, id: `fp:gen:${name}` };
+  if ((m = /^(QFN|DFN|VQFN|WQFN|UQFN|UFQFPN|UFDFPN)-(\d+)(?:-1EP)?_([\d.]+)x([\d.]+)mm_P([\d.]+)mm(?:_EP([\d.]+)x([\d.]+)mm)?/i.exec(name))) return { ...qfn({ kind: 'qfn', pins: Number(m[2]), body: Number(m[3]), pitch: Number(m[5]), thermal: m[6] ? Number(m[6]) : undefined }), name, id: `fp:gen:${name}` };
   if ((m = /^DIP-(\d+)_W([\d.]+)mm/i.exec(name))) return { ...dip({ kind: 'dip', pins: Number(m[1]), span: Number(m[2]) }), name, id: `fp:gen:${name}` };
   if ((m = /^Pin(Header|Socket)_(\d)x(\d{1,2})_P([\d.]+)mm/i.exec(name))) return header({ kind: 'header', rows: Number(m[2]) as 1 | 2, cols: Number(m[3]), pitch: Number(m[4]), socket: m[1].toLowerCase() === 'socket' });
   if ((m = /^SOT-23-?(5|6)?(?:_|$)/i.exec(name)) || /^SOT-23$/i.test(name)) { const n = m?.[1] ? (Number(m[1]) as 5 | 6) : 3; return { ...sot23(n), name: n === 3 ? 'SOT-23' : `SOT-23-${n}`, id: `fp:gen:SOT-23${n === 3 ? '' : '-' + n}` }; }
@@ -154,12 +156,16 @@ export function footprintFromName(rawName: string): FootprintDef | undefined {
   if ((m = /^E?SOP-?(\d+)$/i.exec(name))) { const n = Number(m[1]); const base = soic({ kind: 'soic', pins: n, pitch: 1.27 }); return { ...base, name, id: `fp:gen:${name}`, pads: /^E/i.test(name) ? [...base.pads, pad('EP', 0, 0, 2.3, 3.2)] : base.pads }; }
   if ((m = /^MSOP-?(\d+)$/i.exec(name))) return { ...soic({ kind: 'soic', pins: Number(m[1]), pitch: Number(m[1]) === 8 ? 0.65 : 0.5, bodyW: 3.0 }), name, id: `fp:gen:${name}` };
   if ((m = /^(LQFP|TQFP|QFP)-?(\d+)$/i.exec(name))) { const n = Number(m[2]); const spec = QFP_DEFAULT[n]; if (spec) return { ...qfp({ kind: 'qfp', pins: n, body: spec[0], pitch: spec[1] }), name, id: `fp:gen:${name}` }; }
-  if ((m = /^(QFN|DFN|VQFN|WQFN|UQFN|UDFN|WSON|SON)-?(\d+)$/i.exec(name))) { const n = Number(m[2]); const spec = QFN_DEFAULT[n]; if (spec) return { ...qfn({ kind: 'qfn', pins: n, body: spec[0], pitch: spec[1], thermal: spec[2] }), name, id: `fp:gen:${name}` }; }
+  if ((m = /^(QFN|DFN|VQFN|WQFN|UQFN|UDFN|UFQFPN|UFDFPN|WSON|SON)-?(\d+)$/i.exec(name))) { const n = Number(m[2]); const spec = QFN_DEFAULT[n]; if (spec) return { ...qfn({ kind: 'qfn', pins: n, body: spec[0], pitch: spec[1], thermal: spec[2] }), name, id: `fp:gen:${name}` }; }
   if ((m = /^(SOT-?363|SC-?70-?6|SOT-?23-?6L)$/i.exec(name))) return { ...sot23(6), name, id: `fp:gen:${name}`, body: { w: 2.2, h: 2.4 }, pads: sot23(6).pads.map((q) => ({ ...q, x: r2(q.x * 0.65 / 0.95), y: r2(q.y * 0.9), w: r2(q.w * 0.6), h: r2(q.h * 0.75) })) };
   if ((m = /^(?:Crystal_SMD_)?(3225|2520|2016|1612)(?:-4Pin.*)?$/i.exec(name))) return xtal4(name, m[1]);
   if ((m = /^(?:Crystal_SMD_)?(5032|7050|3215|2012)(?:-2Pin.*)?$/i.exec(name))) return xtal2(name, m[1]);
   if (/^SW_SMD_3x4|^SW_SMD_6x6|^SW_Push|^TS-?1187/i.test(name)) return tact(name, /6x6/i.test(name) ? 6 : 3);
-  if ((m = /^JST_?(PH|XH|ZH|SH)_?[BS]?(\d+)B?/i.exec(name))) { const pitch = { PH: 2.0, XH: 2.5, ZH: 1.5, SH: 1.0 }[m[1].toUpperCase()] ?? 2.0; const n = Number(m[2]); const base = header({ kind: 'header', rows: 1, cols: n, pitch }); return { ...base, name, id: `fp:gen:${name}`, description: `JST ${m[1].toUpperCase()} ${n}P（${pitch}mm）` }; }
+  if ((m = /^JST_?(PH|XH|ZH|SH)_?[BS]?(\d+)B?/i.exec(name))) { const pitch = { PH: 2.0, XH: 2.5, ZH: 1.5, SH: 1.0 }[m[1].toUpperCase()] ?? 2.0; const n = Number(m[2]); const base = header({ kind: 'header', rows: 1, cols: n, pitch });
+    // JST 这里只是**借用排针几何**当替代模型，真实器件顶部进线 / 侧进线都有，光看名字分不出来。
+    // 所以不继承排针的 vertical 声明——保持"方向未知"，解码器会锁定旋转并提示人工确认。
+    const { connector: _drop, ...geom } = base;
+    return { ...geom, name, id: `fp:gen:${name}`, description: `JST ${m[1].toUpperCase()} ${n}P（${pitch}mm，按排针几何近似）` }; }
   if ((m = /^SMD-?(0402|0603|0805|1206|1210)$/i.exec(name))) return { ...chip(m[1] as ChipSize, 'L'), name: `L_${m[1]}_${CHIP_SIZES[m[1] as ChipSize].metric}` };
   if ((m = /^CP_Elec_([\d.]+)x([\d.]+)$/i.exec(name))) return capElec(name, Number(m[1]));
   return undefined;

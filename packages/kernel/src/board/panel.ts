@@ -5,7 +5,7 @@ import type { Board } from '../model/board.js';
 import { allPads, boardBounds, footprintBody, footprintDef } from './geometry.js';
 import { antennaGeometry } from './antennaPlacement.js';
 import { pointInPolygon, pointSegDist, type Rect, type Vec } from '../geometry.js';
-export interface PanelOptions { columns:number; rows:number; gap:number; rail:number; tabWidth:number }
+export interface PanelOptions { columns:number; rows:number; gap:number; rail:number; tabWidth:number; mouseBiteDrill?:number; mouseBitePitch?:number }
 export interface PanelPlan { width:number;height:number;instances:{id:string;x:number;y:number;outline:Vec[]}[];rails:Rect[];tabs:Rect[];holes:Vec[];fiducials:Vec[];profile:Vec[][];errors:string[];options:PanelOptions }
 const overlap=(a:Rect,b:Rect)=>a.x<b.x+b.w && b.x<a.x+a.w && a.y<b.y+b.h && b.y<a.y+a.h;
 const inflate=(r:Rect,d:number):Rect=>({x:r.x-d,y:r.y-d,w:r.w+2*d,h:r.h+2*d});
@@ -14,11 +14,14 @@ const rect=(r:Rect):Vec[]=>[{x:r.x,y:r.y},{x:r.x+r.w,y:r.y},{x:r.x+r.w,y:r.y+r.h
 export function planPanel(board:Board,options:PanelOptions,rules:RuleSet=RULE_SETS[0]):PanelPlan {
   const {columns,rows,gap,rail,tabWidth}=options;
   if(![columns,rows].every(n=>Number.isInteger(n)&&n>=1&&n<=6)||![gap,rail,tabWidth].every(Number.isFinite)||gap<2||rail<5||tabWidth<2||tabWidth>10)throw new Error('Panel: rows/columns 1–6, gap ≥2 mm, rail ≥5 mm, tabs 2–10 mm');
+  const mouseBiteDrill=options.mouseBiteDrill??.5,mouseBitePitch=options.mouseBitePitch??.85;
+  if(![mouseBiteDrill,mouseBitePitch].every(Number.isFinite)||mouseBiteDrill<.3||mouseBiteDrill>1||mouseBitePitch-mouseBiteDrill<Math.max(.3,rules.minHoleToHole)-1e-7||mouseBitePitch+mouseBiteDrill+.4>tabWidth)throw new Error('Mouse bites: drill 0.3–1 mm, hole-edge gap ≥0.3 mm, at least two holes fit inside each tab');
+  const holeKeepout=mouseBiteDrill/2+Math.max(rules.minNpthClearance,.25);
   const bb=boardBounds(board);
   if(board.outline.length<3 || bb.w<=0||bb.h<=0)throw new Error('Panel requires a closed board outline');
   const width=2*rail+2*gap+columns*bb.w+(columns-1)*gap;
   const height=(rows+1)*rail+rows*(bb.h+2*gap);
-  const plan:PanelPlan={width,height,instances:[],rails:[],tabs:[],holes:[],fiducials:[],profile:[],errors:[],options};
+  const plan:PanelPlan={width,height,instances:[],rails:[],tabs:[],holes:[],fiducials:[],profile:[],errors:[],options:{...options,mouseBiteDrill,mouseBitePitch}};
   plan.rails.push({x:0,y:0,w:rail,h:height},{x:width-rail,y:0,w:rail,h:height});
   for(let r=0;r<=rows;r++)plan.rails.push({x:0,y:r*(bb.h+2*gap+rail),w:width,h:rail});
   const protectedAreas=board.footprints.flatMap(f=>{
@@ -26,8 +29,9 @@ export function planPanel(board:Board,options:PanelOptions,rules:RuleSet=RULE_SE
     return [...(ant?[inflate(ant.area,5)]:[]),...(connector || /^(J|CN|USB|P)\d/i.test(f.ref)?[inflate(footprintBody(f),connector?.clearance ?? 3)]:[])];
   });
   const pads=allPads(board);
+  if(pads.some(p=>p.def.castellated))plan.errors.push('Castellated boards require a fabricator-approved support layout; export the single board with its castellation manifest');
   const fills=zoneFills(board,rules).flatMap(f=>f.polygons);
-  const copperNear=(p:Vec)=>fills.some(poly=>(pointInPolygon(p,poly[0])&&!poly.slice(1).some(h=>pointInPolygon(p,h))) || poly.some(r=>r.some((a,i)=>pointSegDist(p,a,r[(i+1)%r.length])<0.5))) || pads.some(a=>overlap(inflate(a.rect,0.5),{x:p.x,y:p.y,w:0.001,h:0.001})) || board.traces.some(t=>t.points.slice(1).some((b,i)=>pointSegDist(p,t.points[i],b)<t.width/2+0.5)) || board.vias.some(v=>Math.hypot(v.x-p.x,v.y-p.y)<v.size/2+0.5);
+  const copperNear=(p:Vec)=>fills.some(poly=>(pointInPolygon(p,poly[0])&&!poly.slice(1).some(h=>pointInPolygon(p,h))) || poly.some(r=>r.some((a,i)=>pointSegDist(p,a,r[(i+1)%r.length])<holeKeepout))) || pads.some(a=>overlap(inflate(a.rect,holeKeepout),{x:p.x,y:p.y,w:0.001,h:0.001})) || board.traces.some(t=>t.points.slice(1).some((b,i)=>pointSegDist(p,t.points[i],b)<t.width/2+holeKeepout)) || board.vias.some(v=>Math.hypot(v.x-p.x,v.y-p.y)<v.size/2+holeKeepout);
   for(let row=0;row<rows;row++)for(let col=0;col<columns;col++){
     const x=rail+gap+col*(bb.w+gap)-bb.x,y=rail+gap+row*(bb.h+2*gap+rail)-bb.y,id=`B${row*columns+col+1}`;
     plan.instances.push({id,x,y,outline:board.outline.map(p=>({x:p.x+x,y:p.y+y}))});
@@ -40,7 +44,9 @@ export function planPanel(board:Board,options:PanelOptions,rules:RuleSet=RULE_SE
         // A tab must attach to a straight exposed edge, never span a concave notch.
         const flat=board.outline.some((p,i)=>{const q=board.outline[(i+1)%board.outline.length];return Math.abs(p.y-ey)<1e-6&&Math.abs(q.y-ey)<1e-6&&Math.min(p.x,q.x)<=a.x&&Math.max(p.x,q.x)>=a.x+a.w;});
         if(!flat||protectedAreas.some(r=>overlap(inflate(a,0.3),r)))continue;
-        const bites=Array.from({length:Math.max(2,Math.floor(tabWidth/0.8))},(_,i)=>({x:a.x+0.4+i*0.8,y:ey+(edge==='top'?-0.4:0.4)}));
+        const count=Math.floor((tabWidth-mouseBiteDrill-.4)/mouseBitePitch)+1;
+        const start=a.x+(tabWidth-(count-1)*mouseBitePitch)/2;
+        const bites=Array.from({length:count},(_,i)=>({x:start+i*mouseBitePitch,y:ey+(edge==='top'?-1:1)*(mouseBiteDrill/2+.1)}));
         if(bites.some(copperNear))continue;
         chosen=a;plan.holes.push(...bites.map(p=>({x:p.x+x,y:p.y+y})));break;
       }

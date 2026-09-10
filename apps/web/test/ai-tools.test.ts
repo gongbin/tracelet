@@ -44,8 +44,9 @@ describe('AI 工具', () => {
     editor.dispatch(sch.addWire(sid, [{ x: 9000, y: 9000 }, { x: 9500, y: 9000 }]));
     expect(await runTool('delete_dangling', {}, ctx)).toContain('已删除 1 条悬空导线');
     expect(gen().wires.length).toBe(before);
-    // 生成结果自检字段
-    const out2 = JSON.parse(await runTool('generate_sheet_from_spec', { title: '空', components: [{ ref: 'X1', pins: [] }] } as unknown as Record<string, unknown>, ctx));
-    expect(out2).toBeTypeOf('object');
+    // Invalid extraction must not add an empty sheet to the user's project.
+    const sheetCount = editor.project.schematic.sheets.length;
+    await expect(runTool('generate_sheet_from_spec', { title: '空', components: [{ ref: 'X1', pins: [] }] }, ctx)).rejects.toThrow('Invalid or duplicate pins');
+    expect(editor.project.schematic.sheets).toHaveLength(sheetCount);
   });
 });

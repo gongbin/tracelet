@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from 'react';
-import { sch, getSymbol, findPin, previewRoute, snapComponentOrigin, componentBounds, SCH_GRID, snapTo, pointOnSeg, pointSegDist, rectsOverlap, milToMm, paperSize, titleBlockSize, type SheetFrame as SheetFrameDef, type Vec, type Rect, type Wire, frameLabels, sheetDisplayName } from '@tracelet/kernel';
+import { sch, getSymbol, findPin, pinGeoms, previewRoute, snapComponentOrigin, componentBounds, SCH_GRID, snapTo, pointOnSeg, pointSegDist, rectsOverlap, milToMm, paperSize, titleBlockSize, type SheetFrame as SheetFrameDef, type Vec, type Rect, type Wire, frameLabels, sheetDisplayName } from '@tracelet/kernel';
 import { useApp, useEditor, useProject, useSheet } from '../../store/app.js';
 import { getAnalysis } from '../../store/analysis.js';
 import { useViewport, gridStep } from '../../hooks/useViewport.js';
+import { wireSnap } from './wireSnap.js';
 import { SymbolGlyph } from './SymbolGlyph.js';
-import { SCH_COLORS, crossSheetLabelNames, netLabelLayout } from '@tracelet/kernel';
+import { SCH_COLORS, crossSheetLabelNames, netLabelLayout, netLabelBounds } from '@tracelet/kernel';
 import { Hint } from '../../components/Hint.js';
-import { usePrefs } from '../../i18n/index.js';
+import { usePrefs, useT } from '../../i18n/index.js';
+import { translateText } from '../../i18n/auto.js';
+import { locateItem } from '../../panels/CheckPanel.js';
 
 let SCH_SNAP = SCH_GRID;
 const G = (v: number) => snapTo(v, SCH_SNAP);
@@ -81,6 +84,8 @@ function SheetFrame({ project, sheetName, index, total, frame: frame0 }: { proje
 }
 
 export function SchematicCanvas() {
+  const t = useT();
+  const locale = usePrefs(s => s.locale);
   const project = useProject();
   const editor = useEditor();
   const app = useApp();
@@ -92,6 +97,7 @@ export function SchematicCanvas() {
   const analysis = getAnalysis(project);
   const drag = useRef<Drag | null>(null);
   const [labelText, setLabelText] = useState('');
+  const [labelScope, setLabelScope] = useState<'local' | 'global'>('global');
   const crossSheet = useMemo(() => crossSheetLabelNames(project.schematic), [project.schematic]);
   const [textPrompt, setTextPrompt] = useState<{ at: Vec; value: string } | null>(null);
   const [marquee, setMarquee] = useState<{ a: Vec; b: Vec } | null>(null);
@@ -146,11 +152,17 @@ export function SchematicCanvas() {
   }, [sheet.wires]);
 
   const tool = app.schTool;
-  const wireMode = tool === 'wire' || !!app.pendingPin;
+  const wireMode = tool === 'wire' || !!app.pendingPin || !!app.wireDraft;
   SCH_SNAP = app.schGrid;
   const placingSym = app.placing ? getSymbol(app.placing.symbolId) : null;
-  const ghostOrigin = placingSym ? snapComponentOrigin(placingSym, app.cursorWorld) : null;
-  const cursorSnap = gp(app.cursorWorld);
+  const ghostOrigin = placingSym ? snapComponentOrigin(placingSym, app.cursorWorld, app.placing?.rotation ?? 0, false, app.schGrid) : null;
+  const snapPins = useMemo(() => sheet.components.flatMap((c) => pinGeoms(c).map((g) => g.end)), [sheet.components]);
+  const snapWire = (raw: Vec, wires = sheet.wires) => wireSnap(raw, snapPins, wires, app.schGrid, Math.min(100, 10 / vp.k));
+  const electricalTool = wireMode || tool === 'label' || tool === 'junction';
+  const wireTarget = electricalTool ? snapWire(app.cursorWorld) : { point: gp(app.cursorWorld), attached: false };
+  const cursorSnap = electricalTool ? wireTarget.point : gp(app.cursorWorld);
+  const targetPin = wireTarget.attached ? sheet.components.flatMap(c => pinGeoms(c).map(g => ({ c, g }))).find(({ g }) => Math.hypot(g.end.x - cursorSnap.x, g.end.y - cursorSnap.y) < 0.5) : undefined;
+  const targetHint = targetPin ? `${targetPin.c.ref}.${targetPin.g.def.number} · ${targetPin.g.def.name}` : wireTarget.attached ? t('sch.assist.wire') : t('sch.assist.grid');
 
   const finishWireDraft = (end?: Vec) => {
     const d = app.wireDraft; if (!d) return;
@@ -164,7 +176,7 @@ export function SchematicCanvas() {
     if (view.panStart(e)) return;
     if (e.button !== 0) return;
     const raw = view.toWorld(e.clientX, e.clientY);
-    const p = gp(raw);
+    const p = electricalTool ? snapWire(raw).point : gp(raw);
     const now = Date.now(); const dbl = now - lastClick.current.t < 350 && Math.abs(e.clientX - lastClick.current.x) < 4 && Math.abs(e.clientY - lastClick.current.y) < 4; lastClick.current = { t: now, x: e.clientX, y: e.clientY };
     if (app.pasting) {
       const r = sch.pasteClipboard(editor.project, sheet.id, app.pasting.clip, p);
@@ -173,7 +185,7 @@ export function SchematicCanvas() {
       return;
     }
     if (app.placing && placingSym) {
-      const r = sch.placeComponent(editor.project, { sheetId: sheet.id, symbolId: app.placing.symbolId, center: raw, value: app.placing.value, footprint: app.placing.footprint, rotation: app.placing.rotation, props: app.placing.props });
+      const r = sch.placeComponent(editor.project, { sheetId: sheet.id, symbolId: app.placing.symbolId, center: raw, value: app.placing.value, footprint: app.placing.footprint, rotation: app.placing.rotation, grid: app.schGrid, props: app.placing.props });
       editor.dispatch(r.command);
       app.patch({ selection: [r.id] });
       if (placingSym.power) app.stopPlacing();
@@ -198,7 +210,7 @@ export function SchematicCanvas() {
       app.patch({ drawDraft: [...d, p] });
       return;
     }
-    if (tool === 'wire' || app.pendingPin) {
+    if (wireMode) {
       if (app.pendingPin) {
         const c = sheet.components.find((x) => x.id === app.pendingPin!.componentId); const g = c && findPin(c, app.pendingPin!.pin);
         if (g) app.patch({ wireDraft: dedupe(ortho(g.end, p)), pendingPin: null });
@@ -206,10 +218,10 @@ export function SchematicCanvas() {
       }
       const d = app.wireDraft;
       if (!d) { app.patch({ wireDraft: [p] }); return; }
-      if (dbl) { finishWireDraft(); return; }
+      if (dbl) { finishWireDraft(p); return; }
       const next = dedupe([...d, ...ortho(d[d.length - 1], p).slice(1)]);
       // 落在其他导线上 → 结束
-      const onWire = sheet.wires.some((w) => w.points.some((_, i) => i < w.points.length - 1 && pointOnSeg(p, w.points[i], w.points[i + 1], 0.5)));
+      const onWire = snapPins.some((pin) => Math.hypot(pin.x - p.x, pin.y - p.y) < 0.5) || sheet.wires.some((w) => w.points.some((_, i) => i < w.points.length - 1 && pointOnSeg(p, w.points[i], w.points[i + 1], 0.5)));
       if (onWire && next.length >= 2) { editor.dispatch(sch.addWire(sheet.id, next)); app.patch({ wireDraft: null }); return; }
       app.patch({ wireDraft: next });
       return;
@@ -231,7 +243,7 @@ export function SchematicCanvas() {
     if (d.kind === 'comp') {
       const c = cur.components.find((x) => x.id === d.id); if (!c) return;
       const sym = getSymbol(c.symbolId);
-      const origin = snapComponentOrigin(sym, { x: raw.x - d.dx + sym.width / 2, y: raw.y - d.dy + sym.height / 2 });
+      const origin = snapComponentOrigin(sym, { x: raw.x - d.dx + sym.width / 2, y: raw.y - d.dy + sym.height / 2 }, c.rotation, c.mirror, app.schGrid);
       if (origin.x !== c.x || origin.y !== c.y) {
         const ddx = origin.x - c.x, ddy = origin.y - c.y;
         const group = app.selection.includes(d.id) ? app.selection : [d.id];
@@ -242,7 +254,7 @@ export function SchematicCanvas() {
       }
     } else if (d.kind === 'wirePt') {
       const w = cur.wires.find((x) => x.id === d.id); if (!w) return;
-      const pts = [...w.points]; pts[d.index] = gp(raw);
+      const pts = [...w.points]; pts[d.index] = snapWire(raw, cur.wires.filter(other => other.id !== w.id)).point;
       editor.dispatch(sch.setWirePoints(sheet.id, d.id, pts));
     } else if (d.kind === 'wireSeg') {
       const a = d.orig[d.index], b = d.orig[d.index + 1];
@@ -254,8 +266,8 @@ export function SchematicCanvas() {
       editor.dispatch(sch.setWirePoints(sheet.id, d.id, pts));
     } else if (d.kind === 'label') {
       const l = cur.labels.find((x) => x.id === d.id); if (!l) return;
-      const nx = G(raw.x - d.dx), ny = G(raw.y - d.dy);
-      if (nx !== l.x || ny !== l.y) { editor.dispatch(sch.deleteLabels(sheet.id, [l.id])); editor.dispatch(sch.addLabel(sheet.id, l.text, { x: nx, y: ny })); }
+      const at = snapWire({ x: raw.x - d.dx, y: raw.y - d.dy }).point;
+      if (at.x !== l.x || at.y !== l.y) editor.dispatch(sch.updateLabel(sheet.id, l.id, at));
     } else if (d.kind === 'poly') {
       // 总线 / 线条整体平移（栅格对齐）
       const ox = G(raw.x - d.start.x), oy = G(raw.y - d.start.y);
@@ -300,7 +312,7 @@ export function SchematicCanvas() {
     const sel = e.shiftKey ? (app.selection.includes(id) ? app.selection.filter((x) => x !== id) : [...app.selection, id]) : app.selection.includes(id) ? app.selection : [id];
     app.patch({ selection: sel, rightTab: app.rightTab === 'lib' || app.rightTab === 'ai' ? app.rightTab : 'props', pendingPin: null, highlightNet: null });
   };
-  const beginDrag = (label: string, dr: Drag, e: RPE<SVGElement>) => { e.stopPropagation(); drag.current = dr; editor.begin(label); };
+  const beginDrag = (label: string, dr: Drag, e: RPE<SVGElement>) => { e.stopPropagation(); drag.current = dr; svgRef.current?.setPointerCapture?.(e.pointerId); editor.begin(label); };
   const editable = tool === 'select';
 
   const dblRef = useRef<{ t: number; id: string }>({ t: 0, id: '' });
@@ -347,9 +359,10 @@ export function SchematicCanvas() {
   };
   const onWireDown = (w: Wire) => (e: RPE<SVGElement>) => {
     if (e.button !== 0 || view.spaceDown) return;
-    if (tool === 'wire' || app.wireDraft) { // 从导线中段开始画新线
+    if (tool === 'wire' || app.wireDraft || app.pendingPin) { // 从导线中段开始画新线
       e.stopPropagation();
-      const p = gp(view.toWorld(e.clientX, e.clientY));
+      const p = snapWire(view.toWorld(e.clientX, e.clientY), [w]).point;
+      if (app.pendingPin) { const c = sheet.components.find((c) => c.id === app.pendingPin!.componentId); const g = c && findPin(c, app.pendingPin.pin); if (g) { const points = dedupe(previewRoute(g, p)); if (points.length >= 2) editor.dispatch(sch.addWire(sheet.id, points)); } app.patch({ pendingPin: null }); return; }
       if (app.wireDraft) finishWireDraft(p); else app.patch({ wireDraft: [p] });
       return;
     }
@@ -357,9 +370,9 @@ export function SchematicCanvas() {
     const p = view.toWorld(e.clientX, e.clientY);
     const wasSole = app.selection.length === 1 && app.selection[0] === w.id;
     // 单击导线：高亮它所在的整个网络（状态栏显示网络名）
-    const netOfWire = analysis.netlist.nets.find((n) => n.pins.some((pin) => w.points.some((pt) => Math.abs(pt.x - pin.pos.x) < 0.5 && Math.abs(pt.y - pin.pos.y) < 0.5))) ?? analysis.netlist.nets.find((n) => sheet.labels.some((l) => l.text === n.name && w.points.some((pt) => Math.abs(pt.x - l.x) < 0.5 && Math.abs(pt.y - l.y) < 0.5)));
-    if (netOfWire && !wasSole) setTimeout(() => app.set('highlightNet', netOfWire.name), 0);
     selectId(w.id, e);
+    const netOfWire = analysis.netlist.wireNet?.get(`${sheet.id}:${w.id}`);
+    if (netOfWire && !wasSole) app.set('highlightNet', netOfWire);
     if (wasSole) {
       let best = 0, bd = Infinity;
       for (let i = 0; i < w.points.length - 1; i++) { const dd = pointSegDist(p, w.points[i], w.points[i + 1]); if (dd < bd) { bd = dd; best = i; } }
@@ -368,9 +381,23 @@ export function SchematicCanvas() {
   };
   const onWirePtDown = (id: string, index: number) => (e: RPE<SVGElement>) => { if (e.button !== 0) return; beginDrag('移动顶点', { kind: 'wirePt', id, index }, e); };
   const onLabelDown = (id: string) => (e: RPE<SVGElement>) => {
+    if (e.button !== 0 || view.spaceDown) return;
+    const label = sheet.labels.find(l => l.id === id)!;
+    if (wireMode && !app.placing && !app.pasting) {
+      e.stopPropagation();
+      const at = { x: label.x, y: label.y };
+      if (app.pendingPin) {
+        const c = sheet.components.find(c => c.id === app.pendingPin!.componentId);
+        const g = c && findPin(c, app.pendingPin.pin);
+        if (g) { const points = dedupe(previewRoute(g, at)); if (points.length >= 2) editor.dispatch(sch.addWire(sheet.id, points)); }
+        app.patch({ pendingPin: null });
+      } else if (app.wireDraft) finishWireDraft(at);
+      else app.patch({ wireDraft: [at] });
+      return;
+    }
     if (e.button !== 0 || !editable) { if (e.button === 0) e.stopPropagation(); return; }
     const l = sheet.labels.find((x) => x.id === id)!; const p = view.toWorld(e.clientX, e.clientY);
-    if (isDbl(id)) { e.stopPropagation(); const v = prompt('网络标签', l.text); if (v !== null && v.trim() && v.trim() !== l.text) { editor.begin('重命名标签'); editor.dispatch(sch.deleteLabels(sheet.id, [l.id])); editor.dispatch(sch.addLabel(sheet.id, v.trim(), { x: l.x, y: l.y })); editor.commit(); } return; }
+    if (isDbl(id)) { e.stopPropagation(); const v = prompt('网络标签', l.text); if (v !== null && v.trim() && v.trim() !== l.text) editor.dispatch(sch.updateLabel(sheet.id, l.id, { text: v.trim() })); return; }
     selectId(id, e); beginDrag('移动标签', { kind: 'label', id, dx: p.x - l.x, dy: p.y - l.y }, e);
   };
   const onSimpleDown = (id: string) => (e: RPE<SVGElement>) => { if (e.button !== 0 || !editable) return; e.stopPropagation(); selectId(id, e); };
@@ -395,6 +422,9 @@ export function SchematicCanvas() {
     e.stopPropagation();
     if (app.placing || app.pasting) return;
     const c = sheet.components.find((x) => x.id === componentId); const g = c && findPin(c, pin);
+    if (tool === 'label' && g) { app.patch({ labelPrompt: g.end }); setLabelText(''); return; }
+    if (tool === 'junction' && g) { editor.dispatch(sch.addJunction(sheet.id, g.end)); return; }
+    if (e.altKey && c) { editor.dispatch(sch.toggleNoConnect(sheet.id, c.id, pin)); return; }
     if (app.wireDraft && g) { finishWireDraft(g.end); return; }
     if (app.busDraft) return;
     if (app.pendingPin) {
@@ -409,12 +439,15 @@ export function SchematicCanvas() {
   const pending = app.pendingPin ? (() => { const c = sheet.components.find((x) => x.id === app.pendingPin!.componentId); const g = c && findPin(c, app.pendingPin!.pin); return g ? previewRoute(g, cursorSnap) : null; })() : null;
   const step = gridStep(SCH_GRID, vp.k, 8);
   const gs = step * vp.k;
-  const ercMarks = analysis.erc.items.filter((i) => i.location && (!i.sheetId || i.sheetId === sheet.id));
-  const highlightPins = app.highlightNet ? analysis.netlist.nets.find((n) => n.name === app.highlightNet)?.pins ?? [] : [];
+  const ercMarks = analysis.erc.items.filter((i) => i.location && (!i.sheetId || i.sheetId === sheet.id) && (app.showSchCheckMarkers || app.checkHighlight === i.id));
   const cursor = app.placing || app.pasting ? 'copy' : wireMode || tool === 'label' || tool === 'bus' || tool === 'junction' || tool === 'draw' || tool === 'measure' ? 'crosshair' : view.panning ? 'grabbing' : view.spaceDown ? 'grab' : 'default';
   const labelScreen = app.labelPrompt ? view.toScreen(app.labelPrompt) : null;
   const textScreen = textPrompt ? view.toScreen(textPrompt.at) : null;
-  const submitLabel = () => { if (app.labelPrompt && labelText.trim()) editor.dispatch(sch.addLabel(sheet.id, labelText.trim(), app.labelPrompt)); app.patch({ labelPrompt: null }); };
+  const promptPosition = (at: Vec) => ({
+    left: Math.max(8, Math.min(at.x + 8, (svgRef.current?.clientWidth || 400) - 360)),
+    top: Math.max(8, Math.min(at.y - 40, (svgRef.current?.clientHeight || 500) - 96))
+  });
+  const submitLabel = () => { if (app.labelPrompt && labelText.trim()) editor.dispatch(sch.addLabel(sheet.id, labelText.trim(), app.labelPrompt, 'net', labelScope)); app.patch({ labelPrompt: null }); };
   const submitText = () => { if (textPrompt && textPrompt.value.trim()) editor.dispatch(sch.addGraphic(sheet.id, { kind: 'text', x: textPrompt.at.x, y: textPrompt.at.y, text: textPrompt.value.trim(), size: 120 })); setTextPrompt(null); };
   const selWire = app.selection.length === 1 ? sheet.wires.find((w) => w.id === app.selection[0]) : undefined;
   const hs = 8 / vp.k;
@@ -443,7 +476,7 @@ export function SchematicCanvas() {
           {(sheet.buses ?? []).map((b) => <path key={b.id} d={pathD(b.points)} stroke={app.selection.includes(b.id) ? '#E5B800' : '#2C5AA0'} strokeWidth={44} fill="none" strokeLinejoin="round" strokeLinecap="round" onPointerDown={onMovableDown(b.id)} style={{ cursor: editable ? 'move' : 'pointer' }} />)}
           {/* 导线 */}
           {sheet.wires.map((w) => {
-                        const inHl = app.highlightNet && highlightPins.some((p) => w.points.some((pt) => pt.x === p.pos.x && pt.y === p.pos.y));
+            const inHl = app.highlightNet && analysis.netlist.wireNet?.get(`${sheet.id}:${w.id}`) === app.highlightNet;
             const sel = app.selection.includes(w.id);
             return <g key={w.id} onPointerDown={onWireDown(w)} style={{ cursor: editable ? 'pointer' : undefined }}>
               {sel && <path d={pathD(w.points)} stroke="rgba(255,216,77,.55)" strokeWidth={70} fill="none" strokeLinejoin="round" strokeLinecap="round" />}
@@ -454,6 +487,7 @@ export function SchematicCanvas() {
           {autoJunctions.map((p, i) => <circle key={'aj' + i} cx={p.x} cy={p.y} r={35} fill={SCH_COLORS.junction} pointerEvents="none" />)}
           {sheet.junctions.map((j) => <circle key={j.id} cx={j.x} cy={j.y} r={app.selection.includes(j.id) ? 48 : 40} fill={app.selection.includes(j.id) ? '#E5B800' : SCH_COLORS.junction} onPointerDown={onMovableDown(j.id)} style={{ cursor: editable ? 'move' : 'pointer' }} />)}
           {/* 预览：引脚连线 / 自由画线 / 总线 / 图形 */}
+          {electricalTool && wireTarget.attached && <circle cx={wireTarget.point.x} cy={wireTarget.point.y} r={6 / vp.k} stroke="#3D8BFF" strokeWidth={1.5 / vp.k} fill="rgba(61,139,255,.15)" pointerEvents="none" />}
           {pending && <path d={pathD(pending)} stroke="#3D8BFF" strokeWidth={16} strokeDasharray="50 40" fill="none" pointerEvents="none" />}
           {app.wireDraft && <path d={pathD([...app.wireDraft, ...ortho(app.wireDraft[app.wireDraft.length - 1], cursorSnap).slice(1)])} stroke="#3D8BFF" strokeWidth={16} strokeDasharray="50 40" fill="none" pointerEvents="none" />}
           {app.busDraft && <path d={pathD([...app.busDraft, ...ortho(app.busDraft[app.busDraft.length - 1], cursorSnap).slice(1)])} stroke="#2C5AA0" strokeWidth={44} strokeDasharray="80 60" fill="none" opacity={0.7} pointerEvents="none" />}
@@ -464,13 +498,12 @@ export function SchematicCanvas() {
           {sheet.labels.map((l) => (
             <g key={l.id} onPointerDown={onLabelDown(l.id)} style={{ cursor: editable ? 'move' : 'pointer' }}>
               {/* 网络标签：普通网络红色纯文字；GND 类画地符号；电源类画端口圆 */}
-              {(() => { const lay = netLabelLayout(sheet, l, crossSheet); const sel = app.selection.includes(l.id); const tw = l.text.length * 62;
-                const hx = lay.text.anchor === 'middle' ? lay.text.x - tw / 2 - 20 : lay.text.anchor === 'end' ? lay.text.x - tw - 20 : lay.text.x - 20;
+              {(() => { const lay = netLabelLayout(sheet, l, crossSheet); const sel = app.selection.includes(l.id); const b = netLabelBounds(l, lay);
                 return <>
-                  <rect x={Math.min(hx, l.x - 160)} y={Math.min(lay.text.y - 110, l.y - 60, ...lay.lines.flat().map((q) => q.y - 30))} width={Math.max(hx + tw + 40, l.x + 160) - Math.min(hx, l.x - 160)} height={Math.max(lay.text.y + 40, l.y + 60, ...lay.lines.flat().map((q) => q.y + 30)) - Math.min(lay.text.y - 110, l.y - 60, ...lay.lines.flat().map((q) => q.y - 30))} rx={20} fill={sel ? 'rgba(255,216,77,.35)' : 'transparent'} stroke={sel ? '#E5B800' : 'none'} strokeWidth={12} />
+                  <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={20} fill={sel ? 'rgba(255,216,77,.35)' : 'transparent'} stroke={sel ? '#E5B800' : 'none'} strokeWidth={12} />
                   {lay.lines.map((ln, k) => <path key={k} d={ln.map((q, j) => `${j ? 'L' : 'M'}${q.x} ${q.y}`).join('')} stroke={SCH_COLORS.wire} strokeWidth={16} fill="none" strokeLinecap="round" />)}
                   {lay.circles.map((ci, k) => <circle key={'c' + k} cx={ci.c.x} cy={ci.c.y} r={ci.r} stroke={SCH_COLORS.wire} strokeWidth={16} fill={SCH_COLORS.fill} />)}
-                  <text x={lay.text.x} y={lay.text.y} fontSize={100} fontFamily={lay.glyph === 'text' ? "'JetBrains Mono',monospace" : undefined} fill={lay.glyph === 'text' ? SCH_COLORS.netLabel : SCH_COLORS.text} textAnchor={lay.text.anchor}>{l.text}</text>
+                  <text x={lay.text.x} y={lay.text.y} fontSize={lay.text.size ?? 100} transform={lay.text.rotation ? `rotate(${lay.text.rotation} ${lay.text.x} ${lay.text.y})` : undefined} fontFamily={lay.glyph === 'text' ? "'JetBrains Mono',monospace" : undefined} fill={lay.glyph === 'text' ? SCH_COLORS.netLabel : SCH_COLORS.text} textAnchor={lay.text.anchor}>{l.text}</text>
                 </>; })()}
             </g>
           ))}
@@ -488,10 +521,12 @@ export function SchematicCanvas() {
             </g>); })()}
           {/* ERC 标记 */}
           {ercMarks.map((m) => (
-            <g key={m.id} transform={`translate(${m.location!.x} ${m.location!.y})`} pointerEvents="none" opacity={app.checkHighlight && app.checkHighlight !== m.id ? 0.35 : 1}>
-              {app.checkHighlight === m.id && <circle r={220} fill={m.severity === 'error' ? 'rgba(255,59,48,.18)' : 'rgba(255,176,32,.18)'} className="drc-pulse" />}
-              <circle r={90} fill={m.severity === 'error' ? '#FF3B30' : '#FFB020'} opacity={0.9} />
-              <text y={40} fontSize={120} fontWeight={700} fill="#fff" textAnchor="middle">{m.severity === 'error' ? '!' : '?'}</text>
+            <g key={m.id} data-erc-marker={m.rule} transform={`translate(${m.location!.x} ${m.location!.y})`} pointerEvents={electricalTool || app.placing ? 'none' : undefined} style={{ cursor: 'pointer' }} onPointerDown={e => { e.stopPropagation(); locateItem(m, 'sch'); }} opacity={app.checkHighlight && app.checkHighlight !== m.id ? 0.35 : 1}>
+              <title>{translateText(`${m.message} · ${m.refs.join(' / ')} — ${m.why}`, locale)}</title>
+              {app.checkHighlight === m.id && <circle r={14 / vp.k} fill={m.severity === 'error' ? 'rgba(255,59,48,.12)' : 'rgba(255,176,32,.12)'} pointerEvents="none" />}
+              <line x1={0} y1={0} x2={8 / vp.k} y2={-8 / vp.k} stroke={m.severity === 'error' ? '#D93636' : '#B98117'} strokeWidth={0.8 / vp.k} pointerEvents="none" />
+              <circle cx={10 / vp.k} cy={-10 / vp.k} r={5 / vp.k} fill="#fffdf5" stroke={m.severity === 'error' ? '#D93636' : '#B98117'} strokeWidth={1.3 / vp.k} />
+              <text x={10 / vp.k} y={-7 / vp.k} fontSize={8 / vp.k} fontWeight={700} fill={m.severity === 'error' ? '#D93636' : '#966800'} textAnchor="middle">!</text>
             </g>
           ))}
           {/* 放置 / 粘贴 幽灵 */}
@@ -509,13 +544,14 @@ export function SchematicCanvas() {
         {marquee && (() => { const a = view.toScreen(marquee.a), b = view.toScreen(marquee.b); const ltr = marquee.b.x >= marquee.a.x; return <rect x={Math.min(a.x, b.x)} y={Math.min(a.y, b.y)} width={Math.abs(b.x - a.x)} height={Math.abs(b.y - a.y)} fill={ltr ? 'rgba(61,139,255,.12)' : 'rgba(52,199,89,.12)'} stroke={ltr ? '#3D8BFF' : '#34C759'} strokeWidth={1} strokeDasharray={ltr ? undefined : '4 3'} pointerEvents="none" />; })()}
       </svg>
       {labelScreen && app.labelPrompt && (
-        <div className="label-prompt" style={{ left: labelScreen.x + 8, top: labelScreen.y - 40 }} onPointerDown={(e) => e.stopPropagation()}>
+        <div className="label-prompt" style={promptPosition(labelScreen)} onPointerDown={(e) => e.stopPropagation()}>
           <input autoFocus value={labelText} placeholder="网络名，如 SDA" onChange={(e) => setLabelText(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') submitLabel(); if (e.key === 'Escape') app.patch({ labelPrompt: null }); }} />
+          <select aria-label={t('sch.scope.title')} value={labelScope} onChange={e => setLabelScope(e.target.value as 'local' | 'global')}><option value="local">{t('sch.scope.local')}</option><option value="global">{t('sch.scope.global')}</option></select>
           <button className="btn sm primary" onClick={submitLabel}>放置</button>
         </div>
       )}
       {textScreen && textPrompt && (
-        <div className="label-prompt" style={{ left: textScreen.x + 8, top: textScreen.y - 40 }} onPointerDown={(e) => e.stopPropagation()}>
+        <div className="label-prompt" style={promptPosition(textScreen)} onPointerDown={(e) => e.stopPropagation()}>
           <input autoFocus value={textPrompt.value} placeholder="注释文字" onChange={(e) => setTextPrompt({ ...textPrompt, value: e.target.value })} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') submitText(); if (e.key === 'Escape') setTextPrompt(null); }} />
           <button className="btn sm primary" onClick={submitText}>放置</button>
         </div>
@@ -528,7 +564,8 @@ export function SchematicCanvas() {
           {([['left', '左'], ['hcenter', '水平居中'], ['right', '右'], ['top', '上'], ['vcenter', '垂直居中'], ['bottom', '下'], ['hdist', '水平等距'], ['vdist', '垂直等距']] as const).map(([m, label]) => <button key={m} className="btn sm" onClick={() => editor.dispatch(sch.alignComponents(sheet.id, app.selection.filter((id) => sheet.components.some((c) => c.id === id)), m))}>{label}</button>)}
         </div>
       )}
-      <Hint space="sch" />
+      {electricalTool && !app.labelPrompt && <div className="sch-assist" data-no-translate><span className={wireTarget.attached ? 'attached' : ''}>{wireTarget.attached ? '●' : '＋'} {targetHint}</span><span>{t(wireMode ? 'sch.assist.draw' : 'sch.assist.attach')}</span></div>}
+      {!electricalTool && <Hint space="sch" />}
       {sheet.components.length === 0 && !app.placing && !app.pasting && (
         <div className="empty-state">
           <div style={{ color: '#6B6B6B' }}>空白图纸 · 从这里开始</div>

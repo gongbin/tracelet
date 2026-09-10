@@ -49,4 +49,4 @@ export const children = (list: SList, name: string): SList[] => list.filter((x):
 /** (name v1 v2 ...) 的值数组。 */
 export const values = (list: SList | undefined): SExpr[] => (list ? list.slice(1) : []);
 /** 是否含有裸符号 flag，如 (hide) 或 hide。 */
-export const hasFlag = (list: SList, flag: string): boolean => list.some((x) => x === flag || (isList(x) && x[0] === flag && x.length === 1));
+export const hasFlag = (list: SList, flag: string): boolean => list.some((x) => x === flag || (isList(x) && x[0] === flag && (x.length === 1 || x[1] === 'yes')));
