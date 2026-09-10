@@ -12,6 +12,7 @@ import { PartDetail, type PartDetailTarget } from '../components/PartDetail.js';
 import { usePartsStore, DEFAULT_PARTS_URL } from '../store/partsStore.js';
 import { useInventory, type InventoryItem } from '../store/inventory.js';
 import { downloadFile } from '../store/backup.js';
+import { useT } from '../i18n/index.js';
 
 const QUICK = [['R', '电阻', 'sym:R', '10kΩ', 'fp:R_0402'], ['C', '电容', 'sym:C', '100nF', 'fp:C_0402'], ['D', 'LED', 'sym:LED', '红 0603', 'fp:LED_0603'], ['●', '测试点（实心）', 'sym:TP', 'TestPoint', 'fp:TestPoint_Pad_D1.0mm'], ['○', '测试点（空心）', 'sym:TP_Open', 'TestPoint', 'fp:TestPoint_Pad_D1.0mm']] as const;
 type Tab = 'all' | 'project' | 'fav' | 'builtin' | 'inv';
@@ -29,6 +30,7 @@ const fpEntry = (f: FootprintDef, source: Entry['source']): Entry => ({ id: f.id
 const detailTarget = (e: Entry): PartDetailTarget => ({ name: e.name, maker: e.maker, kind: e.kind, category: e.part?.category, description: e.description, value: e.value, params: e.params, symbolId: e.symbolId, footprintId: e.footprintId, lcsc: e.part?.lcsc ?? e.inv?.lcsc, part: e.part, mpn: e.part?.mpn ?? e.name });
 
 export function LibraryPanel() {
+  const t = useT();
   const app = useApp();
   const project = useProject();
   const editor = useEditor();
@@ -92,7 +94,7 @@ export function LibraryPanel() {
   };
 
   return (
-    <div className="col" style={{ height: '100%', gap: 0, fontSize: 12 }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const fs = Array.from(e.dataTransfer.files); if (fs.length) void importFiles(fs); }}>
+    <div className="col library-panel" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const fs = Array.from(e.dataTransfer.files); if (fs.length) void importFiles(fs); }}>
       {app.placing && (
         <div className="row" style={{ margin: '10px 12px 0', padding: '8px 10px', borderRadius: 4, background: 'rgba(61,139,255,.14)', border: '1px solid rgba(61,139,255,.5)' }}>
           <span className="dot" style={{ width: 8, height: 8, background: 'var(--accent)' }} />正在放置 <b className="mono" style={{ fontWeight: 500 }}>{app.placing.partLabel ?? app.placing.value}</b> · 点击画布放置，可连续放置
@@ -105,7 +107,7 @@ export function LibraryPanel() {
           <span className="ml-auto muted mono" style={{ cursor: 'pointer' }} onClick={() => app.setPcbTool('select')}>Esc</span>
         </div>
       )}
-      <div className="col" style={{ padding: '12px 12px 0', gap: 10 }}>
+      <div className="col library-panel-controls">
         <div className="row field input-focus-ring" style={{ height: 32, padding: '0 10px' }}>
           <Icon d={I.search} size={14} stroke={2} color="var(--text-2)" />
           <input className="mono grow" style={{ background: 'transparent', border: 0, color: 'var(--text)' }} placeholder={onPcb ? '封装名 · 型号 · 关键字' : '型号 · 参数 · 关键字'} value={app.libQuery} autoFocus onChange={(e) => app.set('libQuery', e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && sel) primary(sel); if (e.key === 'Escape') (e.target as HTMLInputElement).blur(); }} />
@@ -129,9 +131,9 @@ export function LibraryPanel() {
             <input ref={csvRef} type="file" accept=".csv,text/csv" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const n = inventory.importCsv(await f.text()); app.toast(`已导入 / 更新 ${n} 条库存`, 'success'); } e.target.value = ''; }} />
           </div>
         )}
-        {tab !== 'project' && <div style={{ paddingBottom: 4 }}><CategoryFilter value={cat} onChange={setCat} /></div>}
+        {tab !== 'project' && <div style={{ paddingBottom: 4 }}><CategoryFilter value={cat} onChange={setCat} variant="select" /></div>}
       </div>
-      <div className="grow" style={{ overflow: 'auto', padding: 6 }}>
+      <div className="grow library-panel-results" role="region" aria-label={t('lib.title')} tabIndex={0}>
         {pg.shown.map((e) => (
           <div key={e.id} className={`part-row${sel?.id === e.id ? ' on' : ''}`} onClick={() => app.set('libSelected', e.id)} onDoubleClick={() => primary(e)}>
             <div className="part-thumb">{e.symbolId ? <SymbolThumb sym={getSymbol(e.symbolId)} /> : findFootprint(e.footprintId) ? <FootprintThumb fp={findFootprint(e.footprintId)!} size={30} /> : <span className="dim">▢</span>}</div>
@@ -155,7 +157,7 @@ export function LibraryPanel() {
         <div className="row dim xs" style={{ padding: '10px 8px 4px', gap: 6 }}><span style={{ color: 'var(--ai)' }}>✨</span>试试自然语言："能驱动 2A 电机的 H 桥"</div>
       </div>
       {sel && (
-        <div className="col" style={{ flex: 'none', borderTop: '1px solid var(--border)', padding: 12, gap: 10 }}>
+        <div className="col library-panel-preview">
           <div className="kicker">预览 · {sel.name}</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div style={{ height: 84, borderRadius: 4, background: 'var(--bg-canvas-sch)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{sel.symbolId ? <SymbolThumb sym={getSymbol(sel.symbolId)} size={70} /> : <span className="dim xs">{sel.inv ? '未指定符号' : '仅封装'}</span>}</div>
